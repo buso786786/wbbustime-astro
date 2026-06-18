@@ -1,0 +1,116 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout 
+	title="Rent Vehicle"
+	description="Find vehicles for rent in West Bengal. Cars, buses, toto, pickup vans, and ambulances with driver available."
+>
+	<section class="hero">
+		<div class="container">
+			<h1>Rent Vehicles in West Bengal</h1>
+			<p>Find cars, buses, toto, pickup vans, and ambulances with professional drivers</p>
+		</div>
+	</section>
+
+	<section>
+		<div class="container">
+			<div class="search-card">
+				<h3>Search Rental Vehicles</h3>
+				<form action="/rent-vehicle" method="get">
+					<div class="form-row">
+						<div class="form-group">
+							<label for="rent-city">City</label>
+							<input type="text" id="rent-city" name="city" placeholder="Enter city" required />
+						</div>
+						<div class="form-group">
+							<label for="rent-vehicle">Vehicle Type</label>
+							<select id="rent-vehicle" name="vehicle" required>
+								<option value="">Select vehicle</option>
+								<option value="car">Car</option>
+								<option value="bus">Bus</option>
+								<option value="toto">Toto</option>
+								<option value="pickup">Pickup Van</option>
+								<option value="ambulance">Ambulance</option>
+							</select>
+						</div>
+					</div>
+					<button type="submit" class="btn btn-full">Search Rent</button>
+				</form>
+			</div>
+
+			<div class="card mt-2">
+				<h3>About Vehicle Rental</h3>
+				<p>Our vehicle rental search feature is currently being developed. Soon you will be able to:</p>
+				<ul>
+					<li>Search for rental vehicles by city and vehicle type</li>
+					<li>View available vehicles with driver</li>
+					<li>Compare prices and features</li>
+					<li>Contact vehicle owners directly</li>
+					<li>Book vehicles for your travel needs</li>
+				</ul>
+				<p>We are working hard to bring you comprehensive vehicle rental options across West Bengal including cars for personal travel, buses for group tours, toto for local transport, pickup vans for goods transport, and ambulances for medical emergencies.</p>
+			</div>
+
+			<div class="section-title mt-3">
+				<h2>Vehicle Categories</h2>
+			</div>
+			<div class="grid grid-3">
+				<div class="popular-item">
+					<h4>Car</h4>
+					<p>Sedans, SUVs, and hatchbacks with driver for personal and family travel</p>
+				</div>
+				<div class="popular-item">
+					<h4>Bus</h4>
+					<p>Mini buses and full-size buses for group tours and events</p>
+				</div>
+				<div class="popular-item">
+					<h4>Toto</h4>
+					<p>Three-wheeler auto rickshaws for local short-distance travel</p>
+				</div>
+				<div class="popular-item">
+					<h4>Pickup Van</h4>
+					<p>Light commercial vehicles for goods transport and small moves</p>
+				</div>
+				<div class="popular-item">
+					<h4>Ambulance</h4>
+					<p>Medical transport vehicles with basic life support equipment</p>
+				</div>
+				<div class="popular-item">
+					<h4>Traveller</h4>
+					<p>Tempo travellers for medium-sized groups and corporate events</p>
+				</div>
+			</div>
+
+			<div class="section-title mt-3">
+				<h2>Popular Cities</h2>
+			</div>
+			<div class="grid grid-3">
+				<a href="/rent-vehicle?city=Kolkata" class="popular-item">
+					<h4>Kolkata</h4>
+					<p>State capital with maximum options</p>
+				</a>
+				<a href="/rent-vehicle?city=Siliguri" class="popular-item">
+					<h4>Siliguri</h4>
+					<p>Gateway to North Bengal</p>
+				</a>
+				<a href="/rent-vehicle?city=Durgapur" class="popular-item">
+					<h4>Durgapur</h4>
+					<p>Industrial hub of Bengal</p>
+				</a>
+				<a href="/rent-vehicle?city=Asansol" class="popular-item">
+					<h4>Asansol</h4>
+					<p>Major city in Bardhaman district</p>
+				</a>
+				<a href="/rent-vehicle?city=Burdwan" class="popular-item">
+					<h4>Burdwan</h4>
+					<p>Historical city and cultural center</p>
+				</a>
+				<a href="/rent-vehicle?city=Darjeeling" class="popular-item">
+					<h4>Darjeeling</h4>
+					<p>Hill station tourist destination</p>
+				</a>
+			</div>
+		</div>
+	</section>
+</BaseLayout>

@@ -22,3 +22,25 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Ignore accidentally copied app/runtime files
+Devin.exe
+Devin.VisualElementsManifest.xml
+LICENSES.chromium.html
+*.dll
+*.pak
+*.dat
+*.bin
+*.msg
+v8_context_snapshot.bin
+snapshot_blob.bin
+vk_swiftshader_icd.json
+vulkan-1.dll
+locales/
+policies/
+resources/
+tools/
+bin/
+unins000.exe
+unins000.dat
+unins000.msg

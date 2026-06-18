@@ -1,17 +1,187 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
 
+// Static demo stops - will be replaced by Supabase later
+const demoStops = [
+	{ en: "Tarakeswar", bn: "তারকেশ্বর" },
+	{ en: "Arambagh", bn: "আরামবাগ" },
+	{ en: "Digha", bn: "দীঘা" },
+	{ en: "Kolkata", bn: "কলকাতা" },
+	{ en: "Durgapur", bn: "দুর্গাপুর" },
+	{ en: "Bankura", bn: "বাঁকুড়া" }
+];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout
+	title="Home"
+	description="Find Bus Timetable & Rent Vehicles in West Bengal. Search local bus timings and find cars, buses, toto, pickup vans and ambulances with driver."
+>
+	<div class="debug-label">PAGE: HOME</div>
+	<section class="hero">
+		<div class="container">
+			<h1>Home - West Bengal Bus Timetable</h1>
+			<p>
+				<span class="lang-en">Search local bus timings and routes across West Bengal</span>
+				<span class="lang-bn">পশ্চিমবঙ্গ জুড়ে লোকাল বাসের সময় ও রুট খুঁজুন</span>
+			</p>
+		</div>
+	</section>
+
+	<section>
+		<div class="container">
+			<div class="search-card bus-search-main">
+				<h3>
+					<span class="lang-en">Search Bus</span>
+					<span class="lang-bn">বাস খুঁজুন</span>
+				</h3>
+				<form action="/bus-search" method="get">
+					<div class="form-row">
+						<div class="form-group">
+							<label for="bus-from">
+								<span class="lang-en">From</span>
+								<span class="lang-bn">কোথা থেকে</span>
+							</label>
+							<input type="text" id="bus-from" name="from" list="stop-suggestions" placeholder="Enter departure city" required />
+							<datalist id="stop-suggestions">
+								{demoStops.map(stop => (
+									<option value={stop.en}>{stop.en} / {stop.bn}</option>
+								))}
+							</datalist>
+						</div>
+						<div class="form-group">
+							<label for="bus-to">
+								<span class="lang-en">To</span>
+								<span class="lang-bn">কোথায় যাবেন</span>
+							</label>
+							<input type="text" id="bus-to" name="to" list="stop-suggestions" placeholder="Enter destination city" required />
+						</div>
+					</div>
+					<button type="submit" class="btn btn-full">
+						<span class="lang-en">Search Bus</span>
+						<span class="lang-bn">বাস খুঁজুন</span>
+					</button>
+				</form>
+			</div>
+		</div>
+	</section>
+
+	<section>
+		<div class="container">
+			<div class="rent-teaser">
+				<p class="lang-en">Looking for vehicle rental? <a href="/rent-vehicle">Find cars, buses, and more with driver</a></p>
+				<p class="lang-bn">গাড়ি ভাড়া খুঁজছেন? <a href="/rent-vehicle">ড্রাইভারসহ গাড়ি, বাস এবং আরও অনেক কিছু খুঁজুন</a></p>
+			</div>
+		</div>
+	</section>
+
+	<section>
+		<div class="container">
+			<div class="section-title">
+				<h2>
+					<span class="lang-en">Popular Bus Routes</span>
+					<span class="lang-bn">জনপ্রিয় বাস রুট</span>
+				</h2>
+				<p>
+					<span class="lang-en">Most searched bus routes in West Bengal</span>
+					<span class="lang-bn">পশ্চিমবঙ্গের সবচেয়ে বেশি খোঁজা বাস রুট</span>
+				</p>
+			</div>
+			<div class="grid grid-3">
+				<a href="/bus-search?from=Kolkata&to=Siliguri" class="popular-item">
+					<h4>
+						<span class="lang-en">Kolkata to Siliguri</span>
+						<span class="lang-bn">কলকাতা থেকে শিলিগুড়ি</span>
+					</h4>
+					<p>
+						<span class="lang-en">Daily bus service available</span>
+						<span class="lang-bn">প্রতিদিন বাস সার্ভিস আছে</span>
+					</p>
+				</a>
+				<a href="/bus-search?from=Kolkata&to=Durgapur" class="popular-item">
+					<h4>
+						<span class="lang-en">Kolkata to Durgapur</span>
+						<span class="lang-bn">কলকাতা থেকে দুর্গাপুর</span>
+					</h4>
+					<p>
+						<span class="lang-en">Frequent bus service</span>
+						<span class="lang-bn">ঘন ঘন বাস সার্ভিস</span>
+					</p>
+				</a>
+				<a href="/bus-search?from=Siliguri&to=Darjeeling" class="popular-item">
+					<h4>
+						<span class="lang-en">Siliguri to Darjeeling</span>
+						<span class="lang-bn">শিলিগুড়ি থেকে দার্জিলিং</span>
+					</h4>
+					<p>
+						<span class="lang-en">Hill route bus service</span>
+						<span class="lang-bn">পাহাড়ি রুট বাস সার্ভিস</span>
+					</p>
+				</a>
+				<a href="/bus-search?from=Kolkata&to=Asansol" class="popular-item">
+					<h4>
+						<span class="lang-en">Kolkata to Asansol</span>
+						<span class="lang-bn">কলকাতা থেকে আসানসোল</span>
+					</h4>
+					<p>
+						<span class="lang-en">Regular bus service</span>
+						<span class="lang-bn">নিয়মিত বাস সার্ভিস</span>
+					</p>
+				</a>
+				<a href="/bus-search?from=Durgapur&to=Asansol" class="popular-item">
+					<h4>
+						<span class="lang-en">Durgapur to Asansol</span>
+						<span class="lang-bn">দুর্গাপুর থেকে আসানসোল</span>
+					</h4>
+					<p>
+						<span class="lang-en">Short distance service</span>
+						<span class="lang-bn">ছোট দূরত্বের সার্ভিস</span>
+					</p>
+				</a>
+				<a href="/bus-search?from=Kolkata&to=Burdwan" class="popular-item">
+					<h4>
+						<span class="lang-en">Kolkata to Burdwan</span>
+						<span class="lang-bn">কলকাতা থেকে বর্ধমান</span>
+					</h4>
+					<p>
+						<span class="lang-en">Frequent connections</span>
+						<span class="lang-bn">ঘন ঘন সংযোগ</span>
+					</p>
+				</a>
+			</div>
+		</div>
+	</section>
+
+
+	<section>
+		<div class="container">
+			<div class="section-title">
+				<h2>
+					<span class="lang-en">About Sonia Buddy</span>
+					<span class="lang-bn">সোনিয়া বাডি সম্পর্কে</span>
+				</h2>
+			</div>
+			<div class="card">
+				<p class="lang-en">Sonia Buddy is your trusted platform for bus timetables and vehicle rental services in West Bengal. We help you find local bus timings and connect with vehicle rental providers including cars, buses, toto, pickup vans, and ambulances with professional drivers.</p>
+				<p class="lang-bn">সোনিয়া বাডি হল পশ্চিমবঙ্গে বাস টাইমটেবিল এবং গাড়ি ভাড়া সার্ভিসের জন্য আপনার বিশ্বস্ত প্ল্যাটফর্ম। আমরা আপনাকে লোকাল বাসের সময় খুঁজে পেতে এবং ড্রাইভারসহ গাড়ি, বাস, টোটো, পিকআপ ভ্যান এবং অ্যাম্বুলেন্স ভাড়া প্রদানকারীদের সাথে সংযোগ করতে সাহায্য করি।</p>
+				<p class="lang-en">Our mission is to make travel information accessible and help you find reliable transportation options across West Bengal. Whether you need to check bus schedules or rent a vehicle for your journey, Sonia Buddy is here to assist you.</p>
+				<p class="lang-bn">আমাদের লক্ষ্য হল ভ্রমণ তথ্য সহজলভ্য করা এবং পশ্চিমবঙ্গ জুড়ে নির্ভরযোগ্য পরিবহন বিকল্প খুঁজে পেতে আপনাকে সাহায্য করা। আপনার যাত্রার জন্য বাসের সময়সূচী চেক করতে হোক বা গাড়ি ভাড়া নিতে হোক, সোনিয়া বাডি আপনাকে সাহায্য করতে প্রস্তুত।</p>
+				<a href="/about" class="btn">
+					<span class="lang-en">Learn More</span>
+					<span class="lang-bn">আরও জানুন</span>
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "Organization",
+		"name": "Sonia Buddy",
+		"description": "West Bengal Bus Timetables & Vehicle Rental",
+		"url": "https://soniabuddy.com",
+		"logo": "https://soniabuddy.com/logo.png",
+		"sameAs": []
+	}
+	</script>
+</BaseLayout>

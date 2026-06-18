@@ -1,0 +1,220 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Test Route Finder">
+  <section>
+    <div class="container">
+      <div class="section-title">
+        <h1>Test Route Finder</h1>
+        <p>Test the Supabase Edge Function route-finder</p>
+      </div>
+
+      <div class="card">
+        <form id="test-form">
+          <div class="form-group">
+            <label for="from">From</label>
+            <input type="text" id="from" name="from" placeholder="e.g., Kolkata" />
+          </div>
+
+          <div class="form-group">
+            <label for="to">To</label>
+            <input type="text" id="to" name="to" placeholder="e.g., Durgapur" />
+          </div>
+
+          <button type="submit" class="btn">Test Search</button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="result-container">
+        <h2>Result</h2>
+        <div id="result-ui"></div>
+        <h3 style="margin-top: 2rem;">Raw JSON</h3>
+        <pre id="result-json"></pre>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import { findRoutes } from "../lib/routeFinder";
+
+  const form = document.getElementById("test-form");
+  const resultContainer = document.getElementById("result-container");
+  const resultUi = document.getElementById("result-ui");
+  const resultJson = document.getElementById("result-json");
+  const fromInput = document.getElementById("from");
+  const toInput = document.getElementById("to");
+
+  const params = new URLSearchParams(window.location.search);
+  const fromParam = params.get("from");
+  const toParam = params.get("to");
+
+  if (fromInput instanceof HTMLInputElement && fromParam) {
+    fromInput.value = fromParam;
+  }
+
+  if (toInput instanceof HTMLInputElement && toParam) {
+    toInput.value = toParam;
+  }
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    if (!(fromInput instanceof HTMLInputElement)) return;
+    if (!(toInput instanceof HTMLInputElement)) return;
+
+    const from = fromInput.value.trim();
+    const to = toInput.value.trim();
+
+    if (!from || !to) {
+      alert("Please enter both From and To values");
+      return;
+    }
+
+    if (resultContainer) resultContainer.classList.remove("hidden");
+    if (resultJson) resultJson.textContent = "Loading...";
+    if (resultUi) resultUi.innerHTML = "";
+
+    try {
+      const result = await findRoutes(from, to);
+
+      if (resultJson) {
+        resultJson.textContent = JSON.stringify(result, null, 2);
+      }
+
+      // Show UI based on response kind
+      if (resultUi) {
+        if (result.kind === "indirect" && result.data && result.data.options) {
+          const indirectOptions = result.data.options.slice(0, 2);
+          resultUi.innerHTML = `
+            <div style="text-align: center; padding: 2rem; margin-bottom: 2rem; background: #fff7ed; border-radius: 0.5rem;">
+              <h3 style="color: #f97316; margin-bottom: 0.5rem;">No direct bus found</h3>
+              <p style="color: #64748b; margin-bottom: 1.5rem;">Direct bus is not available for this route right now. You can try alternative indirect bus routes below.</p>
+              <a href="/rent-vehicle" class="btn" style="background: #f97316; color: white; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 0.375rem; display: inline-block; margin-bottom: 0.5rem;">
+                Find Rent Car / Cab
+              </a>
+              <p style="font-size: 0.875rem; color: #64748b;">Need faster travel? Book a car with driver.</p>
+            </div>
+            <h3 style="margin-bottom: 1rem;">Alternative indirect bus routes</h3>
+            ${indirectOptions.map((option: any) => `
+              <div class="bus-result-card" style="margin-bottom: 1rem;">
+                <div class="bus-info">
+                  <h4>Via ${option.midpoint || 'Midpoint'}</h4>
+                  <p class="bus-route-segment">
+                    Step 1: ${option.step1?.bus_name || 'Bus 1'} (${option.step1?.from || from} → ${option.step1?.to || option.midpoint})
+                  </p>
+                  <p class="bus-route-segment">
+                    ${option.step1?.departure || 'Time not available'} → ${option.step1?.arrival || 'Time not available'}
+                  </p>
+                  <p class="bus-route-segment">
+                    Step 2: ${option.step2?.bus_name || 'Bus 2'} (${option.step2?.from || option.midpoint} → ${option.step2?.to || to})
+                  </p>
+                  <p class="bus-route-segment">
+                    ${option.step2?.departure || 'Time not available'} → ${option.step2?.arrival || 'Time not available'}
+                  </p>
+                  ${option.waitMin ? `<p class="bus-reg">Wait: ${option.waitMin} min</p>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          `;
+        } else if (result.kind === "none") {
+          resultUi.innerHTML = `
+            <div style="text-align: center; padding: 2rem; background: #fff7ed; border-radius: 0.5rem;">
+              <h3 style="color: #f97316; margin-bottom: 0.5rem;">No bus route found</h3>
+              <p style="color: #64748b; margin-bottom: 1.5rem;">We couldn't find any bus route for this search.</p>
+              <a href="/rent-vehicle" class="btn" style="background: #f97316; color: white; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 0.375rem; display: inline-block; margin-bottom: 0.5rem;">
+                Find Rent Car / Cab
+              </a>
+              <p style="font-size: 0.875rem; color: #64748b;">Need faster travel? Book a car with driver.</p>
+            </div>
+          `;
+        } else if (result.kind === "direct" && result.direct && result.direct.length > 0) {
+          resultUi.innerHTML = `
+            <p style="color: #22c55e; font-weight: 500;">Found ${result.direct.length} direct bus(es)</p>
+            ${result.direct.map((bus: any) => `
+              <div class="bus-result-card" style="margin-bottom: 1rem;">
+                <div class="bus-info">
+                  <h4>${bus.name}</h4>
+                  <p class="bus-reg">${bus.reg_number || ''}</p>
+                  <p class="bus-route-full">${bus.full_route || from + ' → ' + to}</p>
+                  <p class="bus-route-segment">Your Search: ${from} → ${to}</p>
+                  <div class="bus-timing-row">
+                    <div class="timing-item">
+                      <span class="timing-label">Departure</span>
+                      <span class="timing-value">${bus.departure || '--:--'}</span>
+                    </div>
+                    <div class="timing-item">
+                      <span class="timing-label">Arrival</span>
+                      <span class="timing-value">${bus.arrival || '--:--'}</span>
+                    </div>
+                    <div class="timing-item">
+                      <span class="timing-label">Fare</span>
+                      <span class="timing-value">${bus.fare || '--'}</span>
+                    </div>
+                    <div class="timing-item">
+                      <span class="timing-label">Duration</span>
+                      <span class="timing-value">${bus.duration || '--'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          `;
+        } else if (result.kind === "error") {
+          resultUi.innerHTML = `
+            <div style="text-align: center; padding: 2rem; background: #fef2f2; border-radius: 0.5rem;">
+              <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Error</h3>
+              <p style="color: #64748b;">Status: ${result.status}</p>
+              <p style="color: #64748b;">${result.statusText}</p>
+              <p style="color: #64748b; font-size: 0.875rem;">${result.responseText}</p>
+            </div>
+          `;
+        } else {
+          resultUi.innerHTML = `<p style="color: #64748b;">Unknown response format</p>`;
+        }
+      }
+    } catch (error) {
+      console.error("route-finder test error:", error);
+
+      if (resultJson) {
+        resultJson.textContent = JSON.stringify(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : null,
+          },
+          null,
+          2,
+        );
+      }
+
+      if (resultUi) {
+        resultUi.innerHTML = `
+          <div style="text-align: center; padding: 2rem; background: #fef2f2; border-radius: 0.5rem;">
+            <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Error</h3>
+            <p style="color: #64748b;">${error instanceof Error ? error.message : String(error)}</p>
+          </div>
+        `;
+      }
+    }
+  });
+</script>
+
+<style>
+  #result-container {
+    margin-top: 2rem;
+  }
+
+  #result-container.hidden {
+    display: none;
+  }
+
+  #result-json {
+    background: #f1f5f9;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.875rem;
+    min-height: 40px;
+  }
+</style>
