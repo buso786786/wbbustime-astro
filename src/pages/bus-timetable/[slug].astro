@@ -3,11 +3,22 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
 export async function getStaticPaths() {
 	return [
-		{ params: { slug: 'tarakeswar-to-digha' } }
+		{ params: { slug: 'tarakeswar-to-digha' } },
+		{ params: { slug: 'result' } }
 	];
 }
 
 const { slug } = Astro.params;
+
+// Check if this is the result page
+const isResultPage = slug === 'result';
+
+// Read query params for result page
+const url = new URL(Astro.request.url);
+const busId = url.searchParams.get('bus_id') || '';
+const busName = url.searchParams.get('bus_name') || '';
+const from = url.searchParams.get('from') || '';
+const to = url.searchParams.get('to') || '';
 
 // Static demo route data - database-ready structure
 const routeData = {
@@ -123,243 +134,274 @@ const routeData = {
 	]
 };
 
-const routeTitle = routeData.seo_title_en;
+const routeTitle = isResultPage ? 'Bus Timetable' : routeData.seo_title_en;
+const routeDescription = isResultPage ? 'View bus timetable details.' : routeData.seo_description_en;
 const canonical = `/bus-timetable/${slug}/`;
 ---
 
 <BaseLayout
 	title={routeTitle}
-	description={routeData.seo_description_en}
+	description={routeDescription}
 	canonical={canonical}
 >
 	<div class="debug-label">PAGE: TIMETABLE</div>
-	<section class="hero">
-		<div class="container">
-			<h1>Tarakeswar to Digha Bus Timetable</h1>
-		</div>
-	</section>
+	{isResultPage ? (
+		<section class="hero">
+			<div class="container">
+				<h1>Bus Timetable</h1>
+			</div>
+		</section>
+	) : (
+		<section class="hero">
+			<div class="container">
+				<h1>Tarakeswar to Digha Bus Timetable</h1>
+			</div>
+		</section>
+	)}
 
-	<section>
-		<div class="container">
-			<div class="route-summary">
-				<div class="summary-item">
-					<span class="summary-label">
-						<span class="lang-en">Source</span>
-						<span class="lang-bn">উৎস</span>
-					</span>
-					<span class="summary-value">
-						<span class="lang-en">{routeData.source_name_en}</span>
-						<span class="lang-bn">{routeData.source_name_bn}</span>
-					</span>
-				</div>
-				<div class="summary-item">
-					<span class="summary-label">
-						<span class="lang-en">Destination</span>
-						<span class="lang-bn">গন্তব্য</span>
-					</span>
-					<span class="summary-value">
-						<span class="lang-en">{routeData.destination_name_en}</span>
-						<span class="lang-bn">{routeData.destination_name_bn}</span>
-					</span>
-				</div>
-				<div class="summary-item">
-					<span class="summary-label">
-						<span class="lang-en">Distance</span>
-						<span class="lang-bn">দূরত্ব</span>
-					</span>
-					<span class="summary-value">{routeData.distance_text}</span>
-				</div>
-				<div class="summary-item">
-					<span class="summary-label">
-						<span class="lang-en">Duration</span>
-						<span class="lang-bn">সময়কাল</span>
-					</span>
-					<span class="summary-value">{routeData.duration_text}</span>
-				</div>
-				<div class="summary-item">
-					<span class="summary-label">
-						<span class="lang-en">Fare</span>
-						<span class="lang-bn">ভাড়া</span>
-					</span>
-					<span class="summary-value">₹{routeData.fare_min} - ₹{routeData.fare_max}</span>
+	{isResultPage ? (
+		<section>
+			<div class="container">
+				<div class="card" style="text-align: center; padding: 2rem;">
+					<h3 style="margin-bottom: 1rem;">Selected Bus</h3>
+
+<p id="result-bus-name" style="font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem;">
+	Selected bus
+</p>
+
+<p id="result-route" style="color: #64748b; margin-bottom: 0.5rem;"></p>
+
+<p id="result-bus-id" style="color: #64748b; margin-bottom: 1.5rem; font-size: 0.875rem;"></p>
+
+<p style="color: #64748b;">Detailed stop timetable will be connected here.</p>
 				</div>
 			</div>
-		</div>
-	</section>
-
-	<section>
-		<div class="container">
-			<div class="bus-summary-header">
-				<p class="selected-bus-text">Selected Bus: <span id="selected-bus-name">{routeData.buses[0].name}</span></p>
-				<p class="search-segment-text" id="search-segment-container" class="hidden">
-					Search Segment: <span id="search-segment-from"></span> → <span id="search-segment-to"></span> |
-					Direction: <span id="search-direction"></span>
-				</p>
-			</div>
-			<div class="bus-card">
-				<div class="bus-photo">
-					<span class="bus-photo-emoji">🚌</span>
+		</section>
+	) : (
+		<section>
+			<div class="container">
+				<div class="route-summary">
+					<div class="summary-item">
+						<span class="summary-label">
+							<span class="lang-en">Source</span>
+							<span class="lang-bn">উৎস</span>
+						</span>
+						<span class="summary-value">
+							<span class="lang-en">{routeData.source_name_en}</span>
+							<span class="lang-bn">{routeData.source_name_bn}</span>
+						</span>
+					</div>
+					<div class="summary-item">
+						<span class="summary-label">
+							<span class="lang-en">Destination</span>
+							<span class="lang-bn">গন্তব্য</span>
+						</span>
+						<span class="summary-value">
+							<span class="lang-en">{routeData.destination_name_en}</span>
+							<span class="lang-bn">{routeData.destination_name_bn}</span>
+						</span>
+					</div>
+					<div class="summary-item">
+						<span class="summary-label">
+							<span class="lang-en">Distance</span>
+							<span class="lang-bn">দূরত্ব</span>
+						</span>
+						<span class="summary-value">{routeData.distance_text}</span>
+					</div>
+					<div class="summary-item">
+						<span class="summary-label">
+							<span class="lang-en">Duration</span>
+							<span class="lang-bn">সময়কাল</span>
+						</span>
+						<span class="summary-value">{routeData.duration_text}</span>
+					</div>
+					<div class="summary-item">
+						<span class="summary-label">
+							<span class="lang-en">Fare</span>
+							<span class="lang-bn">ভাড়া</span>
+						</span>
+						<span class="summary-value">₹{routeData.fare_min} - ₹{routeData.fare_max}</span>
+					</div>
 				</div>
-				<div class="bus-info">
-					<h3 id="bus-name">{routeData.buses[0].name}</h3>
-					<p class="bus-reg" id="bus-reg">{routeData.buses[0].reg_number}</p>
-					<p class="bus-route">
-						{routeData.source_name_en} → {routeData.destination_name_en}
+			</div>
+		</section>
+	)}
+
+	{!isResultPage && (
+		<>
+		<section>
+			<div class="container">
+				<div class="bus-summary-header">
+					<p class="selected-bus-text">Selected Bus: <span id="selected-bus-name">{routeData.buses[0].name}</span></p>
+					<p class="search-segment-text" id="search-segment-container" class="hidden">
+						Search Segment: <span id="search-segment-from"></span> → <span id="search-segment-to"></span> |
+						Direction: <span id="search-direction"></span>
 					</p>
-					<div class="bus-timing-row">
-						<div class="timing-item">
-							<span class="timing-label">Departure</span>
-							<span class="timing-value" id="bus-departure">{routeData.buses[0].departure}</span>
-						</div>
-						<div class="timing-item">
-							<span class="timing-label">Arrival</span>
-							<span class="timing-value" id="bus-arrival">{routeData.buses[0].arrival}</span>
-						</div>
-						<div class="timing-item">
-							<span class="timing-label">Fare</span>
-							<span class="timing-value" id="bus-fare">{routeData.buses[0].fare}</span>
-						</div>
-						<div class="timing-item">
-							<span class="timing-label">Duration</span>
-							<span class="timing-value" id="bus-duration">{routeData.buses[0].duration}</span>
+				</div>
+				<div class="bus-card">
+					<div class="bus-photo">
+						<span class="bus-photo-emoji">🚌</span>
+					</div>
+					<div class="bus-info">
+						<h3 id="bus-name">{routeData.buses[0].name}</h3>
+						<p class="bus-reg" id="bus-reg">{routeData.buses[0].reg_number}</p>
+						<p class="bus-route">
+							{routeData.source_name_en} → {routeData.destination_name_en}
+						</p>
+						<div class="bus-timing-row">
+							<div class="timing-item">
+								<span class="timing-label">Departure</span>
+								<span class="timing-value" id="bus-departure">{routeData.buses[0].departure}</span>
+							</div>
+							<div class="timing-item">
+								<span class="timing-label">Arrival</span>
+								<span class="timing-value" id="bus-arrival">{routeData.buses[0].arrival}</span>
+							</div>
+							<div class="timing-item">
+								<span class="timing-label">Fare</span>
+								<span class="timing-value" id="bus-fare">{routeData.buses[0].fare}</span>
+							</div>
+							<div class="timing-item">
+								<span class="timing-label">Duration</span>
+								<span class="timing-value" id="bus-duration">{routeData.buses[0].duration}</span>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	</section>
+		</section>
 
-	<section>
-		<div class="container">
-			<a href="/bus-search" class="back-link">← Back to Bus Search</a>
-		</div>
-	</section>
+		<section>
+			<div class="container">
+				<a href="/bus-search" class="back-link">← Back to Bus Search</a>
+			</div>
+		</section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>Select Bus</h2>
+		<section>
+			<div class="container">
+				<div class="section-title">
+					<h2>Select Bus</h2>
+				</div>
+				<div class="bus-selection">
+					{routeData.buses.map((bus: any) => (
+						<a href={`/bus-timetable/${slug}/?bus=${bus.slug}`} class="bus-select-btn" data-bus-slug={bus.slug}>
+							{bus.name}
+						</a>
+					))}
+				</div>
 			</div>
-			<div class="bus-selection">
-				{routeData.buses.map((bus: any) => (
-					<a href={`/bus-timetable/${slug}/?bus=${bus.slug}`} class="bus-select-btn" data-bus-slug={bus.slug}>
-						{bus.name}
-					</a>
-				))}
-			</div>
-		</div>
-	</section>
+		</section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>Full Stops Timetable</h2>
-			</div>
-			<div class="timetable-table">
-				<table>
-					<thead>
-						<tr>
-							<th>Stop No</th>
-							<th>Stop Name</th>
-							<th>Up Time</th>
-							<th>Down Time</th>
-						</tr>
-					</thead>
-					<tbody>
-						{routeData.stops.map((stop, index) => (
-							<tr id={`stop-row-${index}`}>
-								<td>{index + 1}</td>
-								<td>{stop.name_en}</td>
-								<td id={`stop-up-${index}`}>{stop.up_time}</td>
-								<td id={`stop-down-${index}`}>{stop.down_time}</td>
+		<section>
+			<div class="container">
+				<div class="section-title">
+					<h2>Full Stops Timetable</h2>
+				</div>
+				<div class="timetable-table">
+					<table>
+						<thead>
+							<tr>
+								<th>Stop No</th>
+								<th>Stop Name</th>
+								<th>Up Time</th>
+								<th>Down Time</th>
 							</tr>
-						))}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{routeData.stops.map((stop, index) => (
+								<tr id={`stop-row-${index}`}>
+									<td>{index + 1}</td>
+									<td>{stop.name_en}</td>
+									<td id={`stop-up-${index}`}>{stop.up_time}</td>
+									<td id={`stop-down-${index}`}>{stop.down_time}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
 			</div>
-		</div>
-	</section>
+		</section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>Travel Guide</h2>
+		<section>
+			<div class="container">
+				<div class="section-title">
+					<h2>Travel Guide</h2>
+				</div>
+				<div class="card">
+					<p>{routeData.travel_guide_en}</p>
+				</div>
 			</div>
-			<div class="card">
-				<p>{routeData.travel_guide_en}</p>
-			</div>
-		</div>
-	</section>
+		</section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>Fare Information</h2>
+		<section>
+			<div class="container">
+				<div class="section-title">
+					<h2>Fare Information</h2>
+				</div>
+				<div class="card">
+					<p>Fare Range: ₹{routeData.fare_min} - ₹{routeData.fare_max}</p>
+				</div>
 			</div>
-			<div class="card">
-				<p>Fare Range: ₹{routeData.fare_min} - ₹{routeData.fare_max}</p>
+		</section>
+
+		<section>
+			<div class="container">
+				<div class="section-title">
+					<h2>FAQ</h2>
+				</div>
+				<div class="faq-list">
+					{routeData.faq_items.map(faq => (
+						<div class="faq-item">
+							<h3>{faq.question_en}</h3>
+							<p>{faq.answer_en}</p>
+						</div>
+					))}
+				</div>
 			</div>
-		</div>
-	</section>
+		</section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>FAQ</h2>
-			</div>
-			<div class="faq-list">
-				{routeData.faq_items.map(faq => (
-					<div class="faq-item">
-						<h3>{faq.question_en}</h3>
-						<p>{faq.answer_en}</p>
-					</div>
-				))}
-			</div>
-		</div>
-	</section>
+		<script type="application/ld+json" set:html={JSON.stringify({
+			"@context": "https://schema.org",
+			"@type": "BreadcrumbList",
+			"itemListElement": [
+				{
+					"@type": "ListItem",
+					"position": 1,
+					"name": "Home",
+					"item": "https://soniabuddy.com"
+				},
+				{
+					"@type": "ListItem",
+					"position": 2,
+					"name": "Bus Search",
+					"item": "https://soniabuddy.com/bus-search"
+				},
+				{
+					"@type": "ListItem",
+					"position": 3,
+					"name": routeTitle,
+					"item": `https://soniabuddy.com${canonical}`
+				}
+			]
+		})}>
+		</script>
 
-	<script type="application/ld+json" set:html={JSON.stringify({
-		"@context": "https://schema.org",
-		"@type": "BreadcrumbList",
-		"itemListElement": [
-			{
-				"@type": "ListItem",
-				"position": 1,
-				"name": "Home",
-				"item": "https://soniabuddy.com"
-			},
-			{
-				"@type": "ListItem",
-				"position": 2,
-				"name": "Bus Search",
-				"item": "https://soniabuddy.com/bus-search"
-			},
-			{
-				"@type": "ListItem",
-				"position": 3,
-				"name": routeTitle,
-				"item": `https://soniabuddy.com${canonical}`
-			}
-		]
-	})}>
-	</script>
+		<script type="application/ld+json" set:html={JSON.stringify({
+			"@context": "https://schema.org",
+			"@type": "FAQPage",
+			"mainEntity": routeData.faq_items.map(faq => ({
+				"@type": "Question",
+				"name": faq.question_en,
+				"acceptedAnswer": {
+					"@type": "Answer",
+					"text": faq.answer_en
+				}
+			}))
+		})}>
+		</script>
 
-	<script type="application/ld+json" set:html={JSON.stringify({
-		"@context": "https://schema.org",
-		"@type": "FAQPage",
-		"mainEntity": routeData.faq_items.map(faq => ({
-			"@type": "Question",
-			"name": faq.question_en,
-			"acceptedAnswer": {
-				"@type": "Answer",
-				"text": faq.answer_en
-			}
-		}))
-	})}>
-	</script>
-
-<script>
-	(function() {
+		<script>
+		(function() {
 		const buses = [
 			{
 				slug: "tarakeswar-express",
@@ -530,4 +572,32 @@ const canonical = `/bus-timetable/${slug}/`;
 		}
 	})();
 </script>
+		</>
+	)}
+	{isResultPage && (
+	<script>
+		const params = new URLSearchParams(window.location.search);
+
+		const busId = params.get("bus_id") || "";
+		const busName = params.get("bus_name") || params.get("busName") || "";
+		const from = params.get("from") || "";
+		const to = params.get("to") || "";
+
+		const busNameEl = document.getElementById("result-bus-name");
+		const routeEl = document.getElementById("result-route");
+		const busIdEl = document.getElementById("result-bus-id");
+
+		if (busNameEl) {
+			busNameEl.textContent = busName || "Selected bus";
+		}
+
+		if (routeEl) {
+			routeEl.textContent = from && to ? `${from} → ${to}` : "";
+		}
+
+		if (busIdEl) {
+			busIdEl.textContent = busId ? `Bus ID: ${busId}` : "";
+		}
+	</script>
+)}
 </BaseLayout>
