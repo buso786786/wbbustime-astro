@@ -1,0 +1,146 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Static route data array with 10 demo routes
+const routes = [
+	{
+		slug: "arambagh-to-bandar",
+		from_en: "Arambagh",
+		from_bn: "আরামবাগ",
+		to_en: "Bandar",
+		to_bn: "বাঁদর",
+		distance: "45 km",
+		duration: "1h 30m",
+		fare_min: 50,
+		fare_max: 70
+	},
+	{
+		slug: "kolkata-to-durgapur",
+		from_en: "Kolkata",
+		from_bn: "কলকাতা",
+		to_en: "Durgapur",
+		to_bn: "দুর্গাপুর",
+		distance: "160 km",
+		duration: "3h 30m",
+		fare_min: 120,
+		fare_max: 180
+	},
+	{
+		slug: "kolkata-to-siliguri",
+		from_en: "Kolkata",
+		from_bn: "কলকাতা",
+		to_en: "Siliguri",
+		to_bn: "শিলিগুড়ি",
+		distance: "560 km",
+		duration: "10h 30m",
+		fare_min: 450,
+		fare_max: 650
+	},
+	{
+		slug: "kolkata-to-asansol",
+		from_en: "Kolkata",
+		from_bn: "কলকাতা",
+		to_en: "Asansol",
+		to_bn: "আসানসোল",
+		distance: "200 km",
+		duration: "4h 00m",
+		fare_min: 150,
+		fare_max: 220
+	},
+	{
+		slug: "bankura-to-asansol",
+		from_en: "Bankura",
+		from_bn: "বাঁকুড়া",
+		to_en: "Asansol",
+		to_bn: "আসানসোল",
+		distance: "60 km",
+		duration: "1h 45m",
+		fare_min: 60,
+		fare_max: 90
+	},
+	{
+		slug: "durgapur-to-asansol",
+		from_en: "Durgapur",
+		from_bn: "দুর্গাপুর",
+		to_en: "Asansol",
+		to_bn: "আসানসোল",
+		distance: "40 km",
+		duration: "1h 15m",
+		fare_min: 40,
+		fare_max: 60
+	},
+	{
+		slug: "tarakeswar-to-digha",
+		from_en: "Tarakeswar",
+		from_bn: "তারকেশ্বর",
+		to_en: "Digha",
+		to_bn: "দীঘা",
+		distance: "185 km",
+		duration: "4h 15m",
+		fare_min: 150,
+		fare_max: 180
+	},
+	{
+		slug: "howrah-to-tarakeswar",
+		from_en: "Howrah",
+		from_bn: "হাওড়া",
+		to_en: "Tarakeswar",
+		to_bn: "তারকেশ্বর",
+		distance: "70 km",
+		duration: "2h 00m",
+		fare_min: 70,
+		fare_max: 100
+	},
+	{
+		slug: "mecheda-to-digha",
+		from_en: "Mecheda",
+		from_bn: "মেছেদা",
+		to_en: "Digha",
+		to_bn: "দীঘা",
+		distance: "120 km",
+		duration: "2h 45m",
+		fare_min: 100,
+		fare_max: 140
+	},
+	{
+		slug: "kolkata-to-contai",
+		from_en: "Kolkata",
+		from_bn: "কলকাতা",
+		to_en: "Contai",
+		to_bn: "কাঁথি",
+		distance: "140 km",
+		duration: "3h 15m",
+		fare_min: 110,
+		fare_max: 160
+	}
+];
+---
+
+<BaseLayout
+	title="All Bus Routes - West Bengal Bus Timetable"
+	description="Complete list of all bus routes in West Bengal. View timetables, fares, and schedules for all major routes."
+>
+	<div class="debug-label">PAGE: ALL ROUTES</div>
+	<section class="hero">
+		<div class="container">
+			<h1>All Bus Routes</h1>
+			<p>Complete list of all bus routes in West Bengal with timetables, fares, and schedules.</p>
+		</div>
+	</section>
+
+	<section>
+		<div class="container">
+			<div class="section-title">
+				<h2>Available Routes</h2>
+			</div>
+			<div class="grid grid-3">
+				{routes.map(route => (
+					<a href={`/bus-timetable/${route.slug}/`} class="popular-item">
+						<h4>{route.from_en} to {route.to_en}</h4>
+						<p>{route.distance} • {route.duration} • ₹{route.fare_min} - ₹{route.fare_max}</p>
+					</a>
+				))}
+			</div>
+		</div>
+	</section>
+</BaseLayout>

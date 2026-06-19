@@ -1,116 +1,362 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout 
-	title="Rent Vehicle"
-	description="Find vehicles for rent in West Bengal. Cars, buses, toto, pickup vans, and ambulances with driver available."
+<BaseLayout
+  title="Rent with Driver in West Bengal"
+  description="Find car, bus, toto, pickup van and ambulance rental with driver in West Bengal."
 >
-	<section class="hero">
-		<div class="container">
-			<h1>Rent Vehicles in West Bengal</h1>
-			<p>Find cars, buses, toto, pickup vans, and ambulances with professional drivers</p>
-		</div>
-	</section>
+  <div class="debug-label">PAGE: RENT VEHICLE</div>
 
-	<section>
-		<div class="container">
-			<div class="search-card">
-				<h3>Search Rental Vehicles</h3>
-				<form action="/rent-vehicle" method="get">
-					<div class="form-row">
-						<div class="form-group">
-							<label for="rent-city">City</label>
-							<input type="text" id="rent-city" name="city" placeholder="Enter city" required />
-						</div>
-						<div class="form-group">
-							<label for="rent-vehicle">Vehicle Type</label>
-							<select id="rent-vehicle" name="vehicle" required>
-								<option value="">Select vehicle</option>
-								<option value="car">Car</option>
-								<option value="bus">Bus</option>
-								<option value="toto">Toto</option>
-								<option value="pickup">Pickup Van</option>
-								<option value="ambulance">Ambulance</option>
-							</select>
-						</div>
-					</div>
-					<button type="submit" class="btn btn-full">Search Rent</button>
-				</form>
-			</div>
+  <section class="rent-page">
+    <div class="container rent-container">
+      <div class="rent-hero-card">
+        <div>
+          <div class="rent-icon">🚗</div>
+          <h1>Rent with Driver</h1>
+          <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
+        </div>
 
-			<div class="card mt-2">
-				<h3>About Vehicle Rental</h3>
-				<p>Our vehicle rental search feature is currently being developed. Soon you will be able to:</p>
-				<ul>
-					<li>Search for rental vehicles by city and vehicle type</li>
-					<li>View available vehicles with driver</li>
-					<li>Compare prices and features</li>
-					<li>Contact vehicle owners directly</li>
-					<li>Book vehicles for your travel needs</li>
-				</ul>
-				<p>We are working hard to bring you comprehensive vehicle rental options across West Bengal including cars for personal travel, buses for group tours, toto for local transport, pickup vans for goods transport, and ambulances for medical emergencies.</p>
-			</div>
+        <div class="rent-actions">
+          <a href="/rent-vehicle?tab=find" id="find-tab" class="rent-tab active">Find Rent</a>
+          <a href="/rent-vehicle?tab=create" id="create-tab" class="rent-tab">Create Listing</a>
+        </div>
+      </div>
 
-			<div class="section-title mt-3">
-				<h2>Vehicle Categories</h2>
-			</div>
-			<div class="grid grid-3">
-				<div class="popular-item">
-					<h4>Car</h4>
-					<p>Sedans, SUVs, and hatchbacks with driver for personal and family travel</p>
-				</div>
-				<div class="popular-item">
-					<h4>Bus</h4>
-					<p>Mini buses and full-size buses for group tours and events</p>
-				</div>
-				<div class="popular-item">
-					<h4>Toto</h4>
-					<p>Three-wheeler auto rickshaws for local short-distance travel</p>
-				</div>
-				<div class="popular-item">
-					<h4>Pickup Van</h4>
-					<p>Light commercial vehicles for goods transport and small moves</p>
-				</div>
-				<div class="popular-item">
-					<h4>Ambulance</h4>
-					<p>Medical transport vehicles with basic life support equipment</p>
-				</div>
-				<div class="popular-item">
-					<h4>Traveller</h4>
-					<p>Tempo travellers for medium-sized groups and corporate events</p>
-				</div>
-			</div>
+      <section id="find-section" class="rent-panel">
+        <div class="form-group">
+          <label for="rent-city">Where do you need vehicle?</label>
+          <select id="rent-city">
+            <option value="">Select city</option>
+            <option value="kolkata">Kolkata</option>
+            <option value="durgapur">Durgapur</option>
+            <option value="asansol">Asansol</option>
+            <option value="siliguri">Siliguri</option>
+            <option value="bardhaman">Bardhaman</option>
+          </select>
+        </div>
 
-			<div class="section-title mt-3">
-				<h2>Popular Cities</h2>
-			</div>
-			<div class="grid grid-3">
-				<a href="/rent-vehicle?city=Kolkata" class="popular-item">
-					<h4>Kolkata</h4>
-					<p>State capital with maximum options</p>
-				</a>
-				<a href="/rent-vehicle?city=Siliguri" class="popular-item">
-					<h4>Siliguri</h4>
-					<p>Gateway to North Bengal</p>
-				</a>
-				<a href="/rent-vehicle?city=Durgapur" class="popular-item">
-					<h4>Durgapur</h4>
-					<p>Industrial hub of Bengal</p>
-				</a>
-				<a href="/rent-vehicle?city=Asansol" class="popular-item">
-					<h4>Asansol</h4>
-					<p>Major city in Bardhaman district</p>
-				</a>
-				<a href="/rent-vehicle?city=Burdwan" class="popular-item">
-					<h4>Burdwan</h4>
-					<p>Historical city and cultural center</p>
-				</a>
-				<a href="/rent-vehicle?city=Darjeeling" class="popular-item">
-					<h4>Darjeeling</h4>
-					<p>Hill station tourist destination</p>
-				</a>
-			</div>
-		</div>
-	</section>
+        <div class="form-group">
+          <label for="nearby-city">Nearby cities (max 3)</label>
+          <input id="nearby-city" type="text" placeholder="Add nearby city" />
+        </div>
+
+        <div class="form-group">
+          <label>Vehicle type</label>
+          <div class="rent-chip-row" id="vehicle-chips">
+            <button type="button" class="rent-chip" data-type="car">Car</button>
+            <button type="button" class="rent-chip" data-type="bus">Bus</button>
+            <button type="button" class="rent-chip" data-type="toto">Toto</button>
+            <button type="button" class="rent-chip" data-type="auto">Auto</button>
+            <button type="button" class="rent-chip" data-type="pickup">Pickup</button>
+            <button type="button" class="rent-chip" data-type="ambulance">Ambulance</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Purpose</label>
+          <div class="rent-chip-row" id="purpose-chips">
+            <button type="button" class="rent-chip">Cheap Rent</button>
+            <button type="button" class="rent-chip">Wedding</button>
+            <button type="button" class="rent-chip">Tour</button>
+            <button type="button" class="rent-chip">Local</button>
+            <button type="button" class="rent-chip">School/Office</button>
+            <button type="button" class="rent-chip">Emergency</button>
+            <button type="button" class="rent-chip">Goods/Parcel</button>
+          </div>
+        </div>
+
+        <button id="rent-search-btn" class="rent-search-btn" type="button" disabled>
+          🔍 Select a city to search
+        </button>
+
+        <h2 class="rent-section-heading">Available rentals</h2>
+        <div class="rent-empty-card">
+          Select city and vehicle type to see available rentals.
+        </div>
+      </section>
+
+      <section id="create-section" class="rent-panel hidden">
+        <h2 class="rent-section-heading">Create Vehicle Listing</h2>
+
+        <div class="form-group">
+          <label for="owner-name">Owner name</label>
+          <input id="owner-name" type="text" placeholder="Enter owner name" />
+        </div>
+
+        <div class="form-group">
+          <label for="owner-phone">Phone number</label>
+          <input id="owner-phone" type="tel" placeholder="Enter phone number" />
+        </div>
+
+        <div class="form-group">
+          <label for="owner-vehicle-type">Vehicle type</label>
+          <select id="owner-vehicle-type">
+            <option value="">Select vehicle type</option>
+            <option value="car">Car</option>
+            <option value="bus">Bus</option>
+            <option value="toto">Toto</option>
+            <option value="auto">Auto</option>
+            <option value="pickup">Pickup Van</option>
+            <option value="ambulance">Ambulance</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="base-city">Base city</label>
+          <input id="base-city" type="text" placeholder="Enter base city" />
+        </div>
+
+        <div class="form-group">
+          <label for="service-cities">Service cities</label>
+          <input id="service-cities" type="text" placeholder="Add service cities" />
+        </div>
+
+        <button class="rent-search-btn" type="button">
+          Submit listing
+        </button>
+
+        <p class="rent-note">Listing submission will be connected soon.</p>
+      </section>
+    </div>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") || "find";
+    const type = params.get("type") || "car";
+
+    const findTab = document.getElementById("find-tab");
+    const createTab = document.getElementById("create-tab");
+    const findSection = document.getElementById("find-section");
+    const createSection = document.getElementById("create-section");
+
+    function showTab(activeTab) {
+      const isCreate = activeTab === "create";
+
+      findTab?.classList.toggle("active", !isCreate);
+      createTab?.classList.toggle("active", isCreate);
+
+      findSection?.classList.toggle("hidden", isCreate);
+      createSection?.classList.toggle("hidden", !isCreate);
+    }
+
+    showTab(tab);
+
+    const vehicleChips = document.querySelectorAll("#vehicle-chips .rent-chip");
+    vehicleChips.forEach((chip) => {
+      if (chip.getAttribute("data-type") === type) {
+        chip.classList.add("active");
+      }
+
+      chip.addEventListener("click", () => {
+        vehicleChips.forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+      });
+    });
+
+    const purposeChips = document.querySelectorAll("#purpose-chips .rent-chip");
+    purposeChips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        chip.classList.toggle("active");
+      });
+    });
+
+    const citySelect = document.getElementById("rent-city");
+    const searchBtn = document.getElementById("rent-search-btn");
+
+    citySelect?.addEventListener("change", () => {
+      const hasCity = citySelect.value.length > 0;
+      if (searchBtn) {
+        searchBtn.disabled = !hasCity;
+        searchBtn.textContent = hasCity ? "🔍 Search rentals" : "🔍 Select a city to search";
+      }
+    });
+  </script>
+
+  <style>
+    .rent-page {
+      background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      min-height: 100vh;
+      padding: 2rem 0 4rem;
+      color: white;
+    }
+
+    .rent-container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .rent-hero-card,
+    .rent-panel {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 28px;
+      padding: 2rem;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .rent-hero-card {
+      display: flex;
+      justify-content: space-between;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .rent-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #ff6b00;
+      display: grid;
+      place-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .rent-hero-card h1 {
+      font-size: 2rem;
+      margin: 0 0 0.35rem;
+      color: white;
+    }
+
+    .rent-hero-card p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .rent-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      min-width: 170px;
+    }
+
+    .rent-tab {
+      text-align: center;
+      text-decoration: none;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 0.8rem 1rem;
+      font-weight: 700;
+    }
+
+    .rent-tab.active {
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      border-color: #ff6b00;
+    }
+
+    .rent-panel {
+      margin-bottom: 1.5rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .form-group {
+      margin-bottom: 1.35rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.55rem;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: rgba(10, 7, 42, 0.72);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      padding: 0.95rem 1rem;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .form-group option {
+      color: #111827;
+    }
+
+    .rent-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .rent-chip {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: white;
+      border-radius: 999px;
+      padding: 0.55rem 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .rent-chip.active {
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      border-color: #ff6b00;
+    }
+
+    .rent-search-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 999px;
+      padding: 1rem;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+
+    .rent-search-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .rent-section-heading {
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+      color: white;
+    }
+
+    .rent-empty-card {
+      border-radius: 18px;
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      padding: 1.25rem;
+      color: rgba(255, 255, 255, 0.65);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .rent-note {
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 700px) {
+      .rent-hero-card {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .rent-actions {
+        width: 100%;
+      }
+
+      .rent-hero-card,
+      .rent-panel {
+        padding: 1.2rem;
+        border-radius: 22px;
+      }
+    }
+  </style>
 </BaseLayout>

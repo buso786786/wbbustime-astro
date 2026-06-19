@@ -17,59 +17,34 @@ const demoStops = [
 	description="Find Bus Timetable & Rent Vehicles in West Bengal. Search local bus timings and find cars, buses, toto, pickup vans and ambulances with driver."
 >
 	<div class="debug-label">PAGE: HOME</div>
-	<section class="hero">
+	<section class="hero homepage-hero">
 		<div class="container">
-			<h1>Home - West Bengal Bus Timetable</h1>
+			<h1>West Bengal Bus Time Table & Routes</h1>
 			<p>
-				<span class="lang-en">Search local bus timings and routes across West Bengal</span>
-				<span class="lang-bn">পশ্চিমবঙ্গ জুড়ে লোকাল বাসের সময় ও রুট খুঁজুন</span>
+				Plan daily journeys across West Bengal with up-to-date bus routes, stoppages and timings for both private and government buses. Search by source and destination to see schedules, fares and travel duration in seconds. WBBusTime also helps users find rent with driver services including car rental, bus rental, toto rent, pickup van and ambulance rental in West Bengal.
 			</p>
-		</div>
-	</section>
-
-	<section>
-		<div class="container">
-			<div class="search-card bus-search-main">
-				<h3>
-					<span class="lang-en">Search Bus</span>
-					<span class="lang-bn">বাস খুঁজুন</span>
-				</h3>
-				<form action="/bus-search" method="get">
-					<div class="form-row">
-						<div class="form-group">
-							<label for="bus-from">
-								<span class="lang-en">From</span>
-								<span class="lang-bn">কোথা থেকে</span>
-							</label>
-							<input type="text" id="bus-from" name="from" list="stop-suggestions" placeholder="Enter departure city" required />
-							<datalist id="stop-suggestions">
-								{demoStops.map(stop => (
-									<option value={stop.en}>{stop.en} / {stop.bn}</option>
-								))}
-							</datalist>
-						</div>
-						<div class="form-group">
-							<label for="bus-to">
-								<span class="lang-en">To</span>
-								<span class="lang-bn">কোথায় যাবেন</span>
-							</label>
-							<input type="text" id="bus-to" name="to" list="stop-suggestions" placeholder="Enter destination city" required />
-						</div>
-					</div>
-					<button type="submit" class="btn btn-full">
-						<span class="lang-en">Search Bus</span>
-						<span class="lang-bn">বাস খুঁজুন</span>
-					</button>
-				</form>
+			<div class="homepage-cta-row">
+				<a href="/bus-search" class="btn btn-primary btn-large">Route Finder Search</a>
+				<a href="/all-routes" class="btn btn-outline btn-small">See All</a>
 			</div>
 		</div>
 	</section>
 
 	<section>
 		<div class="container">
-			<div class="rent-teaser">
-				<p class="lang-en">Looking for vehicle rental? <a href="/rent-vehicle">Find cars, buses, and more with driver</a></p>
-				<p class="lang-bn">গাড়ি ভাড়া খুঁজছেন? <a href="/rent-vehicle">ড্রাইভারসহ গাড়ি, বাস এবং আরও অনেক কিছু খুঁজুন</a></p>
+			<div class="card rent-card">
+				<h3>Find Rent with Driver</h3>
+				<p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
+				<div class="rent-chips">
+					<a href="/rent-vehicle?type=toto&tab=find" class="chip">Toto Rent</a>
+					<a href="/rent-vehicle?type=pickup&tab=find" class="chip">Pickup Van</a>
+					<a href="/rent-vehicle?type=ambulance&tab=find" class="chip">Ambulance</a>
+					<a href="/rent-vehicle?type=tour-car&tab=find" class="chip">Tour Car</a>
+					<a href="/rent-vehicle?type=school-bus&tab=find" class="chip">School Bus</a>
+					<a href="/rent-vehicle?type=car&tab=find" class="chip">Car Rent</a>
+					<a href="/rent-vehicle?type=bus&tab=find" class="chip">Bus Rent</a>
+					<a href="/rent-vehicle?type=wedding-bus&tab=find" class="chip">Wedding Bus</a>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -77,101 +52,25 @@ const demoStops = [
 	<section>
 		<div class="container">
 			<div class="section-title">
-				<h2>
-					<span class="lang-en">Popular Bus Routes</span>
-					<span class="lang-bn">জনপ্রিয় বাস রুট</span>
-				</h2>
-				<p>
-					<span class="lang-en">Most searched bus routes in West Bengal</span>
-					<span class="lang-bn">পশ্চিমবঙ্গের সবচেয়ে বেশি খোঁজা বাস রুট</span>
-				</p>
+				<h2>Popular Bus Routes</h2>
 			</div>
 			<div class="grid grid-3">
-				<a href="/bus-search?from=Kolkata&to=Siliguri" class="popular-item">
-					<h4>
-						<span class="lang-en">Kolkata to Siliguri</span>
-						<span class="lang-bn">কলকাতা থেকে শিলিগুড়ি</span>
-					</h4>
-					<p>
-						<span class="lang-en">Daily bus service available</span>
-						<span class="lang-bn">প্রতিদিন বাস সার্ভিস আছে</span>
-					</p>
-				</a>
 				<a href="/bus-search?from=Kolkata&to=Durgapur" class="popular-item">
-					<h4>
-						<span class="lang-en">Kolkata to Durgapur</span>
-						<span class="lang-bn">কলকাতা থেকে দুর্গাপুর</span>
-					</h4>
-					<p>
-						<span class="lang-en">Frequent bus service</span>
-						<span class="lang-bn">ঘন ঘন বাস সার্ভিস</span>
-					</p>
+					<h4>Kolkata to Durgapur</h4>
 				</a>
-				<a href="/bus-search?from=Siliguri&to=Darjeeling" class="popular-item">
-					<h4>
-						<span class="lang-en">Siliguri to Darjeeling</span>
-						<span class="lang-bn">শিলিগুড়ি থেকে দার্জিলিং</span>
-					</h4>
-					<p>
-						<span class="lang-en">Hill route bus service</span>
-						<span class="lang-bn">পাহাড়ি রুট বাস সার্ভিস</span>
-					</p>
+				<a href="/bus-search?from=Kolkata&to=Siliguri" class="popular-item">
+					<h4>Kolkata to Siliguri</h4>
 				</a>
 				<a href="/bus-search?from=Kolkata&to=Asansol" class="popular-item">
-					<h4>
-						<span class="lang-en">Kolkata to Asansol</span>
-						<span class="lang-bn">কলকাতা থেকে আসানসোল</span>
-					</h4>
-					<p>
-						<span class="lang-en">Regular bus service</span>
-						<span class="lang-bn">নিয়মিত বাস সার্ভিস</span>
-					</p>
+					<h4>Kolkata to Asansol</h4>
 				</a>
-				<a href="/bus-search?from=Durgapur&to=Asansol" class="popular-item">
-					<h4>
-						<span class="lang-en">Durgapur to Asansol</span>
-						<span class="lang-bn">দুর্গাপুর থেকে আসানসোল</span>
-					</h4>
-					<p>
-						<span class="lang-en">Short distance service</span>
-						<span class="lang-bn">ছোট দূরত্বের সার্ভিস</span>
-					</p>
-				</a>
-				<a href="/bus-search?from=Kolkata&to=Burdwan" class="popular-item">
-					<h4>
-						<span class="lang-en">Kolkata to Burdwan</span>
-						<span class="lang-bn">কলকাতা থেকে বর্ধমান</span>
-					</h4>
-					<p>
-						<span class="lang-en">Frequent connections</span>
-						<span class="lang-bn">ঘন ঘন সংযোগ</span>
-					</p>
+				<a href="/all-routes" class="popular-item">
+					<h4>See all routes</h4>
 				</a>
 			</div>
 		</div>
 	</section>
 
-
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>
-					<span class="lang-en">About Sonia Buddy</span>
-					<span class="lang-bn">সোনিয়া বাডি সম্পর্কে</span>
-				</h2>
-			</div>
-			<div class="card">
-				<p class="lang-en">Sonia Buddy is your trusted platform for bus timetables and vehicle rental services in West Bengal. We help you find local bus timings and connect with vehicle rental providers including cars, buses, toto, pickup vans, and ambulances with professional drivers.</p>
-				<p class="lang-bn">সোনিয়া বাডি হল পশ্চিমবঙ্গে বাস টাইমটেবিল এবং গাড়ি ভাড়া সার্ভিসের জন্য আপনার বিশ্বস্ত প্ল্যাটফর্ম। আমরা আপনাকে লোকাল বাসের সময় খুঁজে পেতে এবং ড্রাইভারসহ গাড়ি, বাস, টোটো, পিকআপ ভ্যান এবং অ্যাম্বুলেন্স ভাড়া প্রদানকারীদের সাথে সংযোগ করতে সাহায্য করি।</p>
-				<p class="lang-en">Our mission is to make travel information accessible and help you find reliable transportation options across West Bengal. Whether you need to check bus schedules or rent a vehicle for your journey, Sonia Buddy is here to assist you.</p>
-				<p class="lang-bn">আমাদের লক্ষ্য হল ভ্রমণ তথ্য সহজলভ্য করা এবং পশ্চিমবঙ্গ জুড়ে নির্ভরযোগ্য পরিবহন বিকল্প খুঁজে পেতে আপনাকে সাহায্য করা। আপনার যাত্রার জন্য বাসের সময়সূচী চেক করতে হোক বা গাড়ি ভাড়া নিতে হোক, সোনিয়া বাডি আপনাকে সাহায্য করতে প্রস্তুত।</p>
-				<a href="/about" class="btn">
-					<span class="lang-en">Learn More</span>
-					<span class="lang-bn">আরও জানুন</span>
-				</a>
-			</div>
-		</div>
-	</section>
 
 	<script type="application/ld+json">
 	{
@@ -184,4 +83,149 @@ const demoStops = [
 		"sameAs": []
 	}
 	</script>
+
+	<style>
+		.homepage-hero {
+			background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+			padding: 4rem 0;
+			color: white;
+		}
+
+		.homepage-hero h1 {
+			font-size: 2.5rem;
+			margin-bottom: 1rem;
+		}
+
+		.homepage-hero p {
+			max-width: 800px;
+			margin-bottom: 2rem;
+			color: rgba(255, 255, 255, 0.85);
+			line-height: 1.6;
+		}
+
+		.homepage-cta-row {
+			display: flex;
+			gap: 1rem;
+			flex-wrap: wrap;
+		}
+
+		.btn-large {
+			padding: 1rem 2rem;
+			font-size: 1.1rem;
+		}
+
+		.btn-small {
+			padding: 0.75rem 1.5rem;
+			font-size: 0.95rem;
+		}
+
+		.btn-primary {
+			background: linear-gradient(135deg, #ff6b00 0%, #ff8a00 100%);
+			color: white;
+			border: none;
+			border-radius: 999px;
+			font-weight: 700;
+			text-decoration: none;
+			transition: all 0.2s;
+		}
+
+		.btn-primary:hover {
+			background: linear-gradient(135deg, #e65a00 0%, #ff6b00 100%);
+			transform: translateY(-2px);
+		}
+
+		.btn-outline {
+			background: transparent;
+			color: white;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			border-radius: 999px;
+			font-weight: 700;
+			text-decoration: none;
+			transition: all 0.2s;
+		}
+
+		.btn-outline:hover {
+			background: rgba(255, 255, 255, 0.1);
+			border-color: rgba(255, 255, 255, 0.5);
+		}
+
+		.rent-card {
+			background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+			border: 1px solid #fcd34d;
+			border-radius: 1rem;
+			padding: 1.5rem;
+		}
+
+		.rent-card h3 {
+			margin-bottom: 0.5rem;
+			color: #1e1b4b;
+		}
+
+		.rent-card p {
+			margin-bottom: 1rem;
+			color: #4b5563;
+		}
+
+		.rent-chips {
+			display: flex;
+			gap: 0.5rem;
+			flex-wrap: wrap;
+		}
+
+		.chip {
+			background: rgba(255, 255, 255, 0.7);
+			color: #1e1b4b;
+			padding: 0.5rem 1rem;
+			border-radius: 999px;
+			font-size: 0.875rem;
+			font-weight: 600;
+			text-decoration: none;
+			transition: all 0.2s;
+		}
+
+		.chip:hover {
+			background: white;
+			transform: translateY(-2px);
+		}
+
+		.popular-item {
+			background: rgba(255, 255, 255, 0.05);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			border-radius: 0.75rem;
+			padding: 1.25rem;
+			text-decoration: none;
+			color: white;
+			transition: all 0.2s;
+		}
+
+		.popular-item:hover {
+			background: rgba(255, 255, 255, 0.1);
+			transform: translateY(-2px);
+		}
+
+		.popular-item h4 {
+			margin: 0;
+			font-size: 1.1rem;
+		}
+
+		@media (max-width: 768px) {
+			.homepage-hero {
+				padding: 2rem 0;
+			}
+
+			.homepage-hero h1 {
+				font-size: 1.75rem;
+			}
+
+			.homepage-cta-row {
+				flex-direction: column;
+			}
+
+			.btn-large,
+			.btn-small {
+				width: 100%;
+				text-align: center;
+			}
+		}
+	</style>
 </BaseLayout>
