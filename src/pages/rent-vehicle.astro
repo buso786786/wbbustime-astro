@@ -11,10 +11,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   <section class="rent-page">
     <div class="container rent-container">
       <div class="rent-hero-card">
-        <div>
+        <div class="rent-header-content">
           <div class="rent-icon">🚗</div>
-          <h1>Rent with Driver</h1>
-          <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
+          <div>
+            <h1>Rent with Driver</h1>
+            <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
+          </div>
         </div>
 
         <div class="rent-actions">
@@ -79,14 +81,16 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <section id="create-section" class="rent-panel hidden">
         <h2 class="rent-section-heading">Create Vehicle Listing</h2>
 
-        <div class="form-group">
-          <label for="owner-name">Owner name</label>
-          <input id="owner-name" type="text" placeholder="Enter owner name" />
-        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="owner-name">Owner name</label>
+            <input id="owner-name" type="text" placeholder="Enter owner name" />
+          </div>
 
-        <div class="form-group">
-          <label for="owner-phone">Phone number</label>
-          <input id="owner-phone" type="tel" placeholder="Enter phone number" />
+          <div class="form-group">
+            <label for="owner-phone">Phone number</label>
+            <input id="owner-phone" type="tel" placeholder="Enter phone number" />
+          </div>
         </div>
 
         <div class="form-group">
@@ -102,14 +106,41 @@ import BaseLayout from "../layouts/BaseLayout.astro";
           </select>
         </div>
 
-        <div class="form-group">
-          <label for="base-city">Base city</label>
-          <input id="base-city" type="text" placeholder="Enter base city" />
+        <div class="form-row">
+          <div class="form-group">
+            <label for="base-city">Base city</label>
+            <input id="base-city" type="text" placeholder="Enter base city" />
+          </div>
+
+          <div class="form-group">
+            <label for="service-cities">Service cities</label>
+            <input id="service-cities" type="text" placeholder="Add service cities" />
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="service-cities">Service cities</label>
-          <input id="service-cities" type="text" placeholder="Add service cities" />
+          <label>Vehicle photos (up to 4)</label>
+          <div class="photo-upload-grid">
+            <div class="photo-upload-box">
+              <span class="photo-placeholder">+</span>
+            </div>
+            <div class="photo-upload-box">
+              <span class="photo-placeholder">+</span>
+            </div>
+            <div class="photo-upload-box">
+              <span class="photo-placeholder">+</span>
+            </div>
+            <div class="photo-upload-box">
+              <span class="photo-placeholder">+</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="consent-checkbox" />
+            <span>I consent to the terms and conditions and privacy policy for vehicle listing.</span>
+          </label>
         </div>
 
         <button class="rent-search-btn" type="button">
@@ -204,6 +235,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       margin-bottom: 1.5rem;
     }
 
+    .rent-header-content {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex: 1;
+    }
+
     .rent-icon {
       width: 42px;
       height: 42px;
@@ -227,8 +265,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     .rent-actions {
       display: flex;
-      flex-direction: column;
-      gap: 0.8rem;
+      flex-direction: row;
+      gap: 0.5rem;
       min-width: 170px;
     }
 
@@ -256,7 +294,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .form-group {
-      margin-bottom: 1.35rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
     }
 
     .form-group label {
@@ -285,7 +330,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     .rent-chip-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.65rem;
+      gap: 0.5rem;
     }
 
     .rent-chip {
@@ -306,7 +351,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     .rent-search-btn {
       width: 100%;
       border: 0;
-      border-radius: 999px;
+      border-radius: 12px;
       padding: 1rem;
       background: linear-gradient(135deg, #ff6b00, #ff8a00);
       color: white;
@@ -339,23 +384,116 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     .rent-note {
       color: rgba(255, 255, 255, 0.7);
       text-align: center;
-      margin-top: 1rem;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .photo-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+
+    .photo-upload-box {
+      aspect-ratio: 1;
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .photo-upload-box:hover {
+      border-color: rgba(255, 107, 0, 0.4);
+      background: rgba(255, 107, 0, 0.1);
+    }
+
+    .photo-placeholder {
+      font-size: 2rem;
+      color: rgba(255, 255, 255, 0.4);
+      font-weight: 300;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: auto;
+      margin-top: 0.25rem;
+      flex-shrink: 0;
+    }
+
+    .checkbox-label span {
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.5;
+      font-size: 0.95rem;
     }
 
     @media (max-width: 700px) {
       .rent-hero-card {
         flex-direction: column;
         align-items: stretch;
+        gap: 1rem;
+      }
+
+      .rent-header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .rent-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .rent-hero-card h1 {
+        font-size: 1.5rem;
+      }
+
+      .rent-hero-card p {
+        font-size: 0.9rem;
       }
 
       .rent-actions {
         width: 100%;
+        flex-direction: row;
+      }
+
+      .rent-tab {
+        flex: 1;
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
       }
 
       .rent-hero-card,
       .rent-panel {
-        padding: 1.2rem;
-        border-radius: 22px;
+        padding: 1.25rem;
+        border-radius: 18px;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .photo-upload-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+      }
+
+      .rent-section-heading {
+        font-size: 1.1rem;
+        margin-top: 1.5rem;
       }
     }
   </style>

@@ -1,0 +1,221 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+	title="West Bengal Bus Route Finder"
+	description="Find West Bengal bus timetable by city, route, bus stop, and landmark. Search for direct and connecting buses."
+>
+	<div class="debug-label">PAGE: ROUTE FINDER</div>
+	<section class="route-finder-section">
+		<div class="container">
+			<a href="/" class="back-link">← Back to Home</a>
+			
+			<h1>West Bengal Bus Route Finder</h1>
+			
+			<p>
+				Find West Bengal bus timetable by city, route, bus stop, and landmark.
+			</p>
+			
+			<div class="helper-text">
+				Type a source and destination. I'll check for a direct bus first, and if there isn't one, I'll find a 1-stop connection including fuzzy matches when stop names differ slightly.
+			</div>
+			
+			<div class="orange-note">
+				Reverse timing also available · উল্টো দিকের সময়ও আছে
+			</div>
+			
+			<div class="suggestion-chips">
+				<a href="/bus-timetable/arambagh-to-digha/" class="chip">Arambagh to Digha</a>
+				<a href="/bus-timetable/howrah-to-tarakeswar/" class="chip">Howrah to Tarakeswar</a>
+				<a href="/bus-timetable/kolkata-to-contai/" class="chip">Kolkata to Contai</a>
+				<a href="/bus-timetable/mecheda-to-digha/" class="chip">Mecheda to Digha</a>
+			</div>
+			
+			<form action="/bus-search" method="get" class="search-form">
+				<div class="form-row">
+					<input type="text" name="from" placeholder="Source city" required />
+					<input type="text" name="to" placeholder="Destination city" required />
+				</div>
+				<button type="submit" class="btn btn-primary">Search Routes</button>
+			</form>
+			
+			<div class="browse-routes">
+				<a href="/all-routes" class="link-arrow">Browse Bus Routes by City →</a>
+			</div>
+		</div>
+	</section>
+	
+	<style>
+		.route-finder-section {
+			background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+			padding: 4rem 0;
+			color: white;
+			min-height: 100vh;
+		}
+		
+		.back-link {
+			display: inline-block;
+			color: rgba(255, 255, 255, 0.7);
+			text-decoration: none;
+			margin-bottom: 1.5rem;
+			font-size: 0.95rem;
+			transition: color 0.2s;
+		}
+		
+		.back-link:hover {
+			color: white;
+		}
+		
+		h1 {
+			font-size: 2.5rem;
+			margin-bottom: 1rem;
+			font-weight: 700;
+		}
+		
+		p {
+			max-width: 700px;
+			margin-bottom: 1.5rem;
+			color: rgba(255, 255, 255, 0.85);
+			line-height: 1.6;
+			font-size: 1.1rem;
+		}
+		
+		.helper-text {
+			max-width: 700px;
+			margin-bottom: 1.5rem;
+			color: rgba(255, 255, 255, 0.7);
+			line-height: 1.6;
+			font-size: 0.95rem;
+		}
+		
+		.orange-note {
+			background: rgba(255, 107, 0, 0.15);
+			border: 1px solid rgba(255, 107, 0, 0.3);
+			border-radius: 0.75rem;
+			padding: 1rem 1.5rem;
+			margin-bottom: 2rem;
+			color: #ff8a00;
+			font-weight: 600;
+			font-size: 0.95rem;
+			display: inline-block;
+		}
+		
+		.suggestion-chips {
+			display: flex;
+			gap: 0.75rem;
+			flex-wrap: wrap;
+			margin-bottom: 2rem;
+		}
+		
+		.chip {
+			background: rgba(255, 255, 255, 0.1);
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			color: white;
+			padding: 0.75rem 1.25rem;
+			border-radius: 999px;
+			font-size: 0.9rem;
+			font-weight: 600;
+			text-decoration: none;
+			transition: all 0.2s;
+		}
+		
+		.chip:hover {
+			background: rgba(255, 107, 0, 0.2);
+			border-color: rgba(255, 107, 0, 0.4);
+			transform: translateY(-2px);
+		}
+		
+		.search-form {
+			max-width: 700px;
+			margin-bottom: 2rem;
+		}
+		
+		.form-row {
+			display: flex;
+			gap: 1rem;
+			margin-bottom: 1rem;
+		}
+		
+		.form-row input {
+			flex: 1;
+			padding: 1rem 1.25rem;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			border-radius: 0.75rem;
+			background: rgba(255, 255, 255, 0.05);
+			color: white;
+			font-size: 1rem;
+		}
+		
+		.form-row input::placeholder {
+			color: rgba(255, 255, 255, 0.5);
+		}
+		
+		.form-row input:focus {
+			outline: none;
+			border-color: rgba(255, 107, 0, 0.5);
+			background: rgba(255, 255, 255, 0.1);
+		}
+		
+		.btn-primary {
+			background: linear-gradient(135deg, #ff6b00 0%, #ff8a00 100%);
+			color: white;
+			border: none;
+			border-radius: 0.75rem;
+			padding: 1rem 2.5rem;
+			font-size: 1.1rem;
+			font-weight: 700;
+			cursor: pointer;
+			transition: all 0.2s;
+			width: 100%;
+		}
+		
+		.btn-primary:hover {
+			background: linear-gradient(135deg, #e65a00 0%, #ff6b00 100%);
+			transform: translateY(-2px);
+		}
+		
+		.browse-routes {
+			margin-top: 1rem;
+		}
+		
+		.link-arrow {
+			color: #ff8a00;
+			text-decoration: none;
+			font-size: 1.1rem;
+			font-weight: 600;
+			transition: color 0.2s;
+		}
+		
+		.link-arrow:hover {
+			color: #ff6b00;
+		}
+		
+		@media (max-width: 768px) {
+			.route-finder-section {
+				padding: 2rem 0;
+			}
+			
+			h1 {
+				font-size: 1.75rem;
+			}
+			
+			p {
+				font-size: 1rem;
+			}
+			
+			.form-row {
+				flex-direction: column;
+				gap: 0.75rem;
+			}
+			
+			.suggestion-chips {
+				flex-direction: column;
+			}
+			
+			.chip {
+				text-align: center;
+			}
+		}
+	</style>
+</BaseLayout>

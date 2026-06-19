@@ -1,0 +1,541 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+	title="Vehicle Listing Dashboard - SoniaBuddy"
+	description="Manage your vehicle listings, view performance stats, and boost visibility on SoniaBuddy."
+>
+	<div class="debug-label">PAGE: RENT DASHBOARD</div>
+	<section class="dashboard-page">
+		<div class="container dashboard-container">
+			<div class="dashboard-header">
+				<h1>Vehicle Listing Dashboard</h1>
+			</div>
+
+			<div class="logged-in-card">
+				<div class="user-info">
+					<div class="user-avatar">👤</div>
+					<div>
+						<h3>Owner Name</h3>
+						<p>+91 9876543210</p>
+					</div>
+				</div>
+				<a href="/rent-vehicle" class="btn btn-outline">Logout</a>
+			</div>
+
+			<div class="free-notice">
+				<span class="notice-icon">🎉</span>
+				<div>
+					<h3>First 3 Months Free</h3>
+					<p>Enjoy unlimited listings and visibility boost for free!</p>
+				</div>
+			</div>
+
+			<div class="dashboard-actions">
+				<a href="/rent-vehicle?tab=create" class="btn btn-primary">Add New Vehicle Listing</a>
+				<a href="#" class="btn btn-outline">View My Vehicle Listings</a>
+			</div>
+
+			<div class="section-title">
+				<h2>Pricing Plans</h2>
+			</div>
+			<div class="plan-cards">
+				<div class="plan-card plan-free">
+					<h3>Free</h3>
+					<div class="plan-price">₹0<span>/month</span></div>
+					<ul class="plan-features">
+						<li>3 Listings</li>
+						<li>Basic visibility</li>
+						<li>Email support</li>
+					</ul>
+					<button class="btn btn-outline">Current Plan</button>
+				</div>
+				<div class="plan-card plan-basic">
+					<h3>Basic</h3>
+					<div class="plan-price">₹299<span>/month</span></div>
+					<ul class="plan-features">
+						<li>10 Listings</li>
+						<li>Enhanced visibility</li>
+						<li>Priority support</li>
+					</ul>
+					<button class="btn btn-primary">Upgrade</button>
+				</div>
+				<div class="plan-card plan-pro">
+					<h3>Pro</h3>
+					<div class="plan-price">₹599<span>/month</span></div>
+					<ul class="plan-features">
+						<li>Unlimited Listings</li>
+						<li>Top visibility</li>
+						<li>24/7 support</li>
+					</ul>
+					<button class="btn btn-primary">Upgrade</button>
+				</div>
+				<div class="plan-card plan-enterprise">
+					<h3>Enterprise</h3>
+					<div class="plan-price">₹999<span>/month</span></div>
+					<ul class="plan-features">
+						<li>Everything in Pro</li>
+						<li>API access</li>
+						<li>Dedicated manager</li>
+					</ul>
+					<button class="btn btn-primary">Contact</button>
+				</div>
+			</div>
+
+			<div class="section-title">
+				<h2>My Listings</h2>
+			</div>
+			<div class="listing-card">
+				<div class="listing-image">
+					<div class="listing-placeholder">🚗</div>
+				</div>
+				<div class="listing-details">
+					<h3>Toyota Innova - Kolkata</h3>
+					<p>Car • 7 Seater • AC</p>
+					<div class="listing-meta">
+						<span class="listing-status status-active">Active</span>
+						<span class="listing-views">👁 1,234 views</span>
+					</div>
+				</div>
+				<button class="btn btn-outline btn-small">Edit</button>
+			</div>
+
+			<div class="section-title">
+				<h2>Listing Performance</h2>
+			</div>
+			<div class="performance-stats">
+				<div class="stat-card">
+					<div class="stat-icon">👁</div>
+					<div class="stat-info">
+						<h4>Total Views</h4>
+						<p class="stat-value">5,432</p>
+					</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-icon">📞</div>
+					<div class="stat-info">
+						<h4>Inquiries</h4>
+						<p class="stat-value">128</p>
+					</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-icon">⭐</div>
+					<div class="stat-info">
+						<h4>Rating</h4>
+						<p class="stat-value">4.8/5</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="boost-cards">
+				<div class="boost-card verified-badge">
+					<div class="boost-icon">✓</div>
+					<div>
+						<h3>Verified Badge</h3>
+						<p>Get verified to build trust with customers</p>
+					</div>
+					<button class="btn btn-primary btn-small">Get Verified</button>
+				</div>
+				<div class="boost-card visibility-boost">
+					<div class="boost-icon">🚀</div>
+					<div>
+						<h3>Visibility Boost</h3>
+						<p>Boost your listing to appear at the top</p>
+					</div>
+					<button class="btn btn-primary btn-small">Boost Now</button>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<style>
+		.dashboard-page {
+			background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+			min-height: 100vh;
+			padding: 2rem 0 4rem;
+			color: white;
+		}
+
+		.dashboard-container {
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+
+		.dashboard-header {
+			margin-bottom: 1.5rem;
+		}
+
+		.dashboard-header h1 {
+			font-size: 2rem;
+			margin: 0;
+			color: white;
+		}
+
+		.logged-in-card {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid rgba(255, 255, 255, 0.14);
+			border-radius: 1rem;
+			padding: 1.5rem;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 1.5rem;
+		}
+
+		.user-info {
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+		}
+
+		.user-avatar {
+			width: 50px;
+			height: 50px;
+			border-radius: 50%;
+			background: rgba(255, 107, 0, 0.2);
+			border: 2px solid rgba(255, 107, 0, 0.4);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 1.5rem;
+		}
+
+		.user-info h3 {
+			margin: 0 0 0.25rem;
+			font-size: 1.1rem;
+		}
+
+		.user-info p {
+			margin: 0;
+			color: rgba(255, 255, 255, 0.7);
+			font-size: 0.9rem;
+		}
+
+		.free-notice {
+			background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
+			border: 1px solid rgba(255, 107, 0, 0.3);
+			border-radius: 1rem;
+			padding: 1.25rem;
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.notice-icon {
+			font-size: 2rem;
+		}
+
+		.free-notice h3 {
+			margin: 0 0 0.25rem;
+			font-size: 1.1rem;
+			color: #ff8a00;
+		}
+
+		.free-notice p {
+			margin: 0;
+			color: rgba(255, 255, 255, 0.8);
+			font-size: 0.9rem;
+		}
+
+		.dashboard-actions {
+			display: flex;
+			gap: 1rem;
+			margin-bottom: 2rem;
+		}
+
+		.btn {
+			padding: 0.875rem 1.75rem;
+			border-radius: 0.75rem;
+			font-weight: 700;
+			text-decoration: none;
+			display: inline-block;
+			cursor: pointer;
+			transition: all 0.2s;
+			text-align: center;
+		}
+
+		.btn-primary {
+			background: linear-gradient(135deg, #ff6b00, #ff8a00);
+			color: white;
+			border: none;
+		}
+
+		.btn-primary:hover {
+			background: linear-gradient(135deg, #e65a00, #ff6b00);
+			transform: translateY(-2px);
+		}
+
+		.btn-outline {
+			background: transparent;
+			color: white;
+			border: 2px solid rgba(255, 255, 255, 0.3);
+		}
+
+		.btn-outline:hover {
+			background: rgba(255, 255, 255, 0.1);
+			border-color: rgba(255, 255, 255, 0.5);
+		}
+
+		.btn-small {
+			padding: 0.5rem 1rem;
+			font-size: 0.9rem;
+		}
+
+		.section-title {
+			margin-bottom: 1rem;
+		}
+
+		.section-title h2 {
+			margin: 0;
+			font-size: 1.25rem;
+			color: white;
+		}
+
+		.plan-cards {
+			display: grid;
+			grid-template-columns: repeat(4, 1fr);
+			gap: 1rem;
+			margin-bottom: 2rem;
+		}
+
+		.plan-card {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid rgba(255, 255, 255, 0.14);
+			border-radius: 1rem;
+			padding: 1.5rem;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.plan-card h3 {
+			margin: 0 0 0.5rem;
+			font-size: 1.25rem;
+		}
+
+		.plan-price {
+			font-size: 2rem;
+			font-weight: 800;
+			margin-bottom: 1rem;
+			color: #ff8a00;
+		}
+
+		.plan-price span {
+			font-size: 0.9rem;
+			color: rgba(255, 255, 255, 0.6);
+			font-weight: 400;
+		}
+
+		.plan-features {
+			list-style: none;
+			padding: 0;
+			margin: 0 0 1.5rem;
+			flex: 1;
+		}
+
+		.plan-features li {
+			padding: 0.5rem 0;
+			color: rgba(255, 255, 255, 0.8);
+			font-size: 0.9rem;
+		}
+
+		.plan-features li::before {
+			content: "✓ ";
+			color: #ff8a00;
+			margin-right: 0.5rem;
+		}
+
+		.listing-card {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid rgba(255, 255, 255, 0.14);
+			border-radius: 1rem;
+			padding: 1.25rem;
+			display: flex;
+			gap: 1rem;
+			align-items: center;
+			margin-bottom: 2rem;
+		}
+
+		.listing-image {
+			width: 80px;
+			height: 80px;
+			border-radius: 0.75rem;
+			background: rgba(255, 255, 255, 0.04);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+		}
+
+		.listing-placeholder {
+			font-size: 2rem;
+		}
+
+		.listing-details {
+			flex: 1;
+		}
+
+		.listing-details h3 {
+			margin: 0 0 0.25rem;
+			font-size: 1.1rem;
+		}
+
+		.listing-details p {
+			margin: 0 0 0.5rem;
+			color: rgba(255, 255, 255, 0.7);
+			font-size: 0.9rem;
+		}
+
+		.listing-meta {
+			display: flex;
+			gap: 1rem;
+			align-items: center;
+		}
+
+		.listing-status {
+			padding: 0.25rem 0.75rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 700;
+		}
+
+		.status-active {
+			background: rgba(34, 197, 94, 0.2);
+			color: #22c55e;
+		}
+
+		.listing-views {
+			color: rgba(255, 255, 255, 0.6);
+			font-size: 0.85rem;
+		}
+
+		.performance-stats {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 1rem;
+			margin-bottom: 2rem;
+		}
+
+		.stat-card {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid rgba(255, 255, 255, 0.14);
+			border-radius: 1rem;
+			padding: 1.25rem;
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+		}
+
+		.stat-icon {
+			font-size: 2rem;
+		}
+
+		.stat-info h4 {
+			margin: 0 0 0.25rem;
+			font-size: 0.9rem;
+			color: rgba(255, 255, 255, 0.8);
+		}
+
+		.stat-value {
+			margin: 0;
+			font-size: 1.5rem;
+			font-weight: 800;
+			color: #ff8a00;
+		}
+
+		.boost-cards {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1rem;
+		}
+
+		.boost-card {
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid rgba(255, 255, 255, 0.14);
+			border-radius: 1rem;
+			padding: 1.25rem;
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+		}
+
+		.boost-icon {
+			font-size: 2rem;
+		}
+
+		.boost-card h3 {
+			margin: 0 0 0.25rem;
+			font-size: 1.1rem;
+		}
+
+		.boost-card p {
+			margin: 0;
+			color: rgba(255, 255, 255, 0.7);
+			font-size: 0.85rem;
+		}
+
+		@media (max-width: 1024px) {
+			.plan-cards {
+				grid-template-columns: repeat(2, 1fr);
+			}
+		}
+
+		@media (max-width: 768px) {
+			.dashboard-page {
+				padding: 1.5rem 0 3rem;
+			}
+
+			.dashboard-header h1 {
+				font-size: 1.5rem;
+			}
+
+			.logged-in-card {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 1rem;
+			}
+
+			.dashboard-actions {
+				flex-direction: column;
+			}
+
+			.dashboard-actions .btn {
+				width: 100%;
+			}
+
+			.plan-cards {
+				grid-template-columns: 1fr;
+			}
+
+			.listing-card {
+				flex-direction: column;
+				align-items: flex-start;
+			}
+
+			.listing-image {
+				width: 100%;
+				height: 120px;
+			}
+
+			.performance-stats {
+				grid-template-columns: 1fr;
+			}
+
+			.boost-cards {
+				grid-template-columns: 1fr;
+			}
+
+			.boost-card {
+				flex-direction: column;
+				align-items: flex-start;
+				text-align: left;
+			}
+
+			.boost-card .btn {
+				width: 100%;
+				margin-top: 1rem;
+			}
+		}
+	</style>
+</BaseLayout>
