@@ -1,0 +1,758 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { supabase } from "../lib/supabase";
+import { listRentCities } from "../lib/rentCities";
+
+const PHOTO_BUCKET = "rent-listing-photos";
+
+type RentCity = {
+  id: string;
+  name: string | null;
+  name_en: string | null;
+  name_bn: string | null;
+  district_en: string | null;
+  district_bn: string | null;
+};
+
+type RentListing = {
+  id: string;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_whatsapp: string | null;
+  vehicle_type: string | null;
+  vehicle_model: string | null;
+  seats: number | null;
+  purposes: string[] | null;
+  base_city_id: string | null;
+  service_city_ids: string[] | null;
+  price_text: string | null;
+  photos: string[] | null;
+  description: string | null;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  is_verified: boolean | null;
+};
+
+const cities = (await listRentCities({ onlyActive: true })) as RentCity[];
+
+const { data: listingsData, error: listingsError } = await supabase
+  .from("rent_listings")
+  .select(`
+    id,
+    owner_name,
+    owner_phone,
+    owner_whatsapp,
+    vehicle_type,
+    vehicle_model,
+    seats,
+    purposes,
+    base_city_id,
+    service_city_ids,
+    price_text,
+    photos,
+    description,
+    status,
+    created_at,
+    updated_at,
+    is_verified
+  `)
+  .eq("status", "active")
+  .order("updated_at", { ascending: false })
+  .limit(100);
+
+if (listingsError) {
+  console.error("Rent listings fetch error:", listingsError);
+}
+
+const listings = (listingsData ?? []) as RentListing[];
+
+function cityName(city: RentCity | undefined | null) {
+  if (!city) return "";
+  return city.name_en || city.name_bn || city.name || "";
+}
+
+function cityDistrict(city: RentCity | undefined | null) {
+  if (!city) return "";
+  return city.district_en || city.district_bn || "";
+}
+
+function publicPhotoUrl(path: string | null | undefined) {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+  const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+const cityOptions = cities.map((city) => ({
+  id: city.id,
+  name: cityName(city),
+  district: cityDistrict(city),
+}));
+
+const listingsForClient = listings.map((listing) => {
+  const baseCity = cities.find((city) => city.id === listing.base_city_id);
+  const serviceCities = (listing.service_city_ids ?? [])
+    .map((id) => cities.find((city) => city.id === id))
+    .filter(Boolean) as RentCity[];
+
+  return {
+    ...listing,
+    base_city_name: cityName(baseCity),
+    service_city_names: serviceCities.map(cityName),
+    photo_urls: (listing.photos ?? []).slice(0, 4).map(publicPhotoUrl),
+  };
+});
+
+const vehicleTypes = Array.from(
+  new Set(listings.map((l) => l.vehicle_type).filter(Boolean))
+);
+
+const purposes = Array.from(
+  new Set(listings.flatMap((l) => l.purposes ?? []).filter(Boolean))
+);
+---
+
+<BaseLayout
+  title="Test Rent Listings UI"
+  description="Test page for rent listing database cards"
+>
+  <div class="debug-label">PAGE: TEST RENT LISTINGS UI</div>
+
+  <section class="test-page">
+    <div class="container test-container">
+      <div class="test-header">
+        <h1>Test Rent Listings UI</h1>
+        <p>Active DB listings with city, vehicle and purpose filters</p>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-grid">
+          <div>
+            <label for="city-filter">City</label>
+            <select id="city-filter">
+              <option value="">All cities</option>
+              {cityOptions.map((city) => (
+                <option value={city.id}>
+                  {city.name}{city.district ? ` — ${city.district}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label for="vehicle-filter">Vehicle Type</label>
+            <select id="vehicle-filter">
+              <option value="">All vehicles</option>
+              {vehicleTypes.map((vehicle) => (
+                <option value={vehicle}>{vehicle}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label for="purpose-filter">Purpose</label>
+            <select id="purpose-filter">
+              <option value="">All purposes</option>
+              {purposes.map((purpose) => (
+                <option value={purpose}>{purpose}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button id="clear-filters" type="button" class="clear-btn">
+          Clear Filters
+        </button>
+      </div>
+
+      {listingsError && (
+        <div class="error-box">
+          Supabase listing fetch error. Check console.
+        </div>
+      )}
+
+      <div class="summary-box">
+        <strong id="result-count">{listingsForClient.length}</strong> active listings found
+      </div>
+
+      <div id="listing-grid" class="listing-grid"></div>
+
+      <div class="debug-section">
+        <h2>Debug Info</h2>
+        <pre id="debug-output"></pre>
+      </div>
+    </div>
+  </section>
+
+  <script define:vars={{ listingsForClient, cityOptions }}>
+    window.rentListingsData = listingsForClient;
+    window.rentCitiesData = cityOptions;
+  </script>
+
+  <script>
+    const listings = Array.isArray(window.rentListingsData)
+      ? window.rentListingsData
+      : [];
+
+    const filters = {
+      cityId: "",
+      vehicleType: "",
+      purpose: "",
+    };
+
+    const grid = document.getElementById("listing-grid");
+    const cityFilter = document.getElementById("city-filter");
+    const vehicleFilter = document.getElementById("vehicle-filter");
+    const purposeFilter = document.getElementById("purpose-filter");
+    const clearBtn = document.getElementById("clear-filters");
+    const resultCount = document.getElementById("result-count");
+    const debugOutput = document.getElementById("debug-output");
+
+    function esc(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function onlyDigits(value) {
+      return String(value || "").replace(/\D/g, "");
+    }
+
+    function whatsappNumber(listing) {
+      const raw = onlyDigits(listing.owner_whatsapp || listing.owner_phone || "");
+      if (raw.length === 10) return `91${raw}`;
+      return raw;
+    }
+
+    function listingMatches(listing) {
+      if (filters.cityId) {
+        const serviceIds = Array.isArray(listing.service_city_ids)
+          ? listing.service_city_ids
+          : [];
+
+        const cityMatch =
+          listing.base_city_id === filters.cityId ||
+          serviceIds.includes(filters.cityId);
+
+        if (!cityMatch) return false;
+      }
+
+      if (filters.vehicleType && listing.vehicle_type !== filters.vehicleType) {
+        return false;
+      }
+
+      if (filters.purpose) {
+        const purposes = Array.isArray(listing.purposes) ? listing.purposes : [];
+        if (!purposes.includes(filters.purpose)) return false;
+      }
+
+      return true;
+    }
+
+    function renderPhotos(listing) {
+      const photos = Array.isArray(listing.photo_urls)
+        ? listing.photo_urls.slice(0, 4)
+        : [];
+
+      if (!photos.length) {
+        return `
+          <div class="photo-grid empty-photos">
+            <div>No Photo</div>
+            <div>No Photo</div>
+            <div>No Photo</div>
+            <div>No Photo</div>
+          </div>
+        `;
+      }
+
+      const cells = [0, 1, 2, 3].map((index) => {
+        const url = photos[index];
+
+        if (!url) {
+          return `<div class="photo-empty">No Photo</div>`;
+        }
+
+        return `
+          <button type="button" class="photo-btn" data-photo-url="${esc(url)}">
+            <img src="${esc(url)}" alt="Rent vehicle photo ${index + 1}" loading="lazy" />
+          </button>
+        `;
+      });
+
+      return `<div class="photo-grid">${cells.join("")}</div>`;
+    }
+
+    function renderCard(listing) {
+      const phone = onlyDigits(listing.owner_phone || "");
+      const wa = whatsappNumber(listing);
+      const serviceNames = Array.isArray(listing.service_city_names)
+        ? listing.service_city_names.filter(Boolean)
+        : [];
+      const purposes = Array.isArray(listing.purposes)
+        ? listing.purposes.filter(Boolean)
+        : [];
+
+      return `
+        <article class="listing-card">
+          ${renderPhotos(listing)}
+
+          <div class="card-body">
+            <div class="card-top">
+              <div>
+                <h2>${esc(listing.owner_name || "Rental provider")}</h2>
+                <p class="vehicle-line">
+                  ${esc(listing.vehicle_type || "Vehicle")}
+                  ${listing.vehicle_model ? ` • ${esc(listing.vehicle_model)}` : ""}
+                  ${listing.seats ? ` • ${esc(listing.seats)} seats` : ""}
+                </p>
+              </div>
+
+              ${
+                listing.is_verified
+                  ? `<span class="verified-badge">Verified</span>`
+                  : ""
+              }
+            </div>
+
+            <div class="info-list">
+              ${
+                listing.base_city_name
+                  ? `<p><strong>Base:</strong> ${esc(listing.base_city_name)}</p>`
+                  : ""
+              }
+
+              ${
+                serviceNames.length
+                  ? `<p><strong>Service:</strong> ${esc(serviceNames.join(", "))}</p>`
+                  : ""
+              }
+
+              ${
+                purposes.length
+                  ? `<p><strong>Purpose:</strong> ${esc(purposes.join(" • "))}</p>`
+                  : ""
+              }
+
+              ${
+                listing.price_text
+                  ? `<p class="price-text">${esc(listing.price_text)}</p>`
+                  : ""
+              }
+
+              ${
+                listing.description
+                  ? `<p class="description">${esc(listing.description)}</p>`
+                  : ""
+              }
+            </div>
+
+            <div class="action-row">
+              ${
+                phone
+                  ? `<a class="action-btn" href="tel:${phone}">Call</a>`
+                  : `<button class="action-btn disabled" type="button">No Phone</button>`
+              }
+
+              ${
+                wa
+                  ? `<a class="action-btn whatsapp" href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`
+                  : `<button class="action-btn disabled" type="button">No WhatsApp</button>`
+              }
+
+              <button class="action-btn outline" type="button" data-listing-id="${esc(listing.id)}">
+                View Details
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function render() {
+      const filtered = listings.filter(listingMatches);
+
+      if (resultCount) {
+        resultCount.textContent = String(filtered.length);
+      }
+
+      if (grid) {
+        if (!filtered.length) {
+          grid.innerHTML = `
+            <div class="empty-box">
+              <h2>No matching listings</h2>
+              <p>Try changing city, vehicle or purpose filters.</p>
+            </div>
+          `;
+        } else {
+          grid.innerHTML = filtered.map(renderCard).join("");
+        }
+      }
+
+      if (debugOutput) {
+        debugOutput.textContent = JSON.stringify(
+          {
+            totalListings: listings.length,
+            filteredListings: filtered.length,
+            filters,
+          },
+          null,
+          2
+        );
+      }
+    }
+
+    function updateFilters() {
+      filters.cityId = cityFilter ? cityFilter.value : "";
+      filters.vehicleType = vehicleFilter ? vehicleFilter.value : "";
+      filters.purpose = purposeFilter ? purposeFilter.value : "";
+      render();
+    }
+
+    cityFilter?.addEventListener("change", updateFilters);
+    vehicleFilter?.addEventListener("change", updateFilters);
+    purposeFilter?.addEventListener("change", updateFilters);
+
+    clearBtn?.addEventListener("click", () => {
+      if (cityFilter) cityFilter.value = "";
+      if (vehicleFilter) vehicleFilter.value = "";
+      if (purposeFilter) purposeFilter.value = "";
+
+      filters.cityId = "";
+      filters.vehicleType = "";
+      filters.purpose = "";
+
+      render();
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+
+      const photoBtn = target.closest(".photo-btn");
+      if (photoBtn) {
+        const url = photoBtn.dataset.photoUrl;
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+      }
+    });
+
+    render();
+  </script>
+
+  <style is:global>
+    .test-page {
+      background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      min-height: 100vh;
+      padding: 2rem 0 4rem;
+      color: white;
+    }
+
+    .test-container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .test-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .test-header h1 {
+      margin: 0 0 0.5rem;
+      font-size: 2rem;
+      color: white;
+    }
+
+    .test-header p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .filter-card,
+    .debug-section,
+    .summary-box,
+    .error-box {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 1rem;
+    }
+
+    .filter-card {
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: #ff8a00;
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    select {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 0.75rem;
+      background: rgba(10, 7, 42, 0.92);
+      color: white;
+      padding: 0.8rem 0.9rem;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: rgba(255, 107, 0, 0.8);
+    }
+
+    option {
+      background: #0b0628;
+      color: white;
+    }
+
+    .clear-btn {
+      margin-top: 0.85rem;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: white;
+      padding: 0.65rem 1rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .clear-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .summary-box {
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      color: rgba(255, 255, 255, 0.86);
+    }
+
+    .summary-box strong {
+      color: #ff8a00;
+      font-size: 1.25rem;
+    }
+
+    .error-box {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-color: rgba(255, 80, 80, 0.5);
+      background: rgba(255, 80, 80, 0.14);
+    }
+
+    .listing-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .listing-card {
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 1rem;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.35rem;
+      padding: 0.75rem 0.75rem 0;
+    }
+
+    .photo-btn,
+    .photo-empty,
+    .empty-photos div {
+      aspect-ratio: 1 / 1;
+      border: 0;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .photo-btn {
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .photo-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .card-body {
+      padding: 1rem;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.7rem;
+    }
+
+    .card-top h2 {
+      margin: 0 0 0.25rem;
+      font-size: 1.05rem;
+      color: white;
+    }
+
+    .vehicle-line {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.74);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .verified-badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: rgba(39, 174, 96, 0.16);
+      color: #64f4a7;
+      padding: 0.3rem 0.55rem;
+      font-size: 0.72rem;
+      font-weight: 900;
+    }
+
+    .info-list {
+      display: grid;
+      gap: 0.35rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .info-list p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.84);
+      line-height: 1.45;
+    }
+
+    .info-list strong {
+      color: white;
+    }
+
+    .price-text {
+      color: #ffb35c !important;
+      font-weight: 900;
+    }
+
+    .description {
+      color: rgba(255, 255, 255, 0.68) !important;
+      font-size: 0.92rem;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.45rem;
+    }
+
+    .action-btn {
+      text-decoration: none;
+      border: 0;
+      border-radius: 0.75rem;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      padding: 0.75rem 0.6rem;
+      text-align: center;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .action-btn.whatsapp {
+      background: linear-gradient(135deg, #11a75c, #19c674);
+    }
+
+    .action-btn.outline {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .action-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .empty-box {
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 1rem;
+      padding: 2rem 1rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .empty-box h2 {
+      margin: 0 0 0.4rem;
+      color: white;
+    }
+
+    .empty-box p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .debug-section {
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .debug-section h2 {
+      margin: 0 0 1rem;
+      color: #ff8a00;
+      font-size: 1.25rem;
+    }
+
+    #debug-output {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      color: #4ade80;
+      font-size: 0.85rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 768px) {
+      .test-page {
+        padding: 1.5rem 0 3rem;
+      }
+
+      .test-header h1 {
+        font-size: 1.5rem;
+      }
+
+      .filter-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .photo-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .action-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</BaseLayout>

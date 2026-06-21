@@ -1,5 +1,115 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { supabase } from "../lib/supabase";
+import { listRentCities } from "../lib/rentCities";
+
+const PHOTO_BUCKET = "rent-listing-photos";
+
+type RentCity = {
+  id: string;
+  name: string | null;
+  name_en: string | null;
+  name_bn: string | null;
+  district_en: string | null;
+  district_bn: string | null;
+  search_keywords_en: string | null;
+  search_keywords_bn: string | null;
+};
+
+type RentListing = {
+  id: string;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_whatsapp: string | null;
+  vehicle_type: string | null;
+  vehicle_model: string | null;
+  seats: number | null;
+  purposes: string[] | null;
+  base_city_id: string | null;
+  service_city_ids: string[] | null;
+  price_text: string | null;
+  photos: string[] | null;
+  description: string | null;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  is_verified: boolean | null;
+};
+
+const cities = (await listRentCities({ onlyActive: true })) as RentCity[];
+
+const { data: listingsData, error: listingsError } = await supabase
+  .from("rent_listings")
+  .select(`
+    id,
+    owner_name,
+    owner_phone,
+    owner_whatsapp,
+    vehicle_type,
+    vehicle_model,
+    seats,
+    purposes,
+    base_city_id,
+    service_city_ids,
+    price_text,
+    photos,
+    description,
+    status,
+    created_at,
+    updated_at,
+    is_verified
+  `)
+  .eq("status", "active")
+  .order("updated_at", { ascending: false })
+  .limit(100);
+
+if (listingsError) {
+  console.error("Rent listings fetch error:", listingsError);
+}
+
+const listings = (listingsData ?? []) as RentListing[];
+
+function cityName(city: RentCity | undefined | null) {
+  if (!city) return "";
+  return city.name_en || city.name_bn || city.name || "";
+}
+
+function cityDistrict(city: RentCity | undefined | null) {
+  if (!city) return "";
+  return city.district_en || city.district_bn || "";
+}
+
+function publicPhotoUrl(path: string | null | undefined) {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+  const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+const citiesForClient = cities.map((city) => ({
+  id: city.id,
+  name: cityName(city),
+  district: cityDistrict(city),
+  name_en: city.name_en,
+  name_bn: city.name_bn,
+  search_keywords_en: city.search_keywords_en,
+  search_keywords_bn: city.search_keywords_bn,
+}));
+
+const listingsForClient = listings.map((listing) => {
+  const baseCity = cities.find((city) => city.id === listing.base_city_id);
+  const serviceCities = (listing.service_city_ids ?? [])
+    .map((id) => cities.find((city) => city.id === id))
+    .filter(Boolean) as RentCity[];
+
+  return {
+    ...listing,
+    base_city_name: cityName(baseCity),
+    service_city_names: serviceCities.map(cityName),
+    photo_urls: (listing.photos ?? []).slice(0, 4).map(publicPhotoUrl),
+  };
+});
 ---
 
 <BaseLayout
@@ -10,7 +120,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
   <section class="rent-page">
     <div class="container rent-container">
-      <!-- Page header -->
       <div class="rent-hero-card">
         <div class="rent-header-content">
           <div class="rent-icon">🚗</div>
@@ -22,134 +131,96 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         <a href="/owner/rent-dashboard" class="btn btn-outline btn-small">Dashboard</a>
       </div>
 
-      <!-- Tabs -->
       <div class="rent-actions">
         <a href="/rent-vehicle?tab=find" id="find-tab" class="rent-tab active">Find Rent</a>
         <a href="/rent-vehicle?tab=register" id="create-tab" class="rent-tab">Create Listing</a>
       </div>
 
-      <!-- Find Rent Section -->
       <section id="find-section" class="rent-panel">
         <div class="form-section-card">
           <h3 class="form-section-title">Search Rentals</h3>
-          
+
           <div class="form-group">
-            <label for="rent-city">Where do you need vehicle?</label>
-            <select id="rent-city">
-              <option value="">Select city</option>
-              <option value="kolkata">Kolkata</option>
-              <option value="durgapur">Durgapur</option>
-              <option value="asansol">Asansol</option>
-              <option value="siliguri">Siliguri</option>
-              <option value="bardhaman">Bardhaman</option>
-            </select>
+            <label>Where do you need vehicle?</label>
+            <div class="city-search-box">
+              <input
+                id="main-city-search"
+                class="city-search-input"
+                type="text"
+                placeholder="Search city name, district, or keywords..."
+                autocomplete="off"
+              />
+              <div id="main-city-dropdown" class="city-dropdown hidden"></div>
+            </div>
+            <div id="main-city-selected" class="selected-cities"></div>
           </div>
 
           <div class="form-group">
-            <label for="nearby-city">Nearby cities (max 3)</label>
-            <input id="nearby-city" type="text" placeholder="Add nearby city" />
+            <label>Nearby cities (max 3)</label>
+            <div class="city-search-box">
+              <input
+                id="nearby-cities-search"
+                class="city-search-input"
+                type="text"
+                placeholder="Add nearby city"
+                autocomplete="off"
+              />
+              <div id="nearby-cities-dropdown" class="city-dropdown hidden"></div>
+            </div>
+            <div id="nearby-cities-selected" class="selected-cities"></div>
           </div>
 
           <div class="form-group">
             <label>Vehicle type</label>
             <div class="rent-chip-row" id="vehicle-chips">
-              <button type="button" class="rent-chip" data-type="car">Car</button>
-              <button type="button" class="rent-chip" data-type="bus">Bus</button>
-              <button type="button" class="rent-chip" data-type="toto">Toto</button>
-              <button type="button" class="rent-chip" data-type="auto">Auto</button>
-              <button type="button" class="rent-chip" data-type="pickup">Pickup</button>
-              <button type="button" class="rent-chip" data-type="ambulance">Ambulance</button>
+              <button type="button" class="rent-chip" data-value="Car">Car</button>
+              <button type="button" class="rent-chip" data-value="Bus">Bus</button>
+              <button type="button" class="rent-chip" data-value="Toto">Toto</button>
+              <button type="button" class="rent-chip" data-value="Auto">Auto</button>
+              <button type="button" class="rent-chip" data-value="Pickup">Pickup</button>
+              <button type="button" class="rent-chip" data-value="Ambulance">Ambulance</button>
             </div>
           </div>
 
           <div class="form-group">
             <label>Purpose</label>
             <div class="rent-chip-row" id="purpose-chips">
-              <button type="button" class="rent-chip">Cheap Rent</button>
-              <button type="button" class="rent-chip">Wedding</button>
-              <button type="button" class="rent-chip">Tour</button>
-              <button type="button" class="rent-chip">Local</button>
-              <button type="button" class="rent-chip">School/Office</button>
-              <button type="button" class="rent-chip">Emergency</button>
-              <button type="button" class="rent-chip">Goods/Parcel</button>
+              <button type="button" class="rent-chip" data-value="Cheap Rent">Cheap Rent</button>
+              <button type="button" class="rent-chip" data-value="Wedding">Wedding</button>
+              <button type="button" class="rent-chip" data-value="Tour">Tour</button>
+              <button type="button" class="rent-chip" data-value="Local">Local</button>
+              <button type="button" class="rent-chip" data-value="School/Office">School/Office</button>
+              <button type="button" class="rent-chip" data-value="Emergency">Emergency</button>
+              <button type="button" class="rent-chip" data-value="Goods/Parcel">Goods/Parcel</button>
             </div>
           </div>
 
           <button id="rent-search-btn" class="rent-search-btn" type="button" disabled>
             🔍 Select a city to search
           </button>
+
+          <button id="clear-search-btn" class="clear-filter-btn" type="button">
+            Clear Filters
+          </button>
         </div>
 
-        <h2 class="rent-section-heading">Available rentals</h2>
-        
-        <!-- Demo rental cards -->
-        <div class="rental-cards-grid">
-          <!-- Card A: Swift Dzire -->
-          <div class="rental-card">
-            <div class="rental-image">
-              <div class="rental-placeholder">🚗</div>
-            </div>
-            <div class="rental-details">
-              <h3>Swift Dzire with Driver</h3>
-              <p class="rental-meta">Car · 4 seats · Kolkata</p>
-              <p class="rental-purposes">Tour, Local</p>
-              <p class="rental-price">Starting ₹2500/day</p>
-              <span class="rental-badge badge-free">Free Trial</span>
-            </div>
-            <div class="rental-actions">
-              <button class="btn btn-small btn-primary">Call Now</button>
-              <button class="btn btn-small btn-outline">WhatsApp</button>
-              <button class="btn btn-small btn-outline">View Details</button>
-            </div>
-          </div>
-
-          <!-- Card B: Wedding Bus -->
-          <div class="rental-card">
-            <div class="rental-image">
-              <div class="rental-placeholder">🚌</div>
-            </div>
-            <div class="rental-details">
-              <h3>Wedding Bus Rental</h3>
-              <p class="rental-meta">Bus · 40 seats · Durgapur</p>
-              <p class="rental-purposes">Wedding, Tour</p>
-              <p class="rental-price">Starting ₹12000/day</p>
-              <span class="rental-badge badge-verified">✓ Verified</span>
-            </div>
-            <div class="rental-actions">
-              <button class="btn btn-small btn-primary">Call Now</button>
-              <button class="btn btn-small btn-outline">WhatsApp</button>
-              <button class="btn btn-small btn-outline">View Details</button>
-            </div>
-          </div>
-
-          <!-- Card C: Ambulance -->
-          <div class="rental-card">
-            <div class="rental-image">
-              <div class="rental-placeholder">🚑</div>
-            </div>
-            <div class="rental-details">
-              <h3>Ambulance Service</h3>
-              <p class="rental-meta">Ambulance · Emergency · Asansol</p>
-              <p class="rental-purposes">Emergency</p>
-              <p class="rental-price">Call for price</p>
-              <span class="rental-badge badge-free">Free Trial</span>
-            </div>
-            <div class="rental-actions">
-              <button class="btn btn-small btn-primary">Call Now</button>
-              <button class="btn btn-small btn-outline">WhatsApp</button>
-              <button class="btn btn-small btn-outline">View Details</button>
-            </div>
-          </div>
+        <div class="rent-section-row">
+          <h2 class="rent-section-heading">Available rentals</h2>
+          <p class="rent-count-text"><strong id="result-count">0</strong> listings</p>
         </div>
 
-        <!-- Owner CTA card -->
+        {listingsError && (
+          <div class="error-box">Rent listings fetch error. Check Supabase columns/RLS.</div>
+        )}
+
+        <div id="rental-cards-grid" class="rental-cards-grid"></div>
+
         <div class="owner-cta-card">
           <h3>Own a vehicle?</h3>
           <p>Create a listing and get first 3 months free.</p>
           <a href="/rent-vehicle?tab=register" class="btn btn-primary">Create Listing</a>
         </div>
 
-        <!-- Trust/info cards -->
         <div class="trust-cards">
           <div class="trust-card">
             <span class="trust-icon">🎉</span>
@@ -166,9 +237,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         </div>
       </section>
 
-      <!-- Create Listing Section -->
       <section id="create-section" class="rent-panel hidden">
-        <!-- Top notice card -->
         <div class="create-notice-card">
           <div class="notice-content">
             <h3>Add your vehicle listing</h3>
@@ -177,7 +246,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
           <a href="/owner/rent-dashboard" class="btn btn-outline btn-small">Dashboard</a>
         </div>
 
-        <!-- Section A: Owner Contact -->
         <div class="form-section-card">
           <h3 class="form-section-title">Owner Contact</h3>
           <div class="form-row">
@@ -197,20 +265,20 @@ import BaseLayout from "../layouts/BaseLayout.astro";
           </div>
         </div>
 
-        <!-- Section B: Vehicle Details -->
         <div class="form-section-card">
           <h3 class="form-section-title">Vehicle Details</h3>
           <div class="form-group">
             <label>Vehicle type</label>
             <div class="rent-chip-row" id="create-vehicle-chips">
-              <button type="button" class="rent-chip" data-type="car">Car</button>
-              <button type="button" class="rent-chip" data-type="bus">Bus</button>
-              <button type="button" class="rent-chip" data-type="toto">Toto</button>
-              <button type="button" class="rent-chip" data-type="auto">Auto</button>
-              <button type="button" class="rent-chip" data-type="pickup">Pickup</button>
-              <button type="button" class="rent-chip" data-type="ambulance">Ambulance</button>
+              <button type="button" class="rent-chip" data-value="Car">Car</button>
+              <button type="button" class="rent-chip" data-value="Bus">Bus</button>
+              <button type="button" class="rent-chip" data-value="Toto">Toto</button>
+              <button type="button" class="rent-chip" data-value="Auto">Auto</button>
+              <button type="button" class="rent-chip" data-value="Pickup">Pickup</button>
+              <button type="button" class="rent-chip" data-value="Ambulance">Ambulance</button>
             </div>
           </div>
+
           <div class="form-row">
             <div class="form-group">
               <label for="vehicle-reg">Vehicle Registration Number</label>
@@ -221,92 +289,108 @@ import BaseLayout from "../layouts/BaseLayout.astro";
               <input id="vehicle-model" type="text" placeholder="e.g., Swift Dzire ZXI" />
             </div>
           </div>
+
           <div class="form-group">
             <label for="vehicle-seats">Seats</label>
             <input id="vehicle-seats" type="number" placeholder="Enter seating capacity" />
           </div>
         </div>
 
-        <!-- Section C: Service Area -->
         <div class="form-section-card">
           <h3 class="form-section-title">Service Area</h3>
+
           <div class="form-group">
-            <label for="base-city">City</label>
-            <input id="base-city" type="text" placeholder="Enter base city" />
+            <label>Base City</label>
+            <div class="city-search-box">
+              <input
+                id="base-city-search"
+                class="city-search-input"
+                type="text"
+                placeholder="Search base city"
+                autocomplete="off"
+              />
+              <div id="base-city-dropdown" class="city-dropdown hidden"></div>
+            </div>
+            <div id="base-city-selected" class="selected-cities"></div>
           </div>
+
           <div class="form-group">
-            <label for="service-cities">Nearby service cities (max 3)</label>
-            <input id="service-cities" type="text" placeholder="Add service cities" />
+            <label>Service cities (max 3)</label>
+            <div class="city-search-box">
+              <input
+                id="service-cities-search"
+                class="city-search-input"
+                type="text"
+                placeholder="Add service city"
+                autocomplete="off"
+              />
+              <div id="service-cities-dropdown" class="city-dropdown hidden"></div>
+            </div>
+            <div id="service-cities-selected" class="selected-cities"></div>
           </div>
         </div>
 
-        <!-- Section D: Rent Details -->
         <div class="form-section-card">
           <h3 class="form-section-title">Rent Details</h3>
           <div class="form-group">
             <label>Rent type</label>
             <div class="rent-chip-row" id="rent-type-chips">
-              <button type="button" class="rent-chip">Cheap Rent</button>
-              <button type="button" class="rent-chip">Wedding</button>
-              <button type="button" class="rent-chip">Tour</button>
-              <button type="button" class="rent-chip">Local</button>
-              <button type="button" class="rent-chip">School/Office</button>
-              <button type="button" class="rent-chip">Emergency</button>
-              <button type="button" class="rent-chip">Goods/Parcel</button>
+              <button type="button" class="rent-chip" data-value="Cheap Rent">Cheap Rent</button>
+              <button type="button" class="rent-chip" data-value="Wedding">Wedding</button>
+              <button type="button" class="rent-chip" data-value="Tour">Tour</button>
+              <button type="button" class="rent-chip" data-value="Local">Local</button>
+              <button type="button" class="rent-chip" data-value="School/Office">School/Office</button>
+              <button type="button" class="rent-chip" data-value="Emergency">Emergency</button>
+              <button type="button" class="rent-chip" data-value="Goods/Parcel">Goods/Parcel</button>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="rent-price">Price</label>
-              <input id="rent-price" type="text" placeholder="e.g., ₹2500/day" />
-            </div>
+
+          <div class="form-group">
+            <label for="rent-price">Price</label>
+            <input id="rent-price" type="text" placeholder="e.g., ₹2500/day" />
           </div>
+
           <div class="form-group">
             <label for="rent-description">Description</label>
             <textarea id="rent-description" rows="3" placeholder="Describe your vehicle and services..."></textarea>
           </div>
         </div>
 
-        <!-- Section E: Photos -->
         <div class="form-section-card">
           <h3 class="form-section-title">Photos (max 4)</h3>
-          <div class="photo-upload-grid">
-            <div class="photo-upload-box">
-              <span class="photo-placeholder">+</span>
-            </div>
-            <div class="photo-upload-box">
-              <span class="photo-placeholder">+</span>
-            </div>
-            <div class="photo-upload-box">
-              <span class="photo-placeholder">+</span>
-            </div>
-            <div class="photo-upload-box">
-              <span class="photo-placeholder">+</span>
-            </div>
+          <input id="rent-photo-input" type="file" accept="image/*" multiple class="hidden-file-input" />
+          <div id="photo-upload-grid" class="photo-upload-grid">
+            <button type="button" class="photo-upload-box" data-photo-slot="0"><span class="photo-placeholder">+</span></button>
+            <button type="button" class="photo-upload-box" data-photo-slot="1"><span class="photo-placeholder">+</span></button>
+            <button type="button" class="photo-upload-box" data-photo-slot="2"><span class="photo-placeholder">+</span></button>
+            <button type="button" class="photo-upload-box" data-photo-slot="3"><span class="photo-placeholder">+</span></button>
           </div>
+          <p class="field-note">Max 4 photos. Photos cannot be saved through Google redirect, so select photos after login if needed.</p>
         </div>
 
-        <!-- Section F: Consent + Login -->
         <div class="form-section-card">
           <div class="form-group">
             <label class="checkbox-label">
               <input type="checkbox" id="consent-checkbox" />
-              <span>I confirm the information above is accurate and consent to making my contact details visible to users searching for rental vehicles.</span>
+              <span>I confirm the information above is accurate and consent to making my contact details visible.</span>
             </label>
           </div>
 
           <div class="login-required-card">
-            <h4>Login required before submit</h4>
-            <p>Please login with Google first, then submit your vehicle listing.</p>
-            <button class="btn btn-primary btn-small btn-disabled">Login with Google</button>
+            <h4>Google login required</h4>
+            <p id="auth-status-text">Login with Google before submitting your listing. Your form draft will be saved.</p>
+            <button id="google-login-btn" class="btn btn-primary btn-small" type="button">
+              Login with Google
+            </button>
           </div>
 
-          <button class="rent-search-btn btn-disabled" type="button" disabled>
-            Submit Listing
-          </button>
+          <div id="submit-message" class="submit-message hidden"></div>
+
+<button id="submit-listing-btn" class="rent-search-btn" type="button">
+  Submit Listing
+</button>
         </div>
 
-        <!-- Membership preview -->
         <div class="membership-preview">
           <h3 class="form-section-title">After free trial</h3>
           <div class="membership-cards">
@@ -326,96 +410,1075 @@ import BaseLayout from "../layouts/BaseLayout.astro";
               <p class="membership-desc">Bus, Wedding Bus, Tour Bus and School Bus visibility</p>
             </div>
           </div>
-          <div class="verified-badge-card">
-            <h4>Verified Badge</h4>
-            <p class="membership-price">₹299 / 3 months</p>
-            <p class="membership-desc">Trust badge for your listings</p>
-          </div>
         </div>
       </section>
     </div>
   </section>
 
+  <script define:vars={{ listingsForClient, citiesForClient }}>
+    window.rentListingsData = listingsForClient;
+    window.rentCitiesData = citiesForClient;
+  </script>
+
   <script>
+    import { supabase } from "../lib/supabase";
+    const listings = Array.isArray(window.rentListingsData) ? window.rentListingsData : [];
+    const cities = Array.isArray(window.rentCitiesData) ? window.rentCitiesData : [];
+
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab") || "find";
-    const type = params.get("type") || "car";
+    const typeParam = params.get("type") || "";
 
-    const findTab = document.getElementById("find-tab");
-    const createTab = document.getElementById("create-tab");
-    const findSection = document.getElementById("find-section");
-    const createSection = document.getElementById("create-section");
+    const state = {
+      mainCity: null,
+      nearbyCities: [],
+      baseCity: null,
+      serviceCities: [],
+      vehicleType: "",
+      purpose: "",
+    };
+
+    const selectorIdMap = {
+      mainCity: {
+        search: "main-city-search",
+        dropdown: "main-city-dropdown",
+        selected: "main-city-selected",
+      },
+      nearbyCities: {
+        search: "nearby-cities-search",
+        dropdown: "nearby-cities-dropdown",
+        selected: "nearby-cities-selected",
+      },
+      baseCity: {
+        search: "base-city-search",
+        dropdown: "base-city-dropdown",
+        selected: "base-city-selected",
+      },
+      serviceCities: {
+        search: "service-cities-search",
+        dropdown: "service-cities-dropdown",
+        selected: "service-cities-selected",
+      },
+    };
+
+    const typeToVehicle = {
+      car: "Car",
+      bus: "Bus",
+      "wedding-bus": "Bus",
+      toto: "Toto",
+      auto: "Auto",
+      pickup: "Pickup",
+      ambulance: "Ambulance",
+      "tour-car": "Car",
+      "school-bus": "Bus",
+    };
+
+    const typeToPurpose = {
+      "wedding-bus": "Wedding",
+      "tour-car": "Tour",
+      "school-bus": "School/Office",
+      ambulance: "Emergency",
+    };
+
+    if (typeParam && typeToVehicle[typeParam]) {
+      state.vehicleType = typeToVehicle[typeParam];
+    }
+
+    if (typeParam && typeToPurpose[typeParam]) {
+      state.purpose = typeToPurpose[typeParam];
+    }
+
+    function esc(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function onlyDigits(value) {
+      return String(value || "").replace(/\D/g, "");
+    }
+
+    function getDisplayName(city) {
+      if (!city) return "";
+      return city.name || city.name_en || city.name_bn || "";
+    }
+
+    function includesText(value, term) {
+      return String(value || "").toLowerCase().includes(term);
+    }
+
+    function cityMatchesSearch(city, searchTerm) {
+      const term = String(searchTerm || "").trim().toLowerCase();
+      if (!term) return true;
+
+      return (
+        includesText(city.name, term) ||
+        includesText(city.name_en, term) ||
+        includesText(city.name_bn, term) ||
+        includesText(city.district, term) ||
+        includesText(city.search_keywords_en, term) ||
+        includesText(city.search_keywords_bn, term)
+      );
+    }
+
+    function getSelectedForType(type) {
+      if (type === "mainCity") return state.mainCity ? [state.mainCity] : [];
+      if (type === "nearbyCities") return state.nearbyCities;
+      if (type === "baseCity") return state.baseCity ? [state.baseCity] : [];
+      if (type === "serviceCities") return state.serviceCities;
+      return [];
+    }
+
+    function filterCities(searchTerm, type) {
+      let selectedIds = getSelectedForType(type).map((city) => city.id);
+
+if (type === "nearbyCities" && state.mainCity) {
+  selectedIds.push(state.mainCity.id);
+}
+
+if (type === "serviceCities" && state.baseCity) {
+  selectedIds.push(state.baseCity.id);
+}
+
+      return cities
+        .filter((city) => city && city.id)
+        .filter((city) => !selectedIds.includes(city.id))
+        .filter((city) => cityMatchesSearch(city, searchTerm))
+        .slice(0, 30);
+    }
+
+    function renderDropdown(filteredCities, dropdown, selectorType) {
+      dropdown.innerHTML = "";
+
+      if (!filteredCities.length) {
+        dropdown.innerHTML = `<div class="dropdown-no-results">No cities found</div>`;
+        return;
+      }
+
+      filteredCities.forEach((city) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "dropdown-item";
+        btn.dataset.cityId = city.id;
+        btn.dataset.selectorType = selectorType;
+
+        btn.innerHTML = `
+          <span class="city-name">${esc(getDisplayName(city))}</span>
+          ${city.district ? `<span class="city-district">${esc(city.district)}</span>` : ""}
+        `;
+
+        dropdown.appendChild(btn);
+      });
+    }
+
+    function closeDropdown(type) {
+      const ids = selectorIdMap[type];
+      const dropdown = document.getElementById(ids.dropdown);
+      if (dropdown) dropdown.classList.add("hidden");
+    }
+
+    function clearSearch(type) {
+  const ids = selectorIdMap[type];
+  const input = document.getElementById(ids.search);
+
+  if (input) {
+    input.value = "";
+    input.blur();
+  }
+}
+
+    function updateSelectedDisplay(type) {
+      const ids = selectorIdMap[type];
+      const container = document.getElementById(ids.selected);
+      if (!container) return;
+
+      const selectedCities = getSelectedForType(type);
+      container.innerHTML = "";
+
+      if (!selectedCities.length) {
+        container.innerHTML = `<div class="no-selection">No city selected</div>`;
+        return;
+      }
+
+      selectedCities.forEach((city) => {
+        const tag = document.createElement("span");
+        tag.className = "city-tag";
+        tag.innerHTML = `
+          <span>${esc(getDisplayName(city))}</span>
+          <button type="button" class="remove-btn" data-city-id="${city.id}" data-type="${type}" aria-label="Remove city">×</button>
+        `;
+        container.appendChild(tag);
+      });
+    }
+
+    function refreshCityDisplays() {
+      updateSelectedDisplay("mainCity");
+      updateSelectedDisplay("nearbyCities");
+      updateSelectedDisplay("baseCity");
+      updateSelectedDisplay("serviceCities");
+      updateSearchButton();
+      renderListings();
+    }
+
+    function handleCitySelection(cityId, selectorType) {
+      const city = cities.find((c) => c.id === cityId);
+      if (!city) return;
+
+      if (selectorType === "mainCity") state.mainCity = city;
+      if (selectorType === "baseCity") state.baseCity = city;
+
+      if (selectorType === "nearbyCities") {
+        if (state.nearbyCities.some((c) => c.id === city.id)) return;
+        if (state.nearbyCities.length >= 3) {
+          alert("Maximum 3 nearby cities allowed");
+          return;
+        }
+        state.nearbyCities.push(city);
+      }
+
+      if (selectorType === "serviceCities") {
+        if (state.serviceCities.some((c) => c.id === city.id)) return;
+        if (state.serviceCities.length >= 3) {
+          alert("Maximum 3 service cities allowed");
+          return;
+        }
+        state.serviceCities.push(city);
+      }
+
+      clearSearch(selectorType);
+      closeDropdown(selectorType);
+      refreshCityDisplays();
+    }
+
+    function removeSelected(cityId, type) {
+      if (type === "mainCity") state.mainCity = null;
+      if (type === "baseCity") state.baseCity = null;
+      if (type === "nearbyCities") {
+        state.nearbyCities = state.nearbyCities.filter((c) => c.id !== cityId);
+      }
+      if (type === "serviceCities") {
+        state.serviceCities = state.serviceCities.filter((c) => c.id !== cityId);
+      }
+
+      refreshCityDisplays();
+    }
+
+    function setupSelector(type) {
+      const ids = selectorIdMap[type];
+      const searchInput = document.getElementById(ids.search);
+      const dropdown = document.getElementById(ids.dropdown);
+
+      if (!searchInput || !dropdown) return;
+
+      function showFiltered() {
+        const filtered = filterCities(searchInput.value, type);
+        renderDropdown(filtered, dropdown, type);
+        dropdown.classList.remove("hidden");
+      }
+
+      searchInput.addEventListener("focus", showFiltered);
+searchInput.addEventListener("click", showFiltered);
+searchInput.addEventListener("input", showFiltered);
+
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    dropdown.classList.add("hidden");
+    searchInput.blur();
+  }
+});
+    }
+
+    function updateSearchButton() {
+      const btn = document.getElementById("rent-search-btn");
+      if (!btn) return;
+
+      const hasCity = Boolean(state.mainCity);
+      btn.disabled = !hasCity;
+      btn.textContent = hasCity ? "🔍 Search rentals" : "🔍 Select a city to search";
+    }
+
+    function whatsappNumber(listing) {
+      const raw = onlyDigits(listing.owner_whatsapp || listing.owner_phone || "");
+      if (raw.length === 10) return `91${raw}`;
+      return raw;
+    }
+
+    function listingMatches(listing) {
+      const cityIds = [
+        state.mainCity?.id,
+        ...state.nearbyCities.map((city) => city.id),
+      ].filter(Boolean);
+
+      if (cityIds.length > 0) {
+        const serviceIds = Array.isArray(listing.service_city_ids)
+          ? listing.service_city_ids
+          : [];
+
+        const cityMatch =
+          cityIds.includes(listing.base_city_id) ||
+          serviceIds.some((id) => cityIds.includes(id));
+
+        if (!cityMatch) return false;
+      }
+
+      if (state.vehicleType && listing.vehicle_type !== state.vehicleType) {
+        return false;
+      }
+
+      if (state.purpose) {
+        const purposes = Array.isArray(listing.purposes) ? listing.purposes : [];
+        if (!purposes.includes(state.purpose)) return false;
+      }
+
+      return true;
+    }
+
+    function renderPhotos(listing) {
+      const photos = Array.isArray(listing.photo_urls)
+        ? listing.photo_urls.slice(0, 4)
+        : [];
+
+      const cells = [0, 1, 2, 3].map((index) => {
+        const url = photos[index];
+
+        if (!url) {
+          return `<div class="photo-empty">No Photo</div>`;
+        }
+
+        return `
+          <button type="button" class="photo-btn" data-photo-url="${esc(url)}">
+            <img src="${esc(url)}" alt="Rent vehicle photo ${index + 1}" loading="lazy" />
+          </button>
+        `;
+      });
+
+      return `<div class="photo-grid">${cells.join("")}</div>`;
+    }
+
+    function renderCard(listing) {
+      const phone = onlyDigits(listing.owner_phone || "");
+      const wa = whatsappNumber(listing);
+      const serviceNames = Array.isArray(listing.service_city_names)
+        ? listing.service_city_names.filter(Boolean)
+        : [];
+      const purposes = Array.isArray(listing.purposes)
+        ? listing.purposes.filter(Boolean)
+        : [];
+
+      return `
+        <article class="rental-card db-rental-card">
+          ${renderPhotos(listing)}
+
+          <div class="rental-details">
+            <div class="card-top-line">
+              <h3>${esc(listing.owner_name || "Rental provider")}</h3>
+              ${listing.is_verified ? `<span class="rental-badge badge-verified">✓ Verified</span>` : ""}
+            </div>
+
+            <p class="rental-meta">
+              ${esc(listing.vehicle_type || "Vehicle")}
+              ${listing.vehicle_model ? ` · ${esc(listing.vehicle_model)}` : ""}
+              ${listing.seats ? ` · ${esc(listing.seats)} seats` : ""}
+            </p>
+
+            ${listing.base_city_name ? `<p class="rental-purposes"><strong>Base:</strong> ${esc(listing.base_city_name)}</p>` : ""}
+            ${serviceNames.length ? `<p class="rental-purposes"><strong>Service:</strong> ${esc(serviceNames.join(", "))}</p>` : ""}
+            ${purposes.length ? `<p class="rental-purposes"><strong>Purpose:</strong> ${esc(purposes.join(" • "))}</p>` : ""}
+            ${listing.price_text ? `<p class="rental-price">${esc(listing.price_text)}</p>` : ""}
+            ${listing.description ? `<p class="rental-desc">${esc(listing.description)}</p>` : ""}
+          </div>
+
+          <div class="rental-actions">
+            ${
+              phone
+                ? `<a class="btn btn-small btn-primary" href="tel:${phone}">Call Now</a>`
+                : `<button class="btn btn-small btn-disabled" type="button" disabled>No Phone</button>`
+            }
+
+            ${
+              wa
+                ? `<a class="btn btn-small btn-outline" href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`
+                : `<button class="btn btn-small btn-disabled" type="button" disabled>No WhatsApp</button>`
+            }
+
+            <button class="btn btn-small btn-outline" type="button" data-listing-id="${esc(listing.id)}">View Details</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderListings() {
+      const grid = document.getElementById("rental-cards-grid");
+      const resultCount = document.getElementById("result-count");
+      if (!grid) return;
+
+      const filtered = listings.filter(listingMatches);
+
+      if (resultCount) resultCount.textContent = String(filtered.length);
+
+      if (!filtered.length) {
+        grid.innerHTML = `
+          <div class="empty-rent-box">
+            <h3>No rentals listed yet</h3>
+            <p>Select another city, nearby city, vehicle type or purpose.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(renderCard).join("");
+    }
+
+    function setupSingleChipGroup(groupId, stateKey) {
+      const chips = Array.from(document.querySelectorAll(`#${groupId} .rent-chip`));
+
+      chips.forEach((chip) => {
+        const value = chip.dataset.value || chip.textContent.trim();
+
+        if (state[stateKey] === value) {
+          chip.classList.add("active");
+        }
+
+        chip.addEventListener("click", () => {
+          const alreadyActive = chip.classList.contains("active");
+
+          chips.forEach((c) => c.classList.remove("active"));
+
+          if (alreadyActive) {
+            state[stateKey] = "";
+          } else {
+            chip.classList.add("active");
+            state[stateKey] = value;
+          }
+
+          renderListings();
+        });
+      });
+    }
+
+    function setupToggleChipGroup(groupId) {
+      const chips = Array.from(document.querySelectorAll(`#${groupId} .rent-chip`));
+      chips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+          chip.classList.toggle("active");
+        });
+      });
+    }
 
     function showTab(activeTab) {
       const isCreate = activeTab === "create" || activeTab === "register";
 
-      findTab?.classList.toggle("active", !isCreate);
-      createTab?.classList.toggle("active", isCreate);
+      document.getElementById("find-tab")?.classList.toggle("active", !isCreate);
+      document.getElementById("create-tab")?.classList.toggle("active", isCreate);
+      document.getElementById("find-section")?.classList.toggle("hidden", isCreate);
+      document.getElementById("create-section")?.classList.toggle("hidden", !isCreate);
+    }
+const RENT_DRAFT_KEY = "wbbustime_astro_rent_listing_draft_v1";
+const RENT_PENDING_SUBMIT_KEY = "wbbustime_astro_rent_pending_submit_v1";
+const MAX_RENT_PHOTOS = 4;
+let selectedPhotoFiles = [];
+let currentUser = null;
 
-      findSection?.classList.toggle("hidden", isCreate);
-      createSection?.classList.toggle("hidden", !isCreate);
+function normalizePhone10(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+
+  return digits;
+}
+
+function normalizeRegNumber(value) {
+  return String(value || "").replace(/[\s-]/g, "").toUpperCase();
+}
+
+function getInputValue(id) {
+  const el = document.getElementById(id);
+  return el ? String(el.value || "").trim() : "";
+}
+
+function setInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value || "";
+}
+
+function isChecked(id) {
+  const el = document.getElementById(id);
+  return Boolean(el && el.checked);
+}
+
+function setCheckboxValue(id, checked) {
+  const el = document.getElementById(id);
+  if (el) el.checked = Boolean(checked);
+}
+
+function getActiveChipValue(groupId) {
+  const active = document.querySelector(`#${groupId} .rent-chip.active`);
+  return active ? String(active.dataset.value || active.textContent || "").trim() : "";
+}
+
+function getActiveChipValues(groupId) {
+  return Array.from(document.querySelectorAll(`#${groupId} .rent-chip.active`))
+    .map((chip) => String(chip.dataset.value || chip.textContent || "").trim())
+    .filter(Boolean);
+}
+
+function setChipActive(groupId, values) {
+  const valueSet = new Set(Array.isArray(values) ? values : [values].filter(Boolean));
+
+  document.querySelectorAll(`#${groupId} .rent-chip`).forEach((chip) => {
+    const value = String(chip.dataset.value || chip.textContent || "").trim();
+    chip.classList.toggle("active", valueSet.has(value));
+  });
+}
+
+function showSubmitMessage(message, type = "info") {
+  const box = document.getElementById("submit-message");
+  if (!box) return;
+
+  box.textContent = message;
+  box.classList.remove("hidden", "success", "error", "info");
+  box.classList.add(type);
+}
+
+function collectCreateListingDraft() {
+  return {
+    ownerName: getInputValue("owner-name"),
+    phone: getInputValue("owner-phone"),
+    whatsapp: getInputValue("owner-whatsapp"),
+    vehicleType: getActiveChipValue("create-vehicle-chips"),
+    regNumber: getInputValue("vehicle-reg"),
+    vehicleModel: getInputValue("vehicle-model"),
+    seats: getInputValue("vehicle-seats"),
+    baseCityId: state.baseCity ? state.baseCity.id : null,
+    serviceCityIds: state.serviceCities.map((city) => city.id).slice(0, 3),
+    purposes: getActiveChipValues("rent-type-chips"),
+    priceText: getInputValue("rent-price"),
+    description: getInputValue("rent-description"),
+    consent: isChecked("consent-checkbox"),
+  };
+}
+
+function saveCreateListingDraft() {
+  try {
+    localStorage.setItem(RENT_DRAFT_KEY, JSON.stringify(collectCreateListingDraft()));
+  } catch (error) {
+    console.error("Draft save failed:", error);
+  }
+}
+
+function clearCreateListingDraft() {
+  try {
+    localStorage.removeItem(RENT_DRAFT_KEY);
+    localStorage.removeItem(RENT_PENDING_SUBMIT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function restoreCreateListingDraft() {
+  let draft = null;
+
+  try {
+    const raw = localStorage.getItem(RENT_DRAFT_KEY);
+    if (!raw) return false;
+    draft = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+
+  setInputValue("owner-name", draft.ownerName || "");
+  setInputValue("owner-phone", draft.phone || "");
+  setInputValue("owner-whatsapp", draft.whatsapp || "");
+  setInputValue("vehicle-reg", draft.regNumber || "");
+  setInputValue("vehicle-model", draft.vehicleModel || "");
+  setInputValue("vehicle-seats", draft.seats || "");
+  setInputValue("rent-price", draft.priceText || "");
+  setInputValue("rent-description", draft.description || "");
+  setCheckboxValue("consent-checkbox", Boolean(draft.consent));
+
+  setChipActive("create-vehicle-chips", draft.vehicleType || "");
+  setChipActive("rent-type-chips", draft.purposes || []);
+
+  if (draft.baseCityId) {
+    const city = cities.find((c) => c.id === draft.baseCityId);
+    if (city) state.baseCity = city;
+  }
+
+  if (Array.isArray(draft.serviceCityIds)) {
+    state.serviceCities = draft.serviceCityIds
+      .map((id) => cities.find((c) => c.id === id))
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  refreshCityDisplays();
+  return true;
+}
+
+async function getCurrentUser() {
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    console.error("Get session failed:", error);
+    return null;
+  }
+
+  return data.session?.user || null;
+}
+
+async function updateAuthStatus() {
+  currentUser = await getCurrentUser();
+
+  const text = document.getElementById("auth-status-text");
+  const loginBtn = document.getElementById("google-login-btn");
+  const submitBtn = document.getElementById("submit-listing-btn");
+
+  if (currentUser?.email) {
+    if (text) text.textContent = `Logged in as ${currentUser.email}. Complete the form and submit your listing.`;
+    if (loginBtn) {
+      loginBtn.textContent = "Logged in";
+      loginBtn.setAttribute("disabled", "disabled");
+      loginBtn.classList.add("btn-disabled");
+    }
+    if (submitBtn) submitBtn.textContent = "Submit Listing";
+    return currentUser;
+  }
+
+  if (text) text.textContent = "Login with Google before submitting your listing. Your form draft will be saved.";
+  if (loginBtn) {
+    loginBtn.textContent = "Login with Google";
+    loginBtn.removeAttribute("disabled");
+    loginBtn.classList.remove("btn-disabled");
+  }
+  if (submitBtn) submitBtn.textContent = "Save Draft & Login";
+  return null;
+}
+
+async function loginWithGoogleAndSaveDraft() {
+  saveCreateListingDraft();
+  localStorage.setItem(RENT_PENDING_SUBMIT_KEY, "1");
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/rent-vehicle?tab=register`,
+    },
+  });
+
+  if (error) {
+    showSubmitMessage(error.message, "error");
+  }
+}
+
+function validateCreateListingForm(input) {
+  if (!input.owner_name) return "Owner name required.";
+
+  if (!/^\d{10}$/.test(input.owner_phone)) {
+    return "Valid 10 digit phone number required.";
+  }
+
+  if (!/^\d{10}$/.test(input.owner_whatsapp)) {
+    return "Valid 10 digit WhatsApp number required.";
+  }
+
+  if (!input.vehicle_type) return "Vehicle type required.";
+  if (!input.reg_number) return "Vehicle registration number required.";
+  if (!input.vehicle_model) return "Vehicle model required.";
+
+  if (!input.seats || Number(input.seats) < 1) {
+    return "Seats required.";
+  }
+
+  if (!input.base_city_id) return "Base city required.";
+
+  if (!input.service_city_ids || input.service_city_ids.length < 1) {
+    return "At least 1 service city required.";
+  }
+
+  if (!input.purposes || input.purposes.length < 1) {
+    return "At least 1 rent type required.";
+  }
+
+  if (!input.price_text) return "Price required.";
+  if (!input.description) return "Description required.";
+
+  if (!selectedPhotoFiles.length) {
+    return "At least 1 vehicle photo required.";
+  }
+
+  if (selectedPhotoFiles.length > MAX_RENT_PHOTOS) {
+    return "Maximum 4 photos allowed.";
+  }
+
+  if (!input.consent_accepted) {
+    return "Please accept consent before submit.";
+  }
+
+  return "";
+}
+
+async function checkDuplicateRegNumber(regNumber) {
+  const cleanReg = normalizeRegNumber(regNumber);
+
+  if (!cleanReg) {
+    return {
+      exists: false,
+      error: "Vehicle registration number required.",
+    };
+  }
+
+  const { count, error } = await supabase
+    .from("rent_listings")
+    .select("id", { count: "exact", head: true })
+    .eq("reg_number", cleanReg)
+    .neq("status", "cancelled");
+
+  if (error) {
+    return {
+      exists: false,
+      error: error.message,
+    };
+  }
+
+  return {
+    exists: (count || 0) > 0,
+    error: "",
+  };
+}
+
+function updatePhotoPreview() {
+  const slots = Array.from(document.querySelectorAll(".photo-upload-box"));
+
+  slots.forEach((slot, index) => {
+    const file = selectedPhotoFiles[index];
+
+    if (!file) {
+      slot.innerHTML = `<span class="photo-placeholder">+</span>`;
+      slot.classList.remove("has-photo");
+      return;
     }
 
-    showTab(tab);
+    const url = URL.createObjectURL(file);
+    slot.classList.add("has-photo");
+    slot.innerHTML = `
+      <img src="${url}" alt="Selected rent photo ${index + 1}" />
+      <span class="photo-remove" data-remove-photo-index="${index}">×</span>
+    `;
+  });
+}
 
-    // Vehicle type chips highlighting based on URL parameter
-    const vehicleChips = document.querySelectorAll("#vehicle-chips .rent-chip");
-    const createVehicleChips = document.querySelectorAll("#create-vehicle-chips .rent-chip");
+function addPhotoFiles(files) {
+  const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+  const remaining = MAX_RENT_PHOTOS - selectedPhotoFiles.length;
 
-    function highlightChip(chips, type) {
-      chips.forEach((chip) => {
-        const chipType = chip.getAttribute("data-type");
-        // Highlight exact match or nearest match
-        if (chipType === type) {
-          chip.classList.add("active");
+  if (remaining <= 0) {
+    showSubmitMessage("Maximum 4 photos allowed.", "error");
+    return;
+  }
+
+  selectedPhotoFiles = [...selectedPhotoFiles, ...imageFiles.slice(0, remaining)].slice(0, MAX_RENT_PHOTOS);
+  updatePhotoPreview();
+}
+
+async function uploadSelectedPhotos(userId) {
+  const uploaded = [];
+
+  for (let i = 0; i < selectedPhotoFiles.length; i++) {
+    const file = selectedPhotoFiles[i];
+    const ext = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
+    const path = `${userId}/${Date.now()}-${i}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from("rent-listing-photos")
+      .upload(path, file, {
+        cacheControl: "31536000",
+        upsert: false,
+        contentType: file.type || "image/jpeg",
+      });
+
+    if (error) {
+      throw new Error(`Photo upload failed: ${error.message}`);
+    }
+
+    uploaded.push(path);
+  }
+
+  return uploaded;
+}
+
+function clearCreateListingForm() {
+  [
+    "owner-name",
+    "owner-phone",
+    "owner-whatsapp",
+    "vehicle-reg",
+    "vehicle-model",
+    "vehicle-seats",
+    "rent-price",
+    "rent-description",
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
+  const consent = document.getElementById("consent-checkbox");
+  if (consent) consent.checked = false;
+
+  document
+    .querySelectorAll("#create-vehicle-chips .rent-chip, #rent-type-chips .rent-chip")
+    .forEach((chip) => chip.classList.remove("active"));
+
+  state.baseCity = null;
+  state.serviceCities = [];
+  selectedPhotoFiles = [];
+
+  const photoInput = document.getElementById("rent-photo-input");
+  if (photoInput) photoInput.value = "";
+
+  updatePhotoPreview();
+  updateSelectedDisplay("baseCity");
+  updateSelectedDisplay("serviceCities");
+  clearCreateListingDraft();
+}
+
+async function submitCreateListing() {
+  const btn = document.getElementById("submit-listing-btn");
+  if (!btn) return;
+
+  const user = await getCurrentUser();
+
+  if (!user?.id || !user?.email) {
+    saveCreateListingDraft();
+    showSubmitMessage("Please login with Google first. Your form draft is saved.", "info");
+    await loginWithGoogleAndSaveDraft();
+    return;
+  }
+
+  const ownerPhone = normalizePhone10(getInputValue("owner-phone"));
+  const ownerWhatsapp = normalizePhone10(getInputValue("owner-whatsapp"));
+
+  const input = {
+    owner_user_id: user.id,
+    owner_email: user.email,
+    owner_name: getInputValue("owner-name"),
+    owner_phone: ownerPhone,
+    owner_whatsapp: ownerWhatsapp,
+    vehicle_type: getActiveChipValue("create-vehicle-chips"),
+    reg_number: normalizeRegNumber(getInputValue("vehicle-reg")),
+    vehicle_model: getInputValue("vehicle-model"),
+    seats: Number(getInputValue("vehicle-seats") || 0),
+    purposes: getActiveChipValues("rent-type-chips"),
+    base_city_id: state.baseCity ? state.baseCity.id : null,
+    service_city_ids: state.serviceCities.map((city) => city.id).slice(0, 3),
+    price_text: getInputValue("rent-price"),
+    description: getInputValue("rent-description"),
+    photos: [],
+    status: "active",
+    is_verified: false,
+    consent_accepted: isChecked("consent-checkbox"),
+    consent_accepted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const errorMessage = validateCreateListingForm(input);
+
+  if (errorMessage) {
+    showSubmitMessage(errorMessage, "error");
+    return;
+  }
+
+  const duplicateCheck = await checkDuplicateRegNumber(input.reg_number);
+
+  if (duplicateCheck.error) {
+    showSubmitMessage(duplicateCheck.error, "error");
+    return;
+  }
+
+  if (duplicateCheck.exists) {
+    showSubmitMessage(
+      "This registration number is already listed. Same vehicle cannot be listed again.",
+      "error"
+    );
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Uploading photos...";
+  showSubmitMessage("Uploading photos...", "info");
+
+  try {
+    const uploadedPhotos = await uploadSelectedPhotos(user.id);
+
+    btn.textContent = "Submitting...";
+    showSubmitMessage("Saving listing...", "info");
+
+    const insertPayload = {
+      ...input,
+      photos: uploadedPhotos,
+    };
+
+    const { data, error } = await supabase
+      .from("rent_listings")
+      .insert(insertPayload)
+      .select("id")
+      .single();
+
+    if (error) throw error;
+
+    showSubmitMessage(
+      "Listing submitted successfully. Your listing is now live.",
+      "success"
+    );
+
+    clearCreateListingForm();
+
+    btn.disabled = false;
+    btn.textContent = "Submit Listing";
+
+    console.log("Created rent listing:", data);
+  } catch (error) {
+    console.error("Create listing failed:", error);
+
+    showSubmitMessage(
+      error && error.message
+        ? error.message
+        : "Listing submit failed. Check Supabase RLS/storage policy/columns.",
+      "error"
+    );
+
+    btn.disabled = false;
+    btn.textContent = "Submit Listing";
+  }
+}
+
+function setupPhotoUpload() {
+  const input = document.getElementById("rent-photo-input");
+  const grid = document.getElementById("photo-upload-grid");
+
+  grid?.addEventListener("click", (event) => {
+    const remove = event.target.closest(".photo-remove");
+    if (remove) {
+      event.preventDefault();
+      event.stopPropagation();
+      const index = Number(remove.dataset.removePhotoIndex);
+      selectedPhotoFiles = selectedPhotoFiles.filter((_, i) => i !== index);
+      updatePhotoPreview();
+      return;
+    }
+
+    input?.click();
+  });
+
+  input?.addEventListener("change", () => {
+    addPhotoFiles(input.files);
+    input.value = "";
+  });
+}
+
+async function handlePostLoginRestore() {
+  const restored = restoreCreateListingDraft();
+  const user = await updateAuthStatus();
+  const hadPendingSubmit = localStorage.getItem(RENT_PENDING_SUBMIT_KEY) === "1";
+
+  if (restored && user?.email && hadPendingSubmit) {
+    localStorage.removeItem(RENT_PENDING_SUBMIT_KEY);
+    showSubmitMessage(
+      "Login complete. Draft restored. Please select photos again, then click Submit Listing.",
+      "info"
+    );
+  }
+}
+
+    document.addEventListener("DOMContentLoaded", () => {
+      showTab(tab);
+
+      handlePostLoginRestore();
+      setupPhotoUpload();
+
+      document.getElementById("google-login-btn")?.addEventListener("click", () => {
+        loginWithGoogleAndSaveDraft();
+      });
+
+      setupSelector("mainCity");
+      setupSelector("nearbyCities");
+      setupSelector("baseCity");
+      setupSelector("serviceCities");
+
+      setupSingleChipGroup("vehicle-chips", "vehicleType");
+      setupSingleChipGroup("purpose-chips", "purpose");
+      setupToggleChipGroup("create-vehicle-chips");
+      setupToggleChipGroup("rent-type-chips");
+
+      document.getElementById("clear-search-btn")?.addEventListener("click", () => {
+        state.mainCity = null;
+        state.nearbyCities = [];
+        state.vehicleType = "";
+        state.purpose = "";
+
+        document.querySelectorAll("#vehicle-chips .rent-chip, #purpose-chips .rent-chip").forEach((chip) => {
+          chip.classList.remove("active");
+        });
+
+        refreshCityDisplays();
+      });
+document.getElementById("submit-listing-btn")?.addEventListener("click", () => {
+  submitCreateListing();
+});
+      document.getElementById("rent-search-btn")?.addEventListener("click", () => {
+        renderListings();
+      });
+
+      document.addEventListener("mousedown", (event) => {
+        const target = event.target;
+
+        const cityOption = target.closest(".dropdown-item");
+        if (cityOption) {
+          event.preventDefault();
+          const cityId = cityOption.dataset.cityId;
+          const selectorType = cityOption.dataset.selectorType;
+          if (cityId && selectorType) {
+            handleCitySelection(cityId, selectorType);
+          }
+          return;
+        }
+
+        const removeBtn = target.closest(".remove-btn");
+        if (removeBtn) {
+          event.preventDefault();
+          const cityId = removeBtn.dataset.cityId;
+          const type = removeBtn.dataset.type;
+          if (cityId && type) {
+            removeSelected(cityId, type);
+          }
+          return;
+        }
+
+        const photoBtn = target.closest(".photo-btn");
+        if (photoBtn) {
+          const url = photoBtn.dataset.photoUrl;
+          if (url) window.open(url, "_blank", "noopener,noreferrer");
+          return;
+        }
+
+        if (!target.closest(".city-search-box")) {
+          Object.keys(selectorIdMap).forEach(closeDropdown);
         }
       });
-    }
 
-    highlightChip(vehicleChips, type);
-    highlightChip(createVehicleChips, type);
-
-    vehicleChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        vehicleChips.forEach((c) => c.classList.remove("active"));
-        chip.classList.add("active");
-      });
-    });
-
-    createVehicleChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        createVehicleChips.forEach((c) => c.classList.remove("active"));
-        chip.classList.add("active");
-      });
-    });
-
-    const purposeChips = document.querySelectorAll("#purpose-chips .rent-chip");
-    purposeChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        chip.classList.toggle("active");
-      });
-    });
-
-    const rentTypeChips = document.querySelectorAll("#rent-type-chips .rent-chip");
-    rentTypeChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        chip.classList.toggle("active");
-      });
-    });
-
-    const citySelect = document.getElementById("rent-city");
-    const searchBtn = document.getElementById("rent-search-btn");
-
-    citySelect?.addEventListener("change", () => {
-      const hasCity = citySelect.value.length > 0;
-      if (searchBtn) {
-        searchBtn.disabled = !hasCity;
-        searchBtn.textContent = hasCity ? "🔍 Search rentals" : "🔍 Select a city to search";
-      }
+      refreshCityDisplays();
     });
   </script>
 
-  <style>
+  <style is:global>
     .rent-page {
       background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
       min-height: 100vh;
@@ -429,10 +1492,19 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       padding: 0 1rem;
     }
 
-    .rent-hero-card {
+    .rent-hero-card,
+    .form-section-card,
+    .owner-cta-card,
+    .trust-card,
+    .create-notice-card,
+    .membership-preview,
+    .error-box {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 1rem;
+    }
+
+    .rent-hero-card {
       padding: 1.5rem;
       display: flex;
       justify-content: space-between;
@@ -491,10 +1563,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       border-color: #ff6b00;
     }
 
-    .rent-panel {
-      margin-bottom: 1.5rem;
-    }
-
     .hidden {
       display: none !important;
     }
@@ -517,20 +1585,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       border: none;
     }
 
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #e65a00, #ff6b00);
-      transform: translateY(-2px);
-    }
-
     .btn-outline {
       background: transparent;
       color: white;
       border: 2px solid rgba(255, 255, 255, 0.3);
-    }
-
-    .btn-outline:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.5);
     }
 
     .btn-small {
@@ -544,9 +1602,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .form-section-card {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 1rem;
       padding: 1.25rem;
       margin-bottom: 1.5rem;
     }
@@ -577,7 +1632,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .form-group input,
-    .form-group select,
     .form-group textarea {
       width: 100%;
       background: rgba(10, 7, 42, 0.72);
@@ -587,6 +1641,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       padding: 0.875rem 1rem;
       font-size: 0.95rem;
       outline: none;
+      box-sizing: border-box;
     }
 
     .form-group textarea {
@@ -594,14 +1649,119 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       min-height: 80px;
     }
 
-    .form-group option {
-      color: #111827;
+    .field-note {
+      margin: 0.4rem 0 0;
+      color: rgba(255, 255, 255, 0.56);
+      font-size: 0.82rem;
     }
 
-    .field-note {
-      margin: 0.25rem 0 0;
+    .city-search-box {
+      position: relative;
+    }
+
+    .city-search-input {
+      width: 100%;
+      background: rgba(10, 7, 42, 0.72);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 0.75rem;
+      padding: 0.875rem 1rem;
+      font-size: 0.95rem;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .city-search-input:focus {
+      border-color: rgba(255, 107, 0, 0.8);
+    }
+
+    .city-dropdown {
+      position: absolute;
+      top: calc(100% + 0.35rem);
+      left: 0;
+      right: 0;
+      background: rgba(10, 7, 42, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 0.75rem;
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 9999;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .dropdown-item {
+      width: 100%;
+      display: block;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      color: white;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font: inherit;
+    }
+
+    .dropdown-item:hover {
+      background: rgba(255, 107, 0, 0.18);
+    }
+
+    .city-name {
+      display: block;
+      font-weight: 700;
+      color: white;
+    }
+
+    .city-district {
+      display: block;
+      font-size: 0.82rem;
+      color: rgba(255, 255, 255, 0.65);
+      margin-top: 0.2rem;
+    }
+
+    .dropdown-no-results {
+      padding: 1rem;
+      text-align: center;
       color: rgba(255, 255, 255, 0.5);
-      font-size: 0.8rem;
+    }
+
+    .selected-cities {
+      margin-top: 0.65rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      min-height: 1.4rem;
+    }
+
+    .no-selection {
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 0.85rem;
+    }
+
+    .city-tag {
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .remove-btn {
+      background: rgba(255, 255, 255, 0.18);
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .rent-chip-row {
@@ -644,14 +1804,48 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       cursor: not-allowed;
     }
 
+    .clear-filter-btn {
+      width: 100%;
+      margin-top: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 0.75rem;
+      padding: 0.85rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .rent-section-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 2rem 0 1rem;
+    }
+
     .rent-section-heading {
-      margin-top: 2rem;
-      margin-bottom: 1rem;
+      margin: 0;
       font-size: 1.25rem;
       color: white;
     }
 
-    /* Rental cards */
+    .rent-count-text {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .rent-count-text strong {
+      color: #ff8a00;
+    }
+
+    .error-box {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-color: rgba(255, 80, 80, 0.5);
+      background: rgba(255, 80, 80, 0.14);
+    }
+
     .rental-cards-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -663,62 +1857,86 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 1rem;
-      padding: 1.25rem;
+      padding: 1rem;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
-    .rental-image {
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.35rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .photo-btn,
+    .photo-empty {
       width: 100%;
-      height: 120px;
-      border-radius: 0.75rem;
-      background: rgba(255, 255, 255, 0.04);
+      aspect-ratio: 1 / 1;
+      border: 0;
+      border-radius: 0.65rem;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.72rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1rem;
+      padding: 0;
     }
 
-    .rental-placeholder {
-      font-size: 2.5rem;
+    .photo-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .rental-details {
+      flex: 1;
+    }
+
+    .card-top-line {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
     }
 
     .rental-details h3 {
-      margin: 0 0 0.5rem;
-      font-size: 1.1rem;
+      margin: 0;
+      font-size: 1.05rem;
     }
 
-    .rental-meta {
+    .rental-meta,
+    .rental-purposes,
+    .rental-desc {
       margin: 0 0 0.5rem;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.86rem;
+      line-height: 1.4;
     }
 
-    .rental-purposes {
-      margin: 0 0 0.5rem;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
+    .rental-purposes strong {
+      color: white;
     }
 
     .rental-price {
-      margin: 0 0 0.75rem;
+      margin: 0 0 0.65rem;
       color: #ff8a00;
-      font-weight: 700;
-      font-size: 1rem;
+      font-weight: 800;
+      font-size: 0.96rem;
     }
 
     .rental-badge {
       display: inline-block;
-      padding: 0.25rem 0.75rem;
+      padding: 0.22rem 0.55rem;
       border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-    }
-
-    .badge-free {
-      background: rgba(255, 107, 0, 0.2);
-      color: #ff8a00;
+      font-size: 0.72rem;
+      font-weight: 800;
+      white-space: nowrap;
     }
 
     .badge-verified {
@@ -735,13 +1953,30 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     .rental-actions .btn {
       width: 100%;
+      box-sizing: border-box;
     }
 
-    /* Owner CTA card */
+    .empty-rent-box {
+      grid-column: 1 / -1;
+      border: 1px dashed rgba(255, 255, 255, 0.22);
+      border-radius: 1rem;
+      padding: 2rem 1rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .empty-rent-box h3 {
+      margin: 0 0 0.45rem;
+    }
+
+    .empty-rent-box p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
     .owner-cta-card {
       background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
-      border: 1px solid rgba(255, 107, 0, 0.3);
-      border-radius: 1rem;
+      border-color: rgba(255, 107, 0, 0.3);
       padding: 1.5rem;
       text-align: center;
       margin-bottom: 1.5rem;
@@ -757,7 +1992,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       color: rgba(255, 255, 255, 0.8);
     }
 
-    /* Trust cards */
     .trust-cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -765,9 +1999,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .trust-card {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 1rem;
       padding: 1rem;
       text-align: center;
       display: flex;
@@ -786,11 +2017,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       font-size: 0.85rem;
     }
 
-    /* Create notice card */
     .create-notice-card {
       background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
-      border: 1px solid rgba(255, 107, 0, 0.3);
-      border-radius: 1rem;
+      border-color: rgba(255, 107, 0, 0.3);
       padding: 1.25rem;
       display: flex;
       justify-content: space-between;
@@ -811,11 +2040,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       font-size: 0.9rem;
     }
 
-    /* Photo upload */
     .photo-upload-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 0.75rem;
+    }
+
+    .hidden-file-input {
+      display: none;
     }
 
     .photo-upload-box {
@@ -826,13 +2058,37 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
+      overflow: hidden;
       cursor: pointer;
-      transition: all 0.2s;
+      color: white;
     }
 
-    .photo-upload-box:hover {
-      border-color: rgba(255, 107, 0, 0.4);
-      background: rgba(255, 107, 0, 0.1);
+    .photo-upload-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-upload-box.has-photo {
+      border-style: solid;
+      border-color: rgba(255, 107, 0, 0.55);
+    }
+
+    .photo-remove {
+      position: absolute;
+      right: 0.35rem;
+      top: 0.35rem;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      cursor: pointer;
     }
 
     .photo-placeholder {
@@ -842,7 +2098,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     .checkbox-label {
-      display: flex;
+      display: flex !important;
       align-items: flex-start;
       gap: 0.75rem;
       cursor: pointer;
@@ -860,7 +2116,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       font-size: 0.85rem;
     }
 
-    /* Login required card */
     .login-required-card {
       background: rgba(255, 107, 0, 0.1);
       border: 1px solid rgba(255, 107, 0, 0.3);
@@ -871,7 +2126,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
     .login-required-card h4 {
       margin: 0 0 0.5rem;
-      font-size: 0.95rem;
       color: #ff8a00;
     }
 
@@ -885,11 +2139,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       width: 100%;
     }
 
-    /* Membership preview */
     .membership-preview {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 1rem;
       padding: 1.25rem;
     }
 
@@ -897,7 +2147,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 1rem;
-      margin-bottom: 1rem;
     }
 
     .membership-card {
@@ -916,7 +2165,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       margin: 0 0 0.5rem;
       color: #ff8a00;
       font-weight: 700;
-      font-size: 1rem;
     }
 
     .membership-desc {
@@ -924,15 +2172,31 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       color: rgba(255, 255, 255, 0.7);
       font-size: 0.8rem;
     }
+    .submit-message {
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
 
-    .verified-badge-card {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 0.75rem;
-      padding: 1rem;
-    }
+.submit-message.info {
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
 
-    /* Mobile responsive */
+.submit-message.success {
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
+}
+
+.submit-message.error {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
     @media (max-width: 1024px) {
       .rental-cards-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -960,29 +2224,15 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         gap: 0.5rem;
       }
 
-      .rent-icon {
-        width: 36px;
-        height: 36px;
-      }
-
       .rent-hero-card h1 {
         font-size: 1.5rem;
-      }
-
-      .rent-hero-card p {
-        font-size: 0.9rem;
       }
 
       .rent-hero-card .btn {
         width: 100%;
       }
 
-      .rent-actions {
-        flex-direction: row;
-      }
-
       .rent-tab {
-        flex: 1;
         padding: 0.75rem 0.5rem;
         font-size: 0.9rem;
       }
@@ -990,11 +2240,6 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       .form-row {
         grid-template-columns: 1fr;
         gap: 0.75rem;
-      }
-
-      .photo-upload-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.5rem;
       }
 
       .rental-cards-grid {
@@ -1012,6 +2257,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       .create-notice-card .btn {
         width: 100%;
+      }
+
+      .photo-upload-grid {
+        grid-template-columns: repeat(2, 1fr);
       }
 
       .membership-cards {
