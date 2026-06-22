@@ -1,0 +1,866 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Rent Memberships Admin - SoniaBuddy"
+  description="Admin page for rent verified badge, visibility boost, payment status and ad activation."
+>
+  <section class="rent-admin-page">
+    <div class="rent-admin-container">
+      <div class="admin-topbar">
+        <div>
+          <p class="eyebrow">Rent Admin</p>
+          <h1>Rent Memberships</h1>
+          <p class="subtitle">Verify payment, activate verified badge, start visibility boost and stop memberships.</p>
+        </div>
+        <div class="top-actions">
+          <a class="btn btn-outline" href="/admin">Back Admin</a>
+          <a class="btn btn-outline" href="/owner/rent-dashboard">Owner Dashboard</a>
+        </div>
+      </div>
+
+      <div id="auth-card" class="panel auth-panel">
+        <div>
+          <p class="muted small">Logged in as</p>
+          <p id="admin-email" class="email-text">Checking...</p>
+        </div>
+        <div class="auth-buttons">
+          <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
+          <button id="logout-btn" class="btn btn-outline hidden" type="button">Logout</button>
+        </div>
+      </div>
+
+      <div id="message" class="message hidden"></div>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span>Pending</span>
+          <strong id="pending-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Active</span>
+          <strong id="active-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span>Expired / Cancelled</span>
+          <strong id="closed-count">0</strong>
+        </div>
+      </div>
+
+      <div class="toolbar panel">
+        <div>
+          <h2>Membership Requests</h2>
+          <p class="muted">basic = Verified Badge · featured = Visibility Boost / Ads</p>
+        </div>
+        <div class="toolbar-actions">
+          <select id="status-filter" class="input-select">
+            <option value="pending">Pending only</option>
+            <option value="active">Active only</option>
+            <option value="all">All</option>
+          </select>
+          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div id="loader" class="panel loading-card">Loading memberships...</div>
+      <div id="memberships-grid" class="memberships-grid"></div>
+    </div>
+  </section>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
+    let currentUser = null;
+    let memberships = [];
+    let listingsById = {};
+
+    function esc(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      try {
+        return new Intl.DateTimeFormat('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }).format(new Date(value));
+      } catch {
+        return '-';
+      }
+    }
+
+    function addDaysIso(days) {
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      return date.toISOString();
+    }
+
+    function isAdmin() {
+      return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase()));
+    }
+
+    function planLabel(planType) {
+      if (planType === 'basic') return 'Verified Badge';
+      if (planType === 'featured') return 'Visibility Boost / Ads';
+      if (planType === 'free_trial') return 'Free Trial';
+      return planType || '-';
+    }
+
+    function badgeClass(status) {
+      if (status === 'active') return 'badge-active';
+      if (status === 'pending') return 'badge-pending';
+      if (status === 'expired') return 'badge-expired';
+      if (status === 'cancelled') return 'badge-cancelled';
+      return '';
+    }
+
+    function paymentBadgeClass(status) {
+      if (status === 'paid') return 'badge-active';
+      if (status === 'pending') return 'badge-pending';
+      if (status === 'failed') return 'badge-cancelled';
+      if (status === 'refunded') return 'badge-expired';
+      return '';
+    }
+
+    function showMessage(text, type = 'info') {
+      const el = document.getElementById('message');
+      if (!el) return;
+      el.textContent = text;
+      el.className = `message ${type}`;
+    }
+
+    function hideMessage() {
+      const el = document.getElementById('message');
+      if (el) el.classList.add('hidden');
+    }
+
+    async function refreshSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error(error);
+        currentUser = null;
+      } else {
+        currentUser = data.session?.user || null;
+      }
+
+      const emailEl = document.getElementById('admin-email');
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+
+      if (currentUser?.email) {
+        emailEl.textContent = currentUser.email;
+        loginBtn?.classList.add('hidden');
+        logoutBtn?.classList.remove('hidden');
+      } else {
+        emailEl.textContent = 'Not logged in';
+        loginBtn?.classList.remove('hidden');
+        logoutBtn?.classList.add('hidden');
+      }
+
+      return currentUser;
+    }
+
+    async function loginWithGoogle() {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/admin/rent-memberships`,
+        },
+      });
+      if (error) showMessage(error.message, 'error');
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      currentUser = null;
+      memberships = [];
+      listingsById = {};
+      await refreshSession();
+      renderMemberships();
+    }
+
+    function updateSummary() {
+      const pending = memberships.filter((m) => m.status === 'pending').length;
+      const active = memberships.filter((m) => m.status === 'active').length;
+      const closed = memberships.filter((m) => ['expired', 'cancelled'].includes(m.status)).length;
+
+      document.getElementById('pending-count').textContent = String(pending);
+      document.getElementById('active-count').textContent = String(active);
+      document.getElementById('closed-count').textContent = String(closed);
+    }
+
+    async function loadMemberships() {
+      const loader = document.getElementById('loader');
+      const grid = document.getElementById('memberships-grid');
+      if (loader) loader.classList.remove('hidden');
+      if (grid) grid.innerHTML = '';
+
+      await refreshSession();
+
+      if (!currentUser) {
+        showMessage('Please login with admin Google account.', 'error');
+        if (loader) loader.classList.add('hidden');
+        renderMemberships();
+        return;
+      }
+
+      if (!isAdmin()) {
+        showMessage('Access denied. This page is only for admin emails.', 'error');
+        if (loader) loader.classList.add('hidden');
+        renderMemberships();
+        return;
+      }
+
+      hideMessage();
+      const filter = document.getElementById('status-filter')?.value || 'pending';
+
+      let query = supabase
+        .from('rent_memberships')
+        .select(`
+          id,
+          listing_id,
+          owner_email,
+          plan_type,
+          vehicle_group,
+          amount,
+          starts_at,
+          expires_at,
+          status,
+          created_at,
+          updated_at,
+          payment_status,
+          ads_status,
+          payment_provider,
+          payment_order_id,
+          paid_at,
+          admin_started_at,
+          admin_started_by,
+          admin_note
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (filter !== 'all') query = query.eq('status', filter);
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(error);
+        showMessage(error.message, 'error');
+        memberships = [];
+        listingsById = {};
+        if (loader) loader.classList.add('hidden');
+        renderMemberships();
+        return;
+      }
+
+      memberships = Array.isArray(data) ? data : [];
+      await loadListingsForMemberships();
+      if (loader) loader.classList.add('hidden');
+      renderMemberships();
+    }
+
+    async function loadListingsForMemberships() {
+      listingsById = {};
+      const ids = Array.from(new Set(memberships.map((m) => m.listing_id).filter(Boolean)));
+      if (!ids.length) return;
+
+      const { data, error } = await supabase
+        .from('rent_listings')
+        .select('id, owner_name, owner_email, owner_phone, owner_whatsapp, vehicle_type, vehicle_model, reg_number, status, is_verified')
+        .in('id', ids);
+
+      if (error) {
+        console.warn('Listing load failed:', error);
+        return;
+      }
+
+      (data || []).forEach((listing) => {
+        listingsById[listing.id] = listing;
+      });
+    }
+
+    function renderMembershipCard(membership) {
+      const listing = listingsById[membership.listing_id] || {};
+      const isBasic = membership.plan_type === 'basic';
+      const isFeatured = membership.plan_type === 'featured';
+      const canActivate = membership.status === 'pending';
+      const canStop = membership.status === 'active';
+      const amount = membership.amount != null ? `₹${membership.amount}` : '-';
+
+      return `
+        <article class="membership-card" data-membership-id="${esc(membership.id)}" data-listing-id="${esc(membership.listing_id)}">
+          <div class="card-main">
+            <div class="card-head">
+              <div>
+                <h3>${esc(planLabel(membership.plan_type))}</h3>
+                <p class="muted">${esc(listing.vehicle_model || listing.owner_name || 'Rental listing')}</p>
+              </div>
+              <div class="badges">
+                <span class="badge ${badgeClass(membership.status)}">${esc(membership.status)}</span>
+                <span class="badge ${paymentBadgeClass(membership.payment_status)}">payment: ${esc(membership.payment_status || '-')}</span>
+                ${isFeatured ? `<span class="badge badge-ad">ads: ${esc(membership.ads_status || '-')}</span>` : ''}
+                ${listing.is_verified ? `<span class="badge badge-active">✓ listing verified</span>` : ''}
+              </div>
+            </div>
+
+            <div class="info-grid">
+              <div><span>Amount</span><strong>${esc(amount)}</strong></div>
+              <div><span>Vehicle</span><strong>${esc(listing.vehicle_type || '-')}</strong></div>
+              <div><span>Reg No</span><strong>${esc(listing.reg_number || '-')}</strong></div>
+              <div><span>Owner</span><strong>${esc(listing.owner_name || '-')}</strong></div>
+              <div><span>Email</span><strong>${esc(membership.owner_email || listing.owner_email || '-')}</strong></div>
+              <div><span>Phone</span><strong>${esc(listing.owner_phone || '-')}</strong></div>
+              <div><span>Starts</span><strong>${esc(formatDate(membership.starts_at))}</strong></div>
+              <div><span>Expires</span><strong>${esc(formatDate(membership.expires_at))}</strong></div>
+            </div>
+
+            <div class="note-box">
+              ${isBasic ? 'Admin activate karega to rent_listings.is_verified = true hoga aur verified badge show hoga.' : ''}
+              ${isFeatured ? 'Admin activate karega to ads_status = active hoga aur paid visibility/ads performance start hoga.' : ''}
+              ${!isBasic && !isFeatured ? 'Free trial / other membership row.' : ''}
+            </div>
+          </div>
+
+          <div class="card-actions">
+            ${canActivate ? `<button class="btn btn-primary activate-btn" type="button">Mark Paid + Activate 90 days</button>` : ''}
+            ${canStop ? `<button class="btn btn-warning stop-btn" type="button">Stop / Expire</button>` : ''}
+            ${membership.status !== 'cancelled' ? `<button class="btn btn-danger cancel-btn" type="button">Cancel</button>` : ''}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderMemberships() {
+      updateSummary();
+      const grid = document.getElementById('memberships-grid');
+      if (!grid) return;
+
+      if (!currentUser) {
+        grid.innerHTML = `<div class="panel empty-card"><h3>Login required</h3><p>Please login with Google admin account.</p></div>`;
+        return;
+      }
+
+      if (!isAdmin()) {
+        grid.innerHTML = `<div class="panel empty-card"><h3>Access denied</h3><p>Your email is not allowed for rent memberships admin.</p></div>`;
+        return;
+      }
+
+      if (!memberships.length) {
+        grid.innerHTML = `<div class="panel empty-card"><h3>No membership rows found</h3><p>No pending/active records for selected filter.</p></div>`;
+        return;
+      }
+
+      grid.innerHTML = memberships.map(renderMembershipCard).join('');
+    }
+
+    async function activateMembership(membershipId, listingId) {
+      if (!isAdmin()) return showMessage('Admin login required.', 'error');
+
+      const membership = memberships.find((m) => m.id === membershipId);
+      if (!membership) return showMessage('Membership not found.', 'error');
+
+      if (!confirm('Mark payment as paid and activate this plan for 90 days?')) return;
+
+      const now = new Date().toISOString();
+      const expiresAt = addDaysIso(90);
+      const isFeatured = membership.plan_type === 'featured';
+      const isBasic = membership.plan_type === 'basic';
+
+      showMessage('Activating membership...', 'info');
+
+      const { error: membershipError } = await supabase
+        .from('rent_memberships')
+        .update({
+          status: 'active',
+          payment_status: 'paid',
+          ads_status: isFeatured ? 'active' : 'stopped',
+          starts_at: now,
+          expires_at: expiresAt,
+          paid_at: now,
+          admin_started_at: now,
+          admin_started_by: currentUser.id,
+          admin_note: isBasic
+            ? 'Admin activated verified badge after payment confirmation.'
+            : isFeatured
+              ? 'Admin activated visibility boost after payment confirmation.'
+              : 'Admin activated membership.',
+          updated_at: now,
+        })
+        .eq('id', membershipId);
+
+      if (membershipError) {
+        showMessage(membershipError.message, 'error');
+        return;
+      }
+
+      if (isBasic && listingId) {
+        const { error: listingError } = await supabase
+          .from('rent_listings')
+          .update({
+            is_verified: true,
+            verified_at: now,
+            verified_by: currentUser.id,
+            updated_at: now,
+          })
+          .eq('id', listingId);
+
+        if (listingError) {
+          showMessage(`Membership active, but verified badge update failed: ${listingError.message}`, 'error');
+          await loadMemberships();
+          return;
+        }
+      }
+
+      showMessage('Membership activated successfully.', 'success');
+      await loadMemberships();
+    }
+
+    async function stopMembership(membershipId) {
+      if (!isAdmin()) return showMessage('Admin login required.', 'error');
+      if (!confirm('Stop this active membership now?')) return;
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('rent_memberships')
+        .update({
+          status: 'expired',
+          ads_status: 'expired',
+          expires_at: now,
+          admin_note: 'Admin stopped/expired this membership.',
+          updated_at: now,
+        })
+        .eq('id', membershipId);
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      showMessage('Membership stopped/expired.', 'success');
+      await loadMemberships();
+    }
+
+    async function cancelMembership(membershipId) {
+      if (!isAdmin()) return showMessage('Admin login required.', 'error');
+      if (!confirm('Cancel this membership request?')) return;
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('rent_memberships')
+        .update({
+          status: 'cancelled',
+          ads_status: 'stopped',
+          admin_note: 'Admin cancelled this membership request.',
+          updated_at: now,
+        })
+        .eq('id', membershipId);
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      showMessage('Membership cancelled.', 'success');
+      await loadMemberships();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('login-btn')?.addEventListener('click', loginWithGoogle);
+      document.getElementById('logout-btn')?.addEventListener('click', logout);
+      document.getElementById('refresh-btn')?.addEventListener('click', loadMemberships);
+      document.getElementById('status-filter')?.addEventListener('change', loadMemberships);
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const card = target.closest('.membership-card');
+        if (!card) return;
+
+        const membershipId = card.dataset.membershipId;
+        const listingId = card.dataset.listingId;
+
+        if (target.closest('.activate-btn') && membershipId) {
+          activateMembership(membershipId, listingId);
+          return;
+        }
+
+        if (target.closest('.stop-btn') && membershipId) {
+          stopMembership(membershipId);
+          return;
+        }
+
+        if (target.closest('.cancel-btn') && membershipId) {
+          cancelMembership(membershipId);
+        }
+      });
+
+      await loadMemberships();
+    });
+  </script>
+
+  <style is:global>
+    .rent-admin-page {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #08051f 0%, #13084a 58%, #201036 100%);
+      color: #ffffff;
+      padding: 2rem 0 4rem;
+    }
+
+    .rent-admin-container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .admin-topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1.25rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #ff8a00;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.75rem;
+    }
+
+    .admin-topbar h1 {
+      margin: 0;
+      font-size: 2rem;
+      line-height: 1.15;
+    }
+
+    .subtitle,
+    .muted {
+      color: rgba(255, 255, 255, 0.72);
+      margin: 0.4rem 0 0;
+      line-height: 1.5;
+    }
+
+    .small {
+      font-size: 0.82rem;
+    }
+
+    .top-actions,
+    .auth-buttons,
+    .toolbar-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .panel,
+    .summary-card,
+    .membership-card {
+      background: rgba(255, 255, 255, 0.065);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 1.1rem;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+    }
+
+    .auth-panel,
+    .toolbar {
+      padding: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .email-text {
+      margin: 0.2rem 0 0;
+      font-weight: 900;
+      word-break: break-word;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.7rem 1rem;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #ff6b00, #ff9500);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.18);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fecaca;
+    }
+
+    .btn-warning {
+      background: rgba(250, 204, 21, 0.14);
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      color: #fde68a;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .message {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 1rem;
+      font-weight: 800;
+    }
+
+    .message.info {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #bfdbfe;
+    }
+
+    .message.success {
+      background: rgba(34, 197, 94, 0.14);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #bbf7d0;
+    }
+
+    .message.error {
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fecaca;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .summary-card {
+      padding: 1rem;
+    }
+
+    .summary-card span {
+      display: block;
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .summary-card strong {
+      font-size: 1.8rem;
+      color: #ff8a00;
+    }
+
+    .toolbar h2 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+
+    .input-select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.7rem 1rem;
+      min-height: 40px;
+      font-weight: 800;
+    }
+
+    .input-select option {
+      color: #111;
+    }
+
+    .loading-card,
+    .empty-card {
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .memberships-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .membership-card {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      gap: 1rem;
+      border-color: rgba(255, 138, 0, 0.18);
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .card-head h3 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .badges {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+
+    .badge {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.74rem;
+      font-weight: 900;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.8);
+      white-space: nowrap;
+    }
+
+    .badge-active {
+      background: rgba(34, 197, 94, 0.18);
+      color: #86efac;
+    }
+
+    .badge-pending {
+      background: rgba(250, 204, 21, 0.16);
+      color: #fde68a;
+    }
+
+    .badge-expired,
+    .badge-cancelled {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fecaca;
+    }
+
+    .badge-ad {
+      background: rgba(255, 138, 0, 0.16);
+      color: #fdba74;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .info-grid div {
+      background: rgba(255, 255, 255, 0.055);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.8rem;
+      padding: 0.65rem;
+      min-width: 0;
+    }
+
+    .info-grid span {
+      display: block;
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 0.75rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .info-grid strong {
+      display: block;
+      font-size: 0.86rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .note-box {
+      margin-top: 0.8rem;
+      border-radius: 0.8rem;
+      padding: 0.75rem;
+      background: rgba(255, 138, 0, 0.1);
+      border: 1px solid rgba(255, 138, 0, 0.18);
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      justify-content: center;
+    }
+
+    .card-actions .btn {
+      width: 100%;
+    }
+
+    @media (max-width: 920px) {
+      .admin-topbar,
+      .auth-panel,
+      .toolbar,
+      .card-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .summary-grid,
+      .info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .membership-card {
+        grid-template-columns: 1fr;
+      }
+
+      .badges {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .summary-grid,
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .top-actions,
+      .toolbar-actions,
+      .auth-buttons {
+        flex-direction: column;
+      }
+
+      .btn,
+      .input-select {
+        width: 100%;
+      }
+    }
+  </style>
+</BaseLayout>

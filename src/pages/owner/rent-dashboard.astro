@@ -3,676 +3,1258 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout
-	title="Vehicle Listing Dashboard - SoniaBuddy"
-	description="Manage your vehicle listings, verified badge, visibility boost and enquiry analytics."
+  title="Vehicle Listing Dashboard - SoniaBuddy"
+  description="Manage your vehicle listings, verified badge, visibility boost and enquiry analytics."
 >
-	<div class="debug-label">PAGE: RENT DASHBOARD</div>
-	<section class="dashboard-page">
-		<div class="container dashboard-container">
-			<!-- 1. Page header -->
-			<div class="dashboard-header">
-				<div class="header-content">
-					<h1>Vehicle Listing Dashboard</h1>
-					<p>Manage your listings, verified badge, visibility boost and enquiry analytics.</p>
-				</div>
-				<a href="/rent-vehicle" class="btn btn-outline">Back to Rent</a>
-			</div>
-
-			<!-- 2. Login/session card -->
-			<div class="logged-in-card">
-				<div class="login-info">
-					<p class="login-label">Logged in as</p>
-					<p class="login-email">demo-owner@example.com</p>
-				</div>
-				<button class="btn btn-outline btn-small">Logout</button>
-			</div>
-
-			<!-- 3. First 3 Months Free notice -->
-			<div class="free-notice">
-				<span class="notice-icon">🎉</span>
-				<div class="notice-content">
-					<h3>First 3 Months Free</h3>
-					<p>Every new rental listing gets first 3 months free. After the free trial, choose Verified Badge for trust or Visibility Boost for sponsored placement.</p>
-				</div>
-			</div>
-
-			<!-- 4. Pricing / plan cards -->
-			<div class="section-title">
-				<h2>Pricing Plans</h2>
-			</div>
-			<div class="plan-cards">
-				<div class="plan-card">
-					<h3>✅ Verified Badge</h3>
-					<div class="plan-price">₹299</div>
-					<p class="plan-duration">for 3 months</p>
-					<p class="plan-description">Trust badge only. No ads boost included.</p>
-					<button class="btn btn-small btn-orange">See features</button>
-				</div>
-				<div class="plan-card">
-					<h3>🚀 Small Vehicle Visibility</h3>
-					<div class="plan-price">₹199</div>
-					<p class="plan-duration">for 3 months</p>
-					<p class="plan-description">For Toto and Auto. Sponsored visibility + ad tracking.</p>
-					<button class="btn btn-small btn-orange">See features</button>
-				</div>
-				<div class="plan-card">
-					<h3>🚀 Car / Pickup / Ambulance Visibility</h3>
-					<div class="plan-price">₹1000</div>
-					<p class="plan-duration">for 3 months</p>
-					<p class="plan-description">Sponsored visibility for car, pickup and ambulance.</p>
-					<button class="btn btn-small btn-orange">See features</button>
-				</div>
-				<div class="plan-card">
-					<h3>🚀 Bus Visibility</h3>
-					<div class="plan-price">₹1500</div>
-					<p class="plan-duration">for 3 months</p>
-					<p class="plan-description">For bus, wedding bus, tour bus and school bus.</p>
-					<button class="btn btn-small btn-orange">See features</button>
-				</div>
-			</div>
-
-			<!-- 5. Action buttons -->
-			<div class="dashboard-actions">
-				<a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a>
-				<a href="#" class="btn btn-outline">View My Vehicle Listings</a>
-			</div>
-
-			<!-- 6. My Listing card -->
-			<div class="section-title">
-				<h2>My Listings</h2>
-			</div>
-			<div class="listing-card">
-				<div class="listing-image">
-					<div class="listing-placeholder">🚗</div>
-				</div>
-				<div class="listing-details">
-					<h3>sffd</h3>
-					<p>Car · 7 seats · hgighjh</p>
-					<div class="listing-meta">
-						<span class="listing-status status-active">active</span>
-						<span class="listing-badge badge-free">Free Trial</span>
-					</div>
-				</div>
-				<button class="btn btn-outline btn-small">Edit Listing</button>
-			</div>
-
-			<!-- 7. Listing Performance -->
-			<div class="section-title">
-				<h2>📊 Listing Performance</h2>
-			</div>
-			<div class="performance-stats">
-				<div class="stat-card">
-					<h4>Views</h4>
-					<p class="stat-value">7</p>
-				</div>
-				<div class="stat-card">
-					<h4>Calls</h4>
-					<p class="stat-value">0</p>
-				</div>
-				<div class="stat-card">
-					<h4>WhatsApp</h4>
-					<p class="stat-value">0</p>
-				</div>
-				<div class="stat-card">
-					<h4>Photo opens</h4>
-					<p class="stat-value">0</p>
-				</div>
-				<div class="stat-card">
-					<h4>Details</h4>
-					<p class="stat-value">4</p>
-				</div>
-				<div class="stat-card">
-					<h4>Paid action clicks</h4>
-					<p class="stat-value">2</p>
-				</div>
-			</div>
-
-			<!-- 8. Visibility / Ads Performance -->
-			<div class="section-title">
-				<h2>⭐ Visibility / Ads Performance</h2>
-			</div>
-			<div class="ads-performance-card">
-				<span class="ads-badge">No ads data</span>
-				<div class="ads-stats">
-					<div class="ad-stat">
-						<h4>Ad impressions</h4>
-						<p class="stat-value">0</p>
-					</div>
-					<div class="ad-stat">
-						<h4>Ad clicks</h4>
-						<p class="stat-value">0</p>
-					</div>
-					<div class="ad-stat">
-						<h4>CTR</h4>
-						<p class="stat-value">0%</p>
-					</div>
-				</div>
-			</div>
-
-			<!-- 9. Payment/upgrade cards -->
-			<div class="payment-cards">
-				<!-- Card A: Verified Badge -->
-				<div class="payment-card">
-					<h3>🗓️ Verified Badge</h3>
-					<p class="payment-amount">₹299 · 3 months</p>
-					<p class="payment-status">Not active</p>
-					<p class="free-expiry">Free trial expiry: 11 Sept 2026</p>
-					<div class="collapsible-row">
-						<span>▶ See features & disclaimer</span>
-					</div>
-					<label class="checkbox-label">
-						<input type="checkbox" />
-						<span>I understand this is a trust badge only and does not guarantee calls, bookings, impressions or clicks.</span>
-					</label>
-					<button class="btn btn-primary btn-small btn-disabled">Get Verified Badge</button>
-				</div>
-
-				<!-- Card B: Visibility Boost -->
-				<div class="payment-card">
-					<h3>⭐ Visibility Boost</h3>
-					<p class="selected-plan">Auto selected plan: Car Plan · ₹1000</p>
-					<p class="payment-status">Not active</p>
-					<div class="collapsible-row">
-						<span>▶ See features & disclaimer</span>
-					</div>
-					<label class="checkbox-label">
-						<input type="checkbox" />
-						<span>I understand impressions, clicks, calls, bookings and revenue are not guaranteed.</span>
-					</label>
-					<button class="btn btn-primary btn-small btn-disabled">Boost Visibility</button>
-				</div>
-			</div>
-		</div>
-	</section>
-
-	<style>
-		.dashboard-page {
-			background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
-			min-height: 100vh;
-			padding: 2rem 0 4rem;
-			color: white;
-		}
-
-		.dashboard-container {
-			max-width: 1100px;
-			margin: 0 auto;
-			padding: 0 1rem;
-		}
-
-		/* 1. Page header */
-		.dashboard-header {
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 1.5rem;
-			gap: 1rem;
-		}
-
-		.header-content h1 {
-			font-size: 1.75rem;
-			margin: 0 0 0.5rem;
-			color: white;
-		}
-
-		.header-content p {
-			margin: 0;
-			color: rgba(255, 255, 255, 0.7);
-			font-size: 0.95rem;
-		}
-
-		/* 2. Login card */
-		.logged-in-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 1.5rem;
-		}
-
-		.login-label {
-			margin: 0 0 0.25rem;
-			color: rgba(255, 255, 255, 0.6);
-			font-size: 0.85rem;
-		}
-
-		.login-email {
-			margin: 0;
-			color: white;
-			font-size: 1rem;
-			font-weight: 600;
-		}
-
-		/* 3. Free notice */
-		.free-notice {
-			background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
-			border: 1px solid rgba(255, 107, 0, 0.3);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			display: flex;
-			align-items: flex-start;
-			gap: 1rem;
-			margin-bottom: 1.5rem;
-		}
-
-		.notice-icon {
-			font-size: 1.75rem;
-			flex-shrink: 0;
-		}
-
-		.notice-content h3 {
-			margin: 0 0 0.5rem;
-			font-size: 1.1rem;
-			color: #ff8a00;
-		}
-
-		.notice-content p {
-			margin: 0;
-			color: rgba(255, 255, 255, 0.85);
-			font-size: 0.9rem;
-			line-height: 1.5;
-		}
-
-		/* Buttons */
-		.btn {
-			padding: 0.75rem 1.5rem;
-			border-radius: 0.75rem;
-			font-weight: 700;
-			text-decoration: none;
-			display: inline-block;
-			cursor: pointer;
-			transition: all 0.2s;
-			text-align: center;
-			font-size: 0.95rem;
-		}
-
-		.btn-primary {
-			background: linear-gradient(135deg, #ff6b00, #ff8a00);
-			color: white;
-			border: none;
-		}
-
-		.btn-primary:hover {
-			background: linear-gradient(135deg, #e65a00, #ff6b00);
-			transform: translateY(-2px);
-		}
-
-		.btn-outline {
-			background: transparent;
-			color: white;
-			border: 2px solid rgba(255, 255, 255, 0.3);
-		}
-
-		.btn-outline:hover {
-			background: rgba(255, 255, 255, 0.1);
-			border-color: rgba(255, 255, 255, 0.5);
-		}
-
-		.btn-orange {
-			background: linear-gradient(135deg, #ff6b00, #ff8a00);
-			color: white;
-			border: none;
-		}
-
-		.btn-small {
-			padding: 0.5rem 1rem;
-			font-size: 0.85rem;
-		}
-
-		.btn-disabled {
-			opacity: 0.5;
-			cursor: not-allowed;
-		}
-
-		/* Section titles */
-		.section-title {
-			margin-bottom: 1rem;
-		}
-
-		.section-title h2 {
-			margin: 0;
-			font-size: 1.25rem;
-			color: white;
-		}
-
-		/* 4. Plan cards */
-		.plan-cards {
-			display: grid;
-			grid-template-columns: repeat(4, 1fr);
-			gap: 1rem;
-			margin-bottom: 2rem;
-		}
-
-		.plan-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			display: flex;
-			flex-direction: column;
-		}
-
-		.plan-card h3 {
-			margin: 0 0 0.5rem;
-			font-size: 1rem;
-		}
-
-		.plan-price {
-			font-size: 1.75rem;
-			font-weight: 800;
-			margin-bottom: 0.25rem;
-			color: #ff8a00;
-		}
-
-		.plan-duration {
-			margin: 0 0 0.75rem;
-			color: rgba(255, 255, 255, 0.6);
-			font-size: 0.85rem;
-		}
-
-		.plan-description {
-			margin: 0 0 1rem;
-			color: rgba(255, 255, 255, 0.75);
-			font-size: 0.85rem;
-			line-height: 1.4;
-			flex: 1;
-		}
-
-		/* 5. Action buttons */
-		.dashboard-actions {
-			display: flex;
-			gap: 1rem;
-			margin-bottom: 2rem;
-		}
-
-		/* 6. Listing card */
-		.listing-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			display: flex;
-			gap: 1rem;
-			align-items: center;
-			margin-bottom: 2rem;
-		}
-
-		.listing-image {
-			width: 70px;
-			height: 70px;
-			border-radius: 0.75rem;
-			background: rgba(255, 255, 255, 0.04);
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			flex-shrink: 0;
-		}
-
-		.listing-placeholder {
-			font-size: 1.75rem;
-		}
-
-		.listing-details {
-			flex: 1;
-		}
-
-		.listing-details h3 {
-			margin: 0 0 0.25rem;
-			font-size: 1.1rem;
-		}
-
-		.listing-details p {
-			margin: 0 0 0.5rem;
-			color: rgba(255, 255, 255, 0.7);
-			font-size: 0.9rem;
-		}
-
-		.listing-meta {
-			display: flex;
-			gap: 0.5rem;
-			align-items: center;
-			flex-wrap: wrap;
-		}
-
-		.listing-status {
-			padding: 0.25rem 0.75rem;
-			border-radius: 999px;
-			font-size: 0.75rem;
-			font-weight: 700;
-		}
-
-		.status-active {
-			background: rgba(34, 197, 94, 0.2);
-			color: #22c55e;
-		}
-
-		.listing-badge {
-			padding: 0.25rem 0.75rem;
-			border-radius: 999px;
-			font-size: 0.75rem;
-			font-weight: 700;
-		}
-
-		.badge-free {
-			background: rgba(255, 107, 0, 0.2);
-			color: #ff8a00;
-		}
-
-		/* 7. Performance stats */
-		.performance-stats {
-			display: grid;
-			grid-template-columns: repeat(3, 1fr);
-			gap: 1rem;
-			margin-bottom: 2rem;
-		}
-
-		.stat-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			text-align: center;
-		}
-
-		.stat-card h4 {
-			margin: 0 0 0.5rem;
-			font-size: 0.85rem;
-			color: rgba(255, 255, 255, 0.8);
-		}
-
-		.stat-value {
-			margin: 0;
-			font-size: 1.75rem;
-			font-weight: 800;
-			color: #ff8a00;
-		}
-
-		/* 8. Ads performance */
-		.ads-performance-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 2px solid rgba(255, 107, 0, 0.3);
-			border-radius: 1rem;
-			padding: 1.25rem;
-			margin-bottom: 2rem;
-		}
-
-		.ads-badge {
-			display: inline-block;
-			background: rgba(255, 107, 0, 0.2);
-			color: #ff8a00;
-			padding: 0.25rem 0.75rem;
-			border-radius: 999px;
-			font-size: 0.8rem;
-			font-weight: 700;
-			margin-bottom: 1rem;
-		}
-
-		.ads-stats {
-			display: flex;
-			gap: 2rem;
-		}
-
-		.ad-stat h4 {
-			margin: 0 0 0.25rem;
-			font-size: 0.85rem;
-			color: rgba(255, 255, 255, 0.8);
-		}
-
-		.ad-stat .stat-value {
-			font-size: 1.5rem;
-		}
-
-		/* 9. Payment cards */
-		.payment-cards {
-			display: grid;
-			grid-template-columns: repeat(2, 1fr);
-			gap: 1rem;
-		}
-
-		.payment-card {
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid rgba(255, 255, 255, 0.14);
-			border-radius: 1rem;
-			padding: 1.25rem;
-		}
-
-		.payment-card h3 {
-			margin: 0 0 0.5rem;
-			font-size: 1.1rem;
-		}
-
-		.payment-amount {
-			margin: 0 0 0.25rem;
-			color: #ff8a00;
-			font-weight: 600;
-			font-size: 1rem;
-		}
-
-		.payment-status {
-			margin: 0 0 0.5rem;
-			color: rgba(255, 255, 255, 0.7);
-			font-size: 0.85rem;
-		}
-
-		.free-expiry {
-			margin: 0 0 1rem;
-			color: rgba(255, 255, 255, 0.6);
-			font-size: 0.85rem;
-		}
-
-		.selected-plan {
-			margin: 0 0 0.5rem;
-			color: rgba(255, 255, 255, 0.7);
-			font-size: 0.85rem;
-		}
-
-		.collapsible-row {
-			background: rgba(255, 107, 0, 0.15);
-			border: 1px solid rgba(255, 107, 0, 0.3);
-			border-radius: 0.5rem;
-			padding: 0.75rem;
-			margin-bottom: 1rem;
-			cursor: pointer;
-			font-size: 0.85rem;
-			color: #ff8a00;
-			font-weight: 600;
-		}
-
-		.checkbox-label {
-			display: flex;
-			align-items: flex-start;
-			gap: 0.75rem;
-			cursor: pointer;
-			margin-bottom: 1rem;
-		}
-
-		.checkbox-label input[type="checkbox"] {
-			width: auto;
-			margin-top: 0.25rem;
-			flex-shrink: 0;
-		}
-
-		.checkbox-label span {
-			color: rgba(255, 255, 255, 0.85);
-			line-height: 1.4;
-			font-size: 0.85rem;
-		}
-
-		/* Mobile responsive */
-		@media (max-width: 1024px) {
-			.plan-cards {
-				grid-template-columns: repeat(2, 1fr);
-			}
-
-			.performance-stats {
-				grid-template-columns: repeat(2, 1fr);
-			}
-		}
-
-		@media (max-width: 768px) {
-			.dashboard-page {
-				padding: 1.5rem 0 3rem;
-			}
-
-			.dashboard-header {
-				flex-direction: column;
-				align-items: flex-start;
-			}
-
-			.dashboard-header .btn {
-				width: 100%;
-			}
-
-			.logged-in-card {
-				flex-direction: column;
-				align-items: flex-start;
-				gap: 1rem;
-			}
-
-			.logged-in-card .btn {
-				width: 100%;
-			}
-
-			.dashboard-actions {
-				flex-direction: column;
-			}
-
-			.dashboard-actions .btn {
-				width: 100%;
-			}
-
-			.plan-cards {
-				grid-template-columns: 1fr;
-			}
-
-			.listing-card {
-				flex-direction: column;
-				align-items: flex-start;
-			}
-
-			.listing-image {
-				width: 100%;
-				height: 100px;
-			}
-
-			.performance-stats {
-				grid-template-columns: repeat(2, 1fr);
-			}
-
-			.ads-stats {
-				flex-direction: column;
-				gap: 1rem;
-			}
-
-			.payment-cards {
-				grid-template-columns: 1fr;
-			}
-
-			.payment-card .btn {
-				width: 100%;
-			}
-		}
-	</style>
+  <div class="debug-label">PAGE: RENT DASHBOARD</div>
+
+  <section class="dashboard-page">
+    <div class="container dashboard-container">
+      <div class="dashboard-header">
+        <div class="header-content">
+          <h1>🚕 Vehicle Listing Dashboard</h1>
+          <p>Manage your listings, verified badge, visibility boost and enquiry analytics.</p>
+        </div>
+        <a href="/rent-vehicle" class="btn btn-outline">Back to Rent</a>
+      </div>
+
+      <div id="auth-card" class="logged-in-card">
+        <div class="login-info">
+          <p class="login-label">Logged in as</p>
+          <p id="login-email" class="login-email">Checking login...</p>
+        </div>
+        <div class="auth-actions">
+          <button id="login-btn" class="btn btn-primary btn-small" type="button">Login with Google</button>
+          <button id="logout-btn" class="btn btn-outline btn-small hidden" type="button">Logout</button>
+        </div>
+      </div>
+
+      <div id="dashboard-message" class="dashboard-message hidden"></div>
+
+      <div class="free-notice">
+        <span class="notice-icon">🎉</span>
+        <div class="notice-content">
+          <h3>First 3 Months Free</h3>
+          <p>Every new rental listing gets first 3 months free. After the free trial, choose Verified Badge for trust or Visibility Boost for sponsored placement.</p>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h2>Pricing Plans</h2>
+      </div>
+
+      <div class="plan-cards">
+        <div class="plan-card">
+          <h3>✅ Verified Badge</h3>
+          <div class="plan-price">₹299</div>
+          <p class="plan-duration">for 3 months</p>
+          <p class="plan-description">Trust badge only. No ads boost included.</p>
+          <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="verified">▶ See features</button>
+        </div>
+
+        <div class="plan-card">
+          <h3>🚀 Small Vehicle Visibility</h3>
+          <div class="plan-price">₹199</div>
+          <p class="plan-duration">for 3 months</p>
+          <p class="plan-description">For Toto and Auto. Sponsored visibility + ad tracking.</p>
+          <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="small">▶ See features</button>
+        </div>
+
+        <div class="plan-card">
+          <h3>🚀 Car / Pickup / Ambulance Visibility</h3>
+          <div class="plan-price">₹1000</div>
+          <p class="plan-duration">for 3 months</p>
+          <p class="plan-description">Sponsored visibility for car, pickup and ambulance.</p>
+          <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="medium">▶ See features</button>
+        </div>
+
+        <div class="plan-card">
+          <h3>🚀 Bus Visibility</h3>
+          <div class="plan-price">₹1500</div>
+          <p class="plan-duration">for 3 months</p>
+          <p class="plan-description">For bus, wedding bus, tour bus and school bus.</p>
+          <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="bus">▶ See features</button>
+        </div>
+      </div>
+
+      <div class="dashboard-actions">
+        <a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a>
+        <a href="#my-listings" class="btn btn-outline">View My Vehicle Listings</a>
+      </div>
+
+      <div id="feature-note" class="feature-note hidden"></div>
+
+      <div class="section-title" id="my-listings">
+        <h2>My Listings</h2>
+      </div>
+
+      <div id="listings-loader" class="loading-card">Loading your listings...</div>
+      <div id="my-listings-grid" class="my-listings-grid"></div>
+    </div>
+  </section>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+
+    const PHOTO_BUCKET = 'rent-listing-photos';
+    let currentUser = null;
+    let currentListings = [];
+    let eventCountsByListing = {};
+    let membershipRequests = [];
+
+    function esc(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function onlyDigits(value) {
+      return String(value || '').replace(/\D/g, '');
+    }
+
+    function showMessage(message, type = 'info') {
+      const box = document.getElementById('dashboard-message');
+      if (!box) return;
+      box.textContent = message;
+      box.classList.remove('hidden', 'success', 'error', 'info');
+      box.classList.add(type);
+    }
+
+    function hideMessage() {
+      const box = document.getElementById('dashboard-message');
+      if (box) box.classList.add('hidden');
+    }
+
+    function showFeatureNote(type) {
+      const box = document.getElementById('feature-note');
+      if (!box) return;
+
+      const notes = {
+        verified: 'Verified Badge is a trust badge only. Admin/payment activation will come later. It does not guarantee calls or bookings.',
+        small: 'Small Vehicle Visibility is for Toto/Auto paid boost. Paid ads tracking is pending until payment activation.',
+        medium: 'Car/Pickup/Ambulance Visibility will start only after payment integration is connected.',
+        bus: 'Bus Visibility will start only after payment integration is connected.',
+      };
+
+      box.textContent = notes[type] || 'Feature details coming soon.';
+      box.classList.remove('hidden');
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function photoUrl(path) {
+      if (!path) return '';
+      if (path.startsWith('http://') || path.startsWith('https://')) return path;
+      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    }
+
+    function formatDate(value) {
+      if (!value) return '';
+      try {
+        return new Intl.DateTimeFormat('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }).format(new Date(value));
+      } catch {
+        return '';
+      }
+    }
+
+    function addMonths(value, months) {
+      try {
+        const date = value ? new Date(value) : new Date();
+        date.setMonth(date.getMonth() + months);
+        return formatDate(date.toISOString());
+      } catch {
+        return '';
+      }
+    }
+
+    function statusClass(status) {
+      if (status === 'active') return 'status-active';
+      if (status === 'cancelled') return 'status-cancelled';
+      if (status === 'rejected') return 'status-rejected';
+      return 'status-pending';
+    }
+
+    function listingTitle(listing) {
+      return listing.vehicle_model || listing.owner_name || 'Rental vehicle';
+    }
+
+    function countFor(listingId, eventType) {
+      return eventCountsByListing?.[listingId]?.[eventType] || 0;
+    }
+
+    function normalStats(listing) {
+      return {
+        views: countFor(listing.id, 'listing_view'),
+        calls: countFor(listing.id, 'call_click'),
+        whatsapp: countFor(listing.id, 'whatsapp_click'),
+        photos: countFor(listing.id, 'photo_open'),
+        details: countFor(listing.id, 'view_details_click'),
+      };
+    }
+
+    function visibilityPlanForListing(listing) {
+      const type = String(listing.vehicle_type || '').toLowerCase();
+
+      if (type === 'toto' || type === 'auto') {
+        return { plan_type: 'small_visibility', amount_inr: 199, label: 'Small Vehicle Visibility' };
+      }
+
+      if (type === 'bus') {
+        return { plan_type: 'bus_visibility', amount_inr: 1500, label: 'Bus Visibility' };
+      }
+
+      return { plan_type: 'car_pickup_ambulance_visibility', amount_inr: 1000, label: 'Car / Pickup / Ambulance Visibility' };
+    }
+
+    function hasMembershipRequest(listingId, planType) {
+      return membershipRequests.some((item) => {
+        return item.listing_id === listingId && item.plan_type === planType && item.status !== 'cancelled';
+      });
+    }
+
+    function renderRequestButton(listing, planType, amount, label, extraClass = '') {
+      const requested = hasMembershipRequest(listing.id, planType);
+      const text = requested ? 'Requested' : `${label} · ₹${amount}`;
+      const disabled = requested ? 'disabled' : '';
+      const disabledClass = requested ? 'btn-disabled' : '';
+
+      return `<button class="btn btn-primary btn-small request-plan-btn ${extraClass} ${disabledClass}" type="button" data-listing-id="${esc(listing.id)}" data-plan-type="${esc(planType)}" data-amount="${amount}" ${disabled}>${esc(text)}</button>`;
+    }
+
+    function renderListingCard(listing) {
+      const photos = Array.isArray(listing.photos) ? listing.photos : [];
+      const photoCells = [0, 1, 2, 3].map((index) => {
+        const url = photoUrl(photos[index]);
+        if (!url) return `<div class="listing-photo-empty">+</div>`;
+        return `<button type="button" class="listing-photo-thumb dashboard-photo-open" data-photo-url="${esc(url)}"><img src="${esc(url)}" alt="${esc(listingTitle(listing))} photo ${index + 1}" loading="lazy" /></button>`;
+      }).join('');
+      const phone = onlyDigits(listing.owner_phone);
+      const whatsappRaw = onlyDigits(listing.owner_whatsapp || listing.owner_phone);
+      const whatsapp = whatsappRaw.length === 10 ? `91${whatsappRaw}` : whatsappRaw;
+      const purposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
+      const serviceIds = Array.isArray(listing.service_city_ids) ? listing.service_city_ids : [];
+      const status = listing.status || 'active';
+      const stats = normalStats(listing);
+      const visibilityPlan = visibilityPlanForListing(listing);
+      const trialExpiry = addMonths(listing.created_at, 3);
+
+      return `
+        <article class="dashboard-listing-card" data-listing-id="${esc(listing.id)}">
+          <div class="listing-head">
+            <div class="listing-photo-grid">${photoCells}</div>
+
+            <div class="listing-head-content">
+              <div class="listing-title-row">
+                <div>
+                  <h3>${esc(listingTitle(listing))}</h3>
+                  <p class="listing-main-line">
+                    ${esc(listing.vehicle_type || 'Vehicle')}
+                    ${listing.seats ? ` · ${esc(listing.seats)} seats` : ''}
+                    ${listing.reg_number ? ` · ${esc(listing.reg_number)}` : ''}
+                  </p>
+                </div>
+                <span class="listing-status ${statusClass(status)}">${esc(status)}</span>
+              </div>
+
+              <p class="listing-sub-line"><strong>Owner:</strong> ${esc(listing.owner_name || '-')}</p>
+              <p class="listing-sub-line"><strong>Price:</strong> ${esc(listing.price_text || '-')}</p>
+              ${purposes.length ? `<p class="listing-sub-line"><strong>Purpose:</strong> ${esc(purposes.join(' • '))}</p>` : ''}
+              ${listing.description ? `<p class="listing-desc">${esc(listing.description)}</p>` : ''}
+
+              <div class="listing-meta">
+                <span class="listing-badge badge-free">Free Trial</span>
+                ${listing.is_verified === true ? `<span class="listing-badge badge-verified">✓ Verified</span>` : ''}
+                <span class="listing-badge">Photos: ${photos.length}</span>
+                <span class="listing-badge">Service cities: ${serviceIds.length}</span>
+                ${listing.created_at ? `<span class="listing-badge">${esc(formatDate(listing.created_at))}</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div class="listing-edit-row">
+            <a class="btn btn-outline btn-small" href="/rent-vehicle?tab=register&edit=${esc(listing.id)}">✎ Edit Listing</a>
+          </div>
+
+          <div class="performance-box">
+            <h4>📊 Listing Performance</h4>
+            <div class="performance-grid">
+              <div class="mini-stat"><span>👁 Views</span><strong>${stats.views}</strong></div>
+              <div class="mini-stat"><span>📞 Calls</span><strong>${stats.calls}</strong></div>
+              <div class="mini-stat"><span>💬 WhatsApp</span><strong>${stats.whatsapp}</strong></div>
+              <div class="mini-stat"><span>🖼 Photo opens</span><strong>${stats.photos}</strong></div>
+              <div class="mini-stat"><span>ℹ️ Details</span><strong>${stats.details}</strong></div>
+            </div>
+          </div>
+
+          <div class="ads-box">
+            <div class="ads-title-row">
+              <h4>⭐ Visibility / Ads Performance</h4>
+              <span class="ads-badge">No ads data</span>
+            </div>
+            <div class="ads-grid">
+              <div class="mini-stat"><span>👁 Ad impressions</span><strong>0</strong></div>
+              <div class="mini-stat"><span>📊 Ad clicks</span><strong>0</strong></div>
+              <div class="mini-stat"><span>☆ CTR</span><strong>0%</strong></div>
+            </div>
+          </div>
+
+          <div class="payment-cards per-listing-payment">
+            <div class="payment-card">
+              <h3>🗓️ Verified Badge</h3>
+              <p class="payment-amount">₹299 · 3 months</p>
+              <p class="payment-status">Status: ${hasMembershipRequest(listing.id, 'verified_badge') ? 'Requested' : 'Not active'}</p>
+              <p class="free-expiry">Free listing trial expiry: ${esc(trialExpiry || '-')}</p>
+              <div class="collapsible-row">▶ See features & disclaimer</div>
+              <label class="checkbox-label">
+                <input type="checkbox" class="verified-disclaimer" data-listing-id="${esc(listing.id)}" />
+                <span>I understand this is a trust badge only and does not guarantee calls, bookings, impressions or clicks.</span>
+              </label>
+              ${renderRequestButton(listing, 'verified_badge', 299, 'Get Verified Badge')}
+            </div>
+
+            <div class="payment-card boost-card">
+              <h3>⭐ Visibility Boost</h3>
+              <p class="selected-plan">Auto selected plan: ${esc(visibilityPlan.label)} · ₹${visibilityPlan.amount_inr}</p>
+              <p class="payment-status">Status: ${hasMembershipRequest(listing.id, visibilityPlan.plan_type) ? 'Requested' : 'Not active'}</p>
+              <div class="collapsible-row">▶ See features & disclaimer</div>
+              <label class="checkbox-label">
+                <input type="checkbox" class="visibility-disclaimer" data-listing-id="${esc(listing.id)}" />
+                <span>I understand impressions, clicks, calls, bookings and revenue are not guaranteed.</span>
+              </label>
+              ${renderRequestButton(listing, visibilityPlan.plan_type, visibilityPlan.amount_inr, 'Boost Visibility')}
+            </div>
+          </div>
+
+          <div class="listing-actions">
+            ${phone ? `<a class="btn btn-primary btn-small" href="tel:${phone}">Call</a>` : `<button class="btn btn-small btn-disabled" disabled>No Call</button>`}
+            ${whatsapp ? `<a class="btn btn-outline btn-small" href="https://wa.me/${whatsapp}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : `<button class="btn btn-small btn-disabled" disabled>No WhatsApp</button>`}
+            <a class="btn btn-outline btn-small" href="/rent-vehicle?tab=register">Add New</a>
+            ${status !== 'cancelled' ? `<button class="btn btn-danger btn-small delete-listing-btn" type="button" data-listing-id="${esc(listing.id)}">Delete</button>` : ''}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderListings() {
+      const grid = document.getElementById('my-listings-grid');
+      const loader = document.getElementById('listings-loader');
+      if (loader) loader.classList.add('hidden');
+      if (!grid) return;
+
+      if (!currentUser) {
+        grid.innerHTML = `
+          <div class="empty-card">
+            <h3>Login required</h3>
+            <p>Please login with Google to view your vehicle listings.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const visibleListings = currentListings.filter((item) => item.status !== 'cancelled');
+
+      if (!visibleListings.length) {
+        grid.innerHTML = `
+          <div class="empty-card">
+            <h3>No listings yet</h3>
+            <p>Create your first vehicle listing and it will appear here.</p>
+            <a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = visibleListings.map(renderListingCard).join('');
+    }
+
+    async function refreshSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Session error:', error);
+        currentUser = null;
+      } else {
+        currentUser = data.session?.user || null;
+      }
+
+      const loginEmail = document.getElementById('login-email');
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+
+      if (currentUser?.email) {
+        if (loginEmail) loginEmail.textContent = currentUser.email;
+        loginBtn?.classList.add('hidden');
+        logoutBtn?.classList.remove('hidden');
+      } else {
+        if (loginEmail) loginEmail.textContent = 'Not logged in';
+        loginBtn?.classList.remove('hidden');
+        logoutBtn?.classList.add('hidden');
+      }
+
+      return currentUser;
+    }
+
+    async function loginWithGoogle() {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/owner/rent-dashboard`,
+        },
+      });
+
+      if (error) showMessage(error.message, 'error');
+    }
+
+    async function logout() {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      currentUser = null;
+      currentListings = [];
+      await refreshSession();
+      renderListings();
+      showMessage('Logged out successfully.', 'success');
+    }
+
+    async function loadMyListings() {
+      const loader = document.getElementById('listings-loader');
+      if (loader) {
+        loader.textContent = 'Loading your listings...';
+        loader.classList.remove('hidden');
+      }
+
+      if (!currentUser?.id) {
+        currentListings = [];
+        renderListings();
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('rent_listings')
+        .select(`
+          id,
+          owner_user_id,
+          owner_email,
+          owner_name,
+          owner_phone,
+          owner_whatsapp,
+          reg_number,
+          vehicle_type,
+          vehicle_model,
+          seats,
+          purposes,
+          base_city_id,
+          service_city_ids,
+          price_text,
+          photos,
+          description,
+          status,
+          created_at,
+          updated_at,
+          is_verified
+        `)
+        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Load listings error:', error);
+        showMessage(error.message, 'error');
+        currentListings = [];
+        renderListings();
+        return;
+      }
+
+      currentListings = Array.isArray(data) ? data : [];
+      await Promise.all([loadEventCounts(), loadMembershipRequests()]);
+      hideMessage();
+      renderListings();
+    }
+
+    async function loadEventCounts() {
+      eventCountsByListing = {};
+      const listingIds = currentListings.map((item) => item.id).filter(Boolean);
+      if (!listingIds.length) return;
+
+      const { data, error } = await supabase
+        .from('rent_listing_events')
+        .select('listing_id,event_type')
+        .in('listing_id', listingIds);
+
+      if (error) {
+        console.warn('Event count load failed:', error);
+        return;
+      }
+
+      (data || []).forEach((event) => {
+        const listingId = event.listing_id;
+        const eventType = event.event_type;
+        if (!listingId || !eventType) return;
+        if (!eventCountsByListing[listingId]) eventCountsByListing[listingId] = {};
+        eventCountsByListing[listingId][eventType] = (eventCountsByListing[listingId][eventType] || 0) + 1;
+      });
+    }
+
+    async function loadMembershipRequests() {
+      membershipRequests = [];
+      if (!currentUser?.id) return;
+
+      const { data, error } = await supabase
+        .from('rent_membership_requests')
+        .select('id,listing_id,plan_type,amount_inr,status,created_at')
+        .eq('owner_user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Membership request load failed:', error);
+        return;
+      }
+
+      membershipRequests = Array.isArray(data) ? data : [];
+    }
+
+    async function requestMembership(listingId, planType, amountInr) {
+      if (!currentUser?.id || !currentUser?.email) {
+        showMessage('Please login first.', 'error');
+        return;
+      }
+
+      const listing = currentListings.find((item) => item.id === listingId);
+      if (!listing) {
+        showMessage('Listing not found.', 'error');
+        return;
+      }
+
+      const checkboxClass = planType === 'verified_badge' ? '.verified-disclaimer' : '.visibility-disclaimer';
+      const checkbox = document.querySelector(`${checkboxClass}[data-listing-id="${listingId}"]`);
+
+      if (!checkbox?.checked) {
+        showMessage('Please tick disclaimer first.', 'error');
+        return;
+      }
+
+      if (hasMembershipRequest(listingId, planType)) {
+        showMessage('Request already exists for this plan.', 'info');
+        return;
+      }
+
+      showMessage('Saving request...', 'info');
+
+      const { error } = await supabase.from('rent_membership_requests').insert({
+        listing_id: listingId,
+        owner_user_id: currentUser.id,
+        owner_email: currentUser.email,
+        plan_type: planType,
+        amount_inr: Number(amountInr || 0),
+        duration_months: 3,
+        status: 'requested',
+        note: 'Owner requested membership from dashboard. Payment gateway/admin activation pending.',
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      showMessage('Request saved. Payment/admin activation pending.', 'success');
+      await loadMembershipRequests();
+      renderListings();
+    }
+
+    async function deleteListing(listingId) {
+      if (!currentUser?.id) {
+        showMessage('Please login first.', 'error');
+        return;
+      }
+
+      if (!confirm('Delete this listing? It will be removed from public search.')) return;
+
+      showMessage('Deleting listing...', 'info');
+
+      const { data, error } = await supabase
+        .from('rent_listings')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', listingId)
+        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
+        .select('id,status')
+        .single();
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      currentListings = currentListings.map((item) => {
+        if (item.id === listingId) return { ...item, status: 'cancelled' };
+        return item;
+      });
+
+      showMessage('Listing deleted from public search.', 'success');
+      renderListings();
+      console.log('Deleted listing:', data);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('login-btn')?.addEventListener('click', loginWithGoogle);
+      document.getElementById('logout-btn')?.addEventListener('click', logout);
+
+      document.querySelectorAll('.plan-feature-btn').forEach((btn) => {
+        btn.addEventListener('click', () => showFeatureNote(btn.dataset.feature));
+      });
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+
+        const requestBtn = target.closest('.request-plan-btn');
+        if (requestBtn && !requestBtn.disabled) {
+          const listingId = requestBtn.dataset.listingId;
+          const planType = requestBtn.dataset.planType;
+          const amount = Number(requestBtn.dataset.amount || 0);
+          if (listingId && planType) requestMembership(listingId, planType, amount);
+          return;
+        }
+
+        const deleteBtn = target.closest('.delete-listing-btn');
+        if (deleteBtn) {
+          const listingId = deleteBtn.dataset.listingId;
+          if (listingId) deleteListing(listingId);
+          return;
+        }
+
+        const photoBtn = target.closest('.dashboard-photo-open');
+        if (photoBtn) {
+          const url = photoBtn.dataset.photoUrl;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      });
+
+      await refreshSession();
+      await loadMyListings();
+    });
+  </script>
+
+  <style is:global>
+    .dashboard-page {
+      background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      min-height: 100vh;
+      padding: 2rem 0 4rem;
+      color: white;
+    }
+
+    .dashboard-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+    }
+
+    .header-content h1 {
+      font-size: 1.75rem;
+      margin: 0 0 0.5rem;
+      color: white;
+    }
+
+    .header-content p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.95rem;
+    }
+
+    .logged-in-card,
+    .free-notice,
+    .plan-card,
+    .dashboard-listing-card,
+    .performance-box,
+    .ads-box,
+    .payment-card,
+    .empty-card,
+    .loading-card,
+    .dashboard-message,
+    .feature-note {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 1rem;
+    }
+
+    .logged-in-card {
+      padding: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+    }
+
+    .auth-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .login-label {
+      margin: 0 0 0.25rem;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85rem;
+    }
+
+    .login-email {
+      margin: 0;
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .dashboard-message,
+    .feature-note {
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-weight: 800;
+    }
+
+    .feature-note {
+      border-color: rgba(255, 107, 0, 0.35);
+      background: rgba(255, 107, 0, 0.12);
+      color: #fed7aa;
+    }
+
+    .dashboard-message.info {
+      border-color: rgba(59, 130, 246, 0.35);
+      background: rgba(59, 130, 246, 0.14);
+      color: #93c5fd;
+    }
+
+    .dashboard-message.success {
+      border-color: rgba(34, 197, 94, 0.35);
+      background: rgba(34, 197, 94, 0.14);
+      color: #86efac;
+    }
+
+    .dashboard-message.error {
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.14);
+      color: #fca5a5;
+    }
+
+    .free-notice {
+      background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
+      border-color: rgba(255, 107, 0, 0.3);
+      padding: 1.25rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .notice-icon {
+      font-size: 1.75rem;
+      flex-shrink: 0;
+    }
+
+    .notice-content h3 {
+      margin: 0 0 0.5rem;
+      color: #ff8a00;
+    }
+
+    .notice-content p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 800;
+      text-decoration: none;
+      display: inline-block;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 0.95rem;
+      border: 0;
+    }
+
+    .btn-primary,
+    .btn-orange {
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      border: none;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.18);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-small {
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+    }
+
+    .btn-disabled,
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .section-title {
+      margin: 0 0 1rem;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: white;
+    }
+
+    .plan-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .plan-card {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .plan-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1rem;
+    }
+
+    .plan-price {
+      font-size: 1.75rem;
+      font-weight: 900;
+      margin-bottom: 0.25rem;
+      color: #ff8a00;
+    }
+
+    .plan-duration {
+      margin: 0 0 0.75rem;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85rem;
+    }
+
+    .plan-description {
+      margin: 0 0 1rem;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.85rem;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .dashboard-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .my-listings-grid {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .loading-card,
+    .empty-card {
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .empty-card h3 {
+      margin: 0 0 0.5rem;
+    }
+
+    .empty-card p {
+      margin: 0 0 1rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .dashboard-listing-card {
+      padding: 1.25rem;
+    }
+
+    .listing-head {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .listing-image {
+      width: 90px;
+      height: 90px;
+      border-radius: 0.9rem;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .listing-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+
+    .listing-photo-grid {
+      width: 110px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.35rem;
+      flex-shrink: 0;
+    }
+
+    .listing-photo-thumb,
+    .listing-photo-empty {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 0;
+      border-radius: 0.55rem;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .listing-photo-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .listing-placeholder {
+      font-size: 2rem;
+    }
+
+    .listing-title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: start;
+      margin-bottom: 0.3rem;
+    }
+
+    .listing-head-content h3 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .listing-main-line,
+    .listing-sub-line,
+    .listing-desc {
+      margin: 0 0 0.45rem;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .listing-sub-line strong {
+      color: white;
+    }
+
+    .listing-meta {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 0.65rem;
+    }
+
+    .listing-status,
+    .listing-badge {
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.09);
+      color: rgba(255, 255, 255, 0.82);
+      white-space: nowrap;
+    }
+
+    .status-active {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .status-cancelled,
+    .status-rejected {
+      background: rgba(239, 68, 68, 0.18);
+      color: #fca5a5;
+    }
+
+    .status-pending {
+      background: rgba(250, 204, 21, 0.16);
+      color: #fde68a;
+    }
+
+    .badge-free {
+      background: rgba(255, 107, 0, 0.2);
+      color: #ff8a00;
+    }
+
+    .badge-verified {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .listing-edit-row {
+      margin-top: 0.85rem;
+    }
+
+    .performance-box {
+      margin-top: 1rem;
+      padding: 1rem;
+    }
+
+    .performance-box h4,
+    .ads-box h4 {
+      margin: 0 0 0.85rem;
+      font-size: 0.95rem;
+      color: white;
+    }
+
+    .performance-grid,
+    .ads-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+
+    .mini-stat {
+      background: rgba(10, 7, 42, 0.42);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.9rem;
+      padding: 0.75rem;
+      min-height: 48px;
+    }
+
+    .mini-stat span {
+      display: block;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.82rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .mini-stat strong {
+      color: white;
+      font-size: 1rem;
+    }
+
+    .ads-box {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid rgba(255, 200, 0, 0.45);
+      background: rgba(255, 200, 0, 0.08);
+    }
+
+    .ads-title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .ads-badge {
+      display: inline-block;
+      background: rgba(255, 107, 0, 0.2);
+      color: #ff8a00;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .payment-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .per-listing-payment {
+      margin-top: 1rem;
+    }
+
+    .payment-card {
+      padding: 1rem;
+    }
+
+    .boost-card {
+      border-color: rgba(255, 200, 0, 0.42);
+      background: rgba(255, 200, 0, 0.08);
+    }
+
+    .payment-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.05rem;
+    }
+
+    .payment-amount,
+    .selected-plan {
+      margin: 0 0 0.35rem;
+      color: #ff8a00;
+      font-weight: 700;
+    }
+
+    .payment-status,
+    .free-expiry {
+      margin: 0 0 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.85rem;
+    }
+
+    .collapsible-row {
+      background: rgba(255, 107, 0, 0.15);
+      border: 1px solid rgba(255, 107, 0, 0.3);
+      border-radius: 0.6rem;
+      padding: 0.65rem;
+      margin-bottom: 0.85rem;
+      color: #ff8a00;
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+
+    .checkbox-label input[type='checkbox'] {
+      width: auto;
+      margin-top: 0.25rem;
+      flex-shrink: 0;
+    }
+
+    .checkbox-label span {
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.4;
+      font-size: 0.85rem;
+    }
+
+    .listing-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+
+    .listing-actions .btn,
+    .payment-card .btn {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 1024px) {
+      .plan-cards,
+      .payment-cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .performance-grid,
+      .ads-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-page {
+        padding: 1.5rem 0 3rem;
+      }
+
+      .dashboard-header,
+      .logged-in-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .dashboard-header .btn,
+      .logged-in-card .btn,
+      .auth-actions {
+        width: 100%;
+      }
+
+      .auth-actions {
+        flex-direction: column;
+      }
+
+      .plan-cards,
+      .payment-cards,
+      .dashboard-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .listing-head {
+        grid-template-columns: 1fr;
+      }
+
+      .listing-image {
+        width: 100%;
+        height: 150px;
+      }
+
+      .listing-photo-grid {
+        width: 100%;
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .listing-title-row,
+      .ads-title-row {
+        flex-direction: column;
+      }
+
+      .performance-grid,
+      .ads-grid,
+      .listing-actions {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </BaseLayout>
