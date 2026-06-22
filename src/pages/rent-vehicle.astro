@@ -128,8 +128,15 @@ const listingsForClient = listings.map((listing) => {
             <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
           </div>
         </div>
-        <a href="/owner/rent-dashboard" class="btn btn-outline btn-small">Dashboard</a>
-      </div>
+        <div class="rent-hero-actions">
+  <div class="rent-lang-toggle" aria-label="Language">
+    <button type="button" class="rent-lang-btn active" data-lang="en">EN</button>
+    <button type="button" class="rent-lang-btn" data-lang="bn">বাংলা</button>
+  </div>
+  <a href="/owner/rent-dashboard" class="btn btn-outline btn-small">Dashboard</a>
+</div>
+  </div>
+    
 
       <div class="rent-actions">
         <a href="/rent-vehicle?tab=find" id="find-tab" class="rent-tab active">Find Rent</a>
@@ -206,7 +213,7 @@ const listingsForClient = listings.map((listing) => {
 
         <div class="rent-section-row">
           <h2 class="rent-section-heading">Available rentals</h2>
-          <p class="rent-count-text"><strong id="result-count">0</strong> listings</p>
+          <p class="rent-count-text"><strong id="result-count">0</strong> <span id="result-label">listings</span></p>
         </div>
 
         {listingsError && (
@@ -479,6 +486,201 @@ const listingsForClient = listings.map((listing) => {
       "school-bus": "School/Office",
       ambulance: "Emergency",
     };
+     const RENT_LANG_KEY = "soniabuddy_rent_lang_v1";
+
+const rentBnText = {
+  "Rent with Driver": "ড্রাইভারসহ গাড়ি ভাড়া",
+  "Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal": "পশ্চিমবঙ্গে কার, বাস, টোটো, পিকআপ ভ্যান ও অ্যাম্বুলেন্স ভাড়া",
+  "Dashboard": "ড্যাশবোর্ড",
+  "Find Rent": "ভাড়া খুঁজুন",
+  "Create Listing": "লিস্টিং তৈরি করুন",
+  "Search Rentals": "ভাড়া সার্চ করুন",
+  "Where do you need vehicle?": "কোথায় গাড়ি দরকার?",
+  "Nearby cities (max 3)": "কাছাকাছি শহর (সর্বোচ্চ ৩টি)",
+  "Vehicle type": "গাড়ির ধরন",
+  "Purpose": "কাজের ধরন",
+  "🔍 Search rentals": "🔍 ভাড়া সার্চ করুন",
+  "🔍 Select a city to search": "🔍 সার্চ করতে শহর সিলেক্ট করুন",
+  "Clear Filters": "ফিল্টার পরিষ্কার করুন",
+  "Available rentals": "পাওয়া যাচ্ছে",
+  "listings": "লিস্টিং",
+  "Own a vehicle?": "আপনার গাড়ি আছে?",
+  "Create a listing and get first 3 months free.": "লিস্টিং তৈরি করুন এবং প্রথম ৩ মাস ফ্রি পান।",
+  "Add your vehicle listing": "আপনার গাড়ির লিস্টিং যোগ করুন",
+  "Add car, bus, toto, pickup van or ambulance rental details. New listings get first 3 months free.": "কার, বাস, টোটো, পিকআপ ভ্যান বা অ্যাম্বুলেন্স ভাড়ার তথ্য যোগ করুন। নতুন লিস্টিং প্রথম ৩ মাস ফ্রি।",
+  "Owner Contact": "মালিকের যোগাযোগ",
+  "Owner name": "মালিকের নাম",
+  "Phone": "ফোন",
+  "WhatsApp": "WhatsApp",
+  "+91 optional": "+91 দিলে বা না দিলেও হবে",
+  "Vehicle Details": "গাড়ির তথ্য",
+  "Vehicle Registration Number": "গাড়ির রেজিস্ট্রেশন নম্বর",
+  "Model / variant": "মডেল / ভ্যারিয়েন্ট",
+  "Seats": "সিট",
+  "Service Area": "সার্ভিস এলাকা",
+  "Base City": "বেস শহর",
+  "Service cities (max 3)": "সার্ভিস শহর (সর্বোচ্চ ৩টি)",
+  "Rent Details": "ভাড়ার তথ্য",
+  "Rent type": "ভাড়ার ধরন",
+  "Price": "ভাড়া",
+  "Description": "বিবরণ",
+  "Photos (max 4)": "ছবি (সর্বোচ্চ ৪টি)",
+  "Max 4 photos. Photos cannot be saved through Google redirect, so select photos after login if needed.": "সর্বোচ্চ ৪টি ছবি। Google login-এর পরে প্রয়োজনে আবার ছবি সিলেক্ট করুন।",
+  "I confirm the information above is accurate and consent to making my contact details visible.": "উপরের তথ্য সঠিক এবং আমার যোগাযোগের তথ্য দেখানোর অনুমতি দিচ্ছি।",
+  "Google login required": "Google login দরকার",
+  "Login with Google before submitting your listing. Your form draft will be saved.": "লিস্টিং সাবমিট করার আগে Google login করুন। আপনার ফর্ম ড্রাফট সেভ থাকবে।",
+  "Login with Google": "Google দিয়ে login করুন",
+  "Submit Listing": "লিস্টিং সাবমিট করুন",
+  "Save Draft & Login": "ড্রাফট সেভ করে login করুন",
+  "After free trial": "ফ্রি ট্রায়ালের পরে",
+  "Small Vehicle Plan": "ছোট গাড়ির প্ল্যান",
+  "Car / Pickup / Ambulance Plan": "কার / পিকআপ / অ্যাম্বুলেন্স প্ল্যান",
+  "Bus Plan": "বাস প্ল্যান",
+  "First 3 months free": "প্রথম ৩ মাস ফ্রি",
+  "Public contact after approval": "Approval-এর পরে contact দেখাবে",
+  "City-based matching": "শহর অনুযায়ী matching",
+
+  "Car": "কার",
+  "Bus": "বাস",
+  "Toto": "টোটো",
+  "Auto": "অটো",
+  "Pickup": "পিকআপ",
+  "Ambulance": "অ্যাম্বুলেন্স",
+  "Cheap Rent": "সস্তা ভাড়া",
+  "Wedding": "বিয়ে",
+  "Tour": "ট্যুর",
+  "Local": "লোকাল",
+  "School/Office": "স্কুল/অফিস",
+  "Emergency": "ইমার্জেন্সি",
+  "Goods/Parcel": "মাল/পার্সেল",
+
+  "Report": "রিপোর্ট",
+  "Serves:": "সার্ভিস:",
+  "Vehicle:": "গাড়ি:",
+  "Vehicle": "গাড়ি",
+  "Available:": "পাওয়া যাচ্ছে:",
+  "Call": "কল",
+  "No Phone": "ফোন নেই",
+  "No WhatsApp": "WhatsApp নেই",
+  "Details": "ডিটেইলস",
+  "No city selected": "কোনো শহর সিলেক্ট হয়নি",
+  "No Photo": "ছবি নেই",
+  "No rentals listed yet": "এখনও কোনো ভাড়ার লিস্টিং নেই",
+  "Select another city, nearby city, vehicle type or purpose.": "অন্য শহর, কাছাকাছি শহর, গাড়ির ধরন বা কাজের ধরন সিলেক্ট করুন।",
+  "Please confirm price, vehicle, date and availability directly with the owner before booking. SoniaBuddy is only a listing platform and is not responsible for owner pricing or service.": "বুকিংয়ের আগে মালিকের সাথে সরাসরি ভাড়া, গাড়ি, তারিখ ও availability confirm করুন। SoniaBuddy শুধুমাত্র listing platform, owner-এর price বা service-এর জন্য দায়ী নয়।",
+
+  "Search city name, district, or keywords...": "শহর, জেলা বা keyword লিখুন...",
+  "Add nearby city": "কাছাকাছি শহর যোগ করুন",
+  "Search base city": "বেস শহর সার্চ করুন",
+  "Add service city": "সার্ভিস শহর যোগ করুন",
+  "Enter owner name": "মালিকের নাম লিখুন",
+  "Enter phone number": "ফোন নম্বর লিখুন",
+  "Enter WhatsApp number": "WhatsApp নম্বর লিখুন",
+  "WB XX XX XXXX": "WB XX XX XXXX",
+  "e.g., Swift Dzire ZXI": "যেমন Swift Dzire ZXI",
+  "Enter seating capacity": "সিট সংখ্যা লিখুন",
+  "e.g., ₹2500/day": "যেমন ₹2500/day",
+  "Describe your vehicle and services...": "আপনার গাড়ি ও সার্ভিসের বিবরণ লিখুন..."
+};
+
+function normalizeLangValue(value) {
+  const clean = String(value || "").trim().toLowerCase();
+  if (clean === "bn" || clean === "bengali" || clean === "bangla" || clean === "বাংলা") return "bn";
+  if (clean === "en" || clean === "english") return "en";
+  return "";
+}
+
+function readRentLang() {
+  const fromUrl = normalizeLangValue(new URLSearchParams(window.location.search).get("lang"));
+  if (fromUrl) return fromUrl;
+
+  const keys = [
+    "soniabuddy_rent_lang_v1",
+    "soniabuddy_lang",
+    "soniabuddy_language",
+    "site_lang",
+    "site-language",
+    "language",
+    "lang",
+    "wbbus_language",
+    "wbbustime_language"
+  ];
+
+  for (const key of keys) {
+    const value = normalizeLangValue(localStorage.getItem(key));
+    if (value) return value;
+  }
+
+  return "en";
+}
+
+let rentLang = readRentLang();
+
+function setRentLang(nextLang) {
+  const clean = normalizeLangValue(nextLang) || "en";
+  rentLang = clean;
+  localStorage.setItem(RENT_LANG_KEY, rentLang);
+  document.documentElement.lang = rentLang === "bn" ? "bn" : "en";
+  applyRentLanguage();
+  updateSearchButton();
+}
+
+function rentT(text) {
+  const key = String(text || "").trim();
+  return rentLang === "bn" ? (rentBnText[key] || key) : key;
+}
+
+function rentLabel(value) {
+  return rentT(String(value || "").trim());
+}
+
+function applyRentLanguage() {
+  document.documentElement.lang = rentLang === "bn" ? "bn" : "en";
+
+  const textSelectors = [
+    ".rent-page h1",
+    ".rent-page h2",
+    ".rent-page h3",
+    ".rent-page h4",
+    ".rent-page label:not(.checkbox-label)",
+    ".rent-page .checkbox-label span",
+    ".rent-page .rent-tab",
+    ".rent-page .btn",
+    ".rent-page .field-note",
+    ".rent-page .trust-card p",
+    ".rent-page .owner-cta-card p",
+    ".rent-page .create-notice-card p",
+    ".rent-page .membership-price",
+    ".rent-page .membership-desc",
+    ".rent-page .login-required-card p",
+    ".rent-page .clear-filter-btn",
+    ".rent-page .rent-chip",
+    ".rent-page .no-selection"
+  ].join(",");
+
+  document.querySelectorAll(textSelectors).forEach((el) => {
+    if (!el.dataset.enText) {
+      el.dataset.enText = String(el.textContent || "").trim();
+    }
+
+    const enText = el.dataset.enText;
+    el.textContent = rentT(enText);
+  });
+
+  document.querySelectorAll("input[placeholder], textarea[placeholder]").forEach((el) => {
+    if (!el.dataset.enPlaceholder) {
+      el.dataset.enPlaceholder = el.getAttribute("placeholder") || "";
+    }
+
+    const enPlaceholder = el.dataset.enPlaceholder;
+    el.setAttribute("placeholder", rentT(enPlaceholder));
+  });
+
+  const resultLabel = document.getElementById("result-label");
+  if (resultLabel) resultLabel.textContent = rentT("listings");
+
+  updateSearchButton();
+}
 
     if (typeParam && typeToVehicle[typeParam]) {
       state.vehicleType = typeToVehicle[typeParam];
@@ -697,7 +899,7 @@ searchInput.addEventListener("keydown", (event) => {
 
       const hasCity = Boolean(state.mainCity);
       btn.disabled = !hasCity;
-      btn.textContent = hasCity ? "🔍 Search rentals" : "🔍 Select a city to search";
+      btn.textContent = hasCity ? rentT("🔍 Search rentals") : rentT("🔍 Select a city to search");
     }
 
     function whatsappNumber(listing) {
@@ -745,7 +947,7 @@ searchInput.addEventListener("keydown", (event) => {
         const url = photos[index];
 
         if (!url) {
-          return `<div class="photo-empty">No Photo</div>`;
+          return `<div class="photo-empty">${rentT("No Photo")}</div>`;
         }
 
         return `
@@ -793,73 +995,101 @@ searchInput.addEventListener("keydown", (event) => {
         </div>
 
         <button class="rent-report-btn" type="button" data-listing-id="${esc(listing.id)}">
-          ⚐ Report
+          ⚐ ${rentT("Report")}
         </button>
       </div>
 
       ${renderPhotos(listing)}
 
       <div class="rent-pro-info">
-        ${serviceNames.length ? `<p><strong>Serves:</strong> ${esc(serviceNames.join(", "))}</p>` : ""}
+        ${serviceNames.length ? `<p><strong>${rentT("Serves:")}</strong> ${esc(serviceNames.join(", "))}</p>` : ""}
         <p>
-          <strong>Vehicle:</strong>
-          ${esc(listing.vehicle_type || "Vehicle")}
+          <strong>${rentT("Vehicle:")}</strong>
+          ${esc(rentLabel(listing.vehicle_type || "Vehicle"))}
           ${listing.vehicle_model ? ` • ${esc(listing.vehicle_model)}` : ""}
           ${listing.seats ? ` • ${esc(listing.seats)} seater` : ""}
         </p>
-        ${purposes.length ? `<p><strong>Available:</strong> ${esc(purposes.join(" • "))}</p>` : ""}
+        ${purposes.length ? `<p><strong>${rentT("Available:")}</strong> ${esc(purposes.map(rentLabel).join(" • "))}</p>` : ""}
         ${listing.price_text ? `<p class="rent-price-line">${esc(listing.price_text)}</p>` : ""}
         ${listing.description ? `<p class="rent-desc-line">${esc(listing.description)}</p>` : ""}
       </div>
 
       <div class="rent-warning-note">
-        Please confirm price, vehicle, date and availability directly with the owner before booking.
-        SoniaBuddy is only a listing platform and is not responsible for owner pricing or service.
+        ${rentT("Please confirm price, vehicle, date and availability directly with the owner before booking. SoniaBuddy is only a listing platform and is not responsible for owner pricing or service.")}
       </div>
 
       <div class="rent-pro-actions">
         ${
           phone
-            ? `<a class="rent-action-btn rent-call-btn" href="tel:${phone}">📞 Call</a>`
-            : `<button class="rent-action-btn rent-disabled-btn" type="button" disabled>No Phone</button>`
+            ? `<a class="rent-action-btn rent-call-btn" href="tel:${phone}">📞 ${rentT("Call")}</a>`
+            : `<button class="rent-action-btn rent-disabled-btn" type="button" disabled>${rentT("No Phone")}</button>`
         }
 
         ${
           wa
             ? `<a class="rent-action-btn rent-wa-btn" href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>`
-            : `<button class="rent-action-btn rent-disabled-btn" type="button" disabled>No WhatsApp</button>`
+            : `<button class="rent-action-btn rent-disabled-btn" type="button" disabled>${rentT("No WhatsApp")}</button>`
         }
 
         <button class="rent-action-btn rent-detail-btn" type="button" data-listing-id="${esc(listing.id)}">
-          Details
+         ${rentT("Details")}
         </button>
       </div>
     </article>
   `;
 }
 
-    function renderListings() {
-      const grid = document.getElementById("rental-cards-grid");
-      const resultCount = document.getElementById("result-count");
-      if (!grid) return;
+    function renderListings(forceSearch = false) {
+  const grid = document.getElementById("rental-cards-grid");
+  const resultCount = document.getElementById("result-count");
+  if (!grid) return;
 
-      const filtered = listings.filter(listingMatches);
+  const hasSearch =
+    Boolean(state.mainCity) ||
+    state.nearbyCities.length > 0 ||
+    Boolean(state.vehicleType) ||
+    Boolean(state.purpose);
 
-      if (resultCount) resultCount.textContent = String(filtered.length);
+  if (!forceSearch && !hasSearch) {
+    if (resultCount) resultCount.textContent = "0";
 
-      if (!filtered.length) {
-        grid.innerHTML = `
-          <div class="empty-rent-box">
-            <h3>No rentals listed yet</h3>
-            <p>Select another city, nearby city, vehicle type or purpose.</p>
-          </div>
-        `;
-        return;
-      }
+    grid.innerHTML = `
+      <div class="empty-rent-box">
+        <h3>${rentT("Search Rentals")}</h3>
+        <p>Select city, vehicle type or purpose, then click Search.</p>
+      </div>
+    `;
+    return;
+  }
 
-      grid.innerHTML = filtered.map(renderCard).join("");
-    }
+  if (!state.mainCity) {
+    if (resultCount) resultCount.textContent = "0";
 
+    grid.innerHTML = `
+      <div class="empty-rent-box">
+        <h3>Select a city first</h3>
+        <p>Rent cards will show after city search.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const filtered = listings.filter(listingMatches);
+
+  if (resultCount) resultCount.textContent = String(filtered.length);
+
+  if (!filtered.length) {
+    grid.innerHTML = `
+      <div class="empty-rent-box">
+        <h3>No rentals listed yet</h3>
+        <p>Select another city, nearby city, vehicle type or purpose.</p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(renderCard).join("");
+}
     function setupSingleChipGroup(groupId, stateKey) {
       const chips = Array.from(document.querySelectorAll(`#${groupId} .rent-chip`));
 
@@ -1451,7 +1681,42 @@ async function handlePostLoginRestore() {
 
     document.addEventListener("DOMContentLoaded", () => {
       showTab(tab);
+      applyRentLanguage();
 
+document.addEventListener("click", (event) => {
+  const langButton = event.target?.closest?.("button, a, [data-lang], [data-language]");
+  if (!langButton) return;
+
+  const attrLang =
+    langButton.dataset?.lang ||
+    langButton.dataset?.language ||
+    langButton.getAttribute?.("data-lang") ||
+    langButton.getAttribute?.("data-language") ||
+    "";
+
+  const text = String(langButton.textContent || "").trim().toLowerCase();
+  let nextLang = normalizeLangValue(attrLang);
+
+  if (!nextLang) {
+    if (text === "en" || text.includes("english")) nextLang = "en";
+    if (text.includes("বাংলা") || text === "bn" || text.includes("bengali")) nextLang = "bn";
+  }
+
+  if (!nextLang || nextLang === rentLang) return;
+
+  setTimeout(() => {
+    setRentLang(nextLang);
+  }, 0);
+});
+
+window.addEventListener("storage", () => {
+  const nextLang = readRentLang();
+  if (nextLang !== rentLang) {
+    rentLang = nextLang;
+    applyRentLanguage();
+    renderListings();
+  }
+});
       handlePostLoginRestore();
       setupPhotoUpload();
 
@@ -1485,8 +1750,8 @@ document.getElementById("submit-listing-btn")?.addEventListener("click", () => {
   submitCreateListing();
 });
       document.getElementById("rent-search-btn")?.addEventListener("click", () => {
-        renderListings();
-      });
+  renderListings(true);
+});
 
       document.addEventListener("mousedown", (event) => {
         const target = event.target;
@@ -2576,6 +2841,88 @@ if (reportBtn) {
     padding: 0.45rem 0.45rem !important;
     font-size: 0.75rem !important;
   }
+}
+/* Rent language toggle */
+.rent-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rent-lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.rent-lang-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 900;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.rent-lang-btn.active {
+  background: linear-gradient(135deg, #ff6b00, #ff8a00);
+  color: white;
+}
+
+@media (max-width: 640px) {
+  .rent-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+/* DESKTOP RENT PAGE ALIGN FIX */
+@media (min-width: 769px) {
+  .rent-panel {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .rent-panel > .form-section-card {
+    max-width: 740px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .rent-section-row {
+    max-width: 740px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .owner-cta-card,
+  .trust-cards {
+    max-width: 740px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .rent-hero-card {
+    max-width: 740px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .rent-actions {
+    max-width: 740px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+.rent-lang-toggle {
+  display: none !important;
 }
   </style>
 </BaseLayout>

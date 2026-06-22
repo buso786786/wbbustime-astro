@@ -125,6 +125,28 @@ import '../../styles/admin-compact.css';
     }
 
     function hideMessage() {
+      function showActionMessage(button, text, type = 'success') {
+  const card = button?.closest('.payment-card, .listing-card');
+  if (!card) {
+    showMessage(text, type);
+    return;
+  }
+
+  let box = card.querySelector('.inline-action-message');
+
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'inline-action-message';
+    card.appendChild(box);
+  }
+
+  box.textContent = text;
+  box.className = `inline-action-message ${type}`;
+
+  setTimeout(() => {
+    box.remove();
+  }, 4500);
+}
       const box = document.getElementById('dashboard-message');
       if (box) box.classList.add('hidden');
     }
@@ -280,7 +302,43 @@ import '../../styles/admin-compact.css';
           </div>
 
           <div class="listing-edit-row">
-            <a class="btn btn-outline btn-small" href="/rent-vehicle?tab=register&edit=${esc(listing.id)}">✎ Edit Listing</a>
+          <div class="contact-edit-box hidden" id="contact-edit-${esc(listing.id)}">
+  <div class="contact-edit-grid">
+    <label>
+      Phone
+      <input
+        type="tel"
+        class="edit-phone-input"
+        data-listing-id="${esc(listing.id)}"
+        value="${esc(listing.owner_phone || '')}"
+        placeholder="10 digit phone"
+      />
+    </label>
+
+    <label>
+      WhatsApp
+      <input
+        type="tel"
+        class="edit-whatsapp-input"
+        data-listing-id="${esc(listing.id)}"
+        value="${esc(listing.owner_whatsapp || '')}"
+        placeholder="10 digit WhatsApp"
+      />
+    </label>
+  </div>
+
+  <div class="contact-edit-actions">
+    <button class="btn btn-primary btn-small save-contact-btn" type="button" data-listing-id="${esc(listing.id)}">
+      Save Contact
+    </button>
+    <button class="btn btn-outline btn-small cancel-contact-edit-btn" type="button" data-listing-id="${esc(listing.id)}">
+      Cancel
+    </button>
+  </div>
+</div>
+            <button class="btn btn-outline btn-small edit-contact-btn" type="button" data-listing-id="${esc(listing.id)}">
+  ✎ Edit Contact
+</button>
           </div>
 
           <div class="performance-box">
@@ -315,7 +373,7 @@ import '../../styles/admin-compact.css';
               <div class="collapsible-row">▶ See features & disclaimer</div>
               <label class="checkbox-label">
                 <input type="checkbox" class="verified-disclaimer" data-listing-id="${esc(listing.id)}" />
-                <span>I understand this is a trust badge only and does not guarantee calls, bookings, impressions or clicks.</span>
+                <span>I understand this badge helps users trust my listing. Calls and bookings depend on user demand, location and availability.</span>
               </label>
               ${renderRequestButton(listing, 'verified_badge', 299, 'Get Verified Badge')}
             </div>
@@ -327,7 +385,7 @@ import '../../styles/admin-compact.css';
               <div class="collapsible-row">▶ See features & disclaimer</div>
               <label class="checkbox-label">
                 <input type="checkbox" class="visibility-disclaimer" data-listing-id="${esc(listing.id)}" />
-                <span>I understand impressions, clicks, calls, bookings and revenue are not guaranteed.</span>
+                <span>I understand boost can help my listing appear with more visibility. Results depend on city, vehicle type and user demand.</span>
               </label>
               ${renderRequestButton(listing, visibilityPlan.plan_type, visibilityPlan.amount_inr, 'Boost Visibility')}
             </div>
@@ -522,7 +580,7 @@ import '../../styles/admin-compact.css';
       membershipRequests = Array.isArray(data) ? data : [];
     }
 
-    async function requestMembership(listingId, planType, amountInr) {
+    async function requestMembership(listingId, planType, amountInr, sourceButton = null) {
       if (!currentUser?.id || !currentUser?.email) {
         showMessage('Please login first.', 'error');
         return;
@@ -566,11 +624,73 @@ import '../../styles/admin-compact.css';
         return;
       }
 
-      showMessage('Request saved. Payment/admin activation pending.', 'success');
+      const successText =
+  planType === 'verified_badge'
+    ? 'Verified Badge request submitted. Admin will review and activate it.'
+    : 'Visibility Boost request submitted. Admin will review and activate it.';
+
+showMessage(successText, 'success');
+alert(successText);
       await loadMembershipRequests();
       renderListings();
     }
+function cleanPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
 
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+
+  return digits;
+}
+
+async function saveListingContact(listingId) {
+  if (!currentUser?.id || !currentUser?.email) {
+    showMessage('Please login first.', 'error');
+    return;
+  }
+
+  const phoneInput = document.querySelector(`.edit-phone-input[data-listing-id="${listingId}"]`);
+  const whatsappInput = document.querySelector(`.edit-whatsapp-input[data-listing-id="${listingId}"]`);
+
+  const phone = cleanPhone(phoneInput?.value || '');
+  const whatsapp = cleanPhone(whatsappInput?.value || '');
+
+  if (!/^\d{10}$/.test(phone)) {
+    showMessage('Please enter valid 10 digit phone number.', 'error');
+    return;
+  }
+
+  if (!/^\d{10}$/.test(whatsapp)) {
+    showMessage('Please enter valid 10 digit WhatsApp number.', 'error');
+    return;
+  }
+
+  showMessage('Updating contact...', 'info');
+
+  const { error } = await supabase
+    .from('rent_listings')
+    .update({
+      owner_phone: phone,
+      owner_whatsapp: whatsapp,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', listingId)
+    .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`);
+
+  if (error) {
+    showMessage(error.message, 'error');
+    return;
+  }
+
+  showMessage('Contact updated successfully.', 'success');
+
+  await loadListings();
+}
     async function deleteListing(listingId) {
       if (!currentUser?.id) {
         showMessage('Please login first.', 'error');
@@ -623,10 +743,31 @@ import '../../styles/admin-compact.css';
           const listingId = requestBtn.dataset.listingId;
           const planType = requestBtn.dataset.planType;
           const amount = Number(requestBtn.dataset.amount || 0);
-          if (listingId && planType) requestMembership(listingId, planType, amount);
+          if (listingId && planType) requestMembership(listingId, planType, amount, requestBtn);
           return;
         }
+        const editBtn = target.closest('.edit-contact-btn');
+if (editBtn) {
+  const listingId = editBtn.dataset.listingId;
+  const box = document.getElementById(`contact-edit-${listingId}`);
+  if (box) box.classList.toggle('hidden');
+  return;
+}
 
+const cancelEditBtn = target.closest('.cancel-contact-edit-btn');
+if (cancelEditBtn) {
+  const listingId = cancelEditBtn.dataset.listingId;
+  const box = document.getElementById(`contact-edit-${listingId}`);
+  if (box) box.classList.add('hidden');
+  return;
+}
+
+const saveContactBtn = target.closest('.save-contact-btn');
+if (saveContactBtn) {
+  const listingId = saveContactBtn.dataset.listingId;
+  if (listingId) saveListingContact(listingId);
+  return;
+}
         const deleteBtn = target.closest('.delete-listing-btn');
         if (deleteBtn) {
           const listingId = deleteBtn.dataset.listingId;
@@ -1257,5 +1398,132 @@ import '../../styles/admin-compact.css';
         grid-template-columns: 1fr;
       }
     }
+    /* Owner dashboard tight action UI */
+.listing-edit-row,
+.listing-actions,
+.contact-edit-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.45rem !important;
+  align-items: center !important;
+}
+
+.btn.btn-small,
+.listing-actions .btn,
+.listing-edit-row .btn,
+.contact-edit-actions .btn,
+.request-membership-btn {
+  width: auto !important;
+  min-height: 30px !important;
+  padding: 0.38rem 0.65rem !important;
+  border-radius: 0.55rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.payment-card .btn,
+.payment-card button {
+  min-height: 34px !important;
+  padding: 0.45rem 0.7rem !important;
+  font-size: 0.76rem !important;
+  border-radius: 0.6rem !important;
+}
+
+.checkbox-label {
+  align-items: flex-start !important;
+  gap: 0.55rem !important;
+}
+
+.checkbox-label span {
+  font-size: 0.78rem !important;
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+}
+
+.contact-edit-box {
+  margin-top: 0.65rem;
+  margin-bottom: 0.85rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.contact-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.65rem;
+}
+
+.contact-edit-grid label {
+  display: grid;
+  gap: 0.3rem;
+  color: white;
+  font-weight: 900;
+  font-size: 0.75rem;
+}
+
+.contact-edit-grid input {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 7, 42, 0.72);
+  color: white;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.82rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .contact-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .listing-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .listing-actions .btn {
+    width: 100% !important;
+  }
+
+  .payment-cards.per-listing-payment {
+    gap: 0.75rem !important;
+  }
+
+  .payment-card {
+    padding: 0.85rem !important;
+  }
+}
+.inline-action-message {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.inline-action-message.success {
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
+}
+
+.inline-action-message.error {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.inline-action-message.info {
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
   </style>
 </BaseLayout>

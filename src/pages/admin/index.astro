@@ -1,214 +1,349 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-
-const adminCards = [
-  {
-    title: 'Rent Listings',
-    desc: 'Verify badge, cancel/restore listings and check owner details.',
-    href: '/admin/rent-listings',
-    icon: '✅',
-  },
-  {
-    title: 'Rent Events',
-    desc: 'Views, call clicks, WhatsApp clicks and listing analytics.',
-    href: '/admin/rent-events',
-    icon: '📈',
-  },
-  {
-    title: 'Rent Memberships',
-    desc: 'Verified Badge, Visibility Boost, payment/admin activation.',
-    href: '/admin/rent-memberships',
-    icon: '💳',
-  },
-  {
-    title: 'Rent Reports',
-    desc: 'User reports, reject report, resolve and cancel fake listings.',
-    href: '/admin/rent-reports',
-    icon: '🚩',
-  },
-  
-];
+import '../../styles/admin-compact.css';
 ---
 
 <BaseLayout
   title="Admin Panel - SoniaBuddy"
-  description="SoniaBuddy admin tools for rent listings, reports, membership and analytics."
+  description="SoniaBuddy secure admin control panel."
 >
-  <main class="sb-admin-page">
-    <div class="sb-admin-container">
-      <header class="sb-admin-header">
+  <section class="admin-page">
+    <div class="admin-container">
+      <div class="admin-header">
         <div>
-          <p class="sb-eyebrow">SoniaBuddy Admin</p>
+          <p class="eyebrow">SoniaBuddy Admin</p>
           <h1>Admin Control Panel</h1>
-          <p>
-            Manage rent listings, reports, verified badge, visibility boost and analytics.
-          </p>
+          <p id="admin-subtitle">Checking admin access...</p>
         </div>
 
-        <a class="sb-top-btn" href="/">Back to Home</a>
-      </header>
+        <div class="top-actions hidden" id="admin-top-actions">
+          <button id="logout-btn" class="btn btn-outline" type="button">Logout</button>
+        </div>
+      </div>
 
-      <section class="sb-admin-grid">
-        {adminCards.map((card) => (
-          <a class="sb-admin-card" href={card.href}>
-            <span class="sb-admin-icon">{card.icon}</span>
-            <div>
-              <h2>{card.title}</h2>
-              <p>{card.desc}</p>
-            </div>
-            <span class="sb-open-btn">Open</span>
-          </a>
-        ))}
-      </section>
+      <div id="auth-box" class="notice-card">
+        <strong>Checking admin access...</strong>
+      </div>
+
+      <div id="admin-grid" class="admin-grid hidden">
+        <a class="admin-card" href="/admin/rent-listings">
+          <div class="admin-icon">✅</div>
+          <div>
+            <h2>Rent Listings</h2>
+            <p>Verify badge, reject/restore listings and check owner details.</p>
+          </div>
+          <span class="open-pill">Open</span>
+        </a>
+
+        <a class="admin-card" href="/admin/rent-events">
+          <div class="admin-icon">📈</div>
+          <div>
+            <h2>Rent Events</h2>
+            <p>Views, call clicks, WhatsApp clicks and listing analytics.</p>
+          </div>
+          <span class="open-pill">Open</span>
+        </a>
+
+        <a class="admin-card" href="/admin/rent-memberships">
+          <div class="admin-icon">💳</div>
+          <div>
+            <h2>Rent Memberships</h2>
+            <p>Verified badge, visibility boost and manual activation.</p>
+          </div>
+          <span class="open-pill">Open</span>
+        </a>
+
+        <a class="admin-card" href="/admin/rent-reports">
+          <div class="admin-icon">🚩</div>
+          <div>
+            <h2>Rent Reports</h2>
+            <p>User reports, reject report, resolve and reject fake listings.</p>
+          </div>
+          <span class="open-pill">Open</span>
+        </a>
+      </div>
     </div>
-  </main>
+  </section>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
+
+    function esc(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function isAdmin(user) {
+      return Boolean(
+        user?.email &&
+        ADMIN_EMAILS.includes(user.email.toLowerCase())
+      );
+    }
+
+    function showBlocked(message) {
+      const authBox = document.getElementById('auth-box');
+      const adminGrid = document.getElementById('admin-grid');
+      const topActions = document.getElementById('admin-top-actions');
+      const subtitle = document.getElementById('admin-subtitle');
+
+      if (adminGrid) adminGrid.classList.add('hidden');
+      if (topActions) topActions.classList.add('hidden');
+      if (subtitle) subtitle.textContent = 'Admin access required.';
+
+      if (authBox) {
+        authBox.classList.remove('hidden');
+        authBox.innerHTML = message;
+      }
+    }
+
+    function showAdmin(user) {
+      const authBox = document.getElementById('auth-box');
+      const adminGrid = document.getElementById('admin-grid');
+      const topActions = document.getElementById('admin-top-actions');
+      const subtitle = document.getElementById('admin-subtitle');
+
+      if (authBox) {
+        authBox.classList.remove('hidden');
+        authBox.innerHTML = `
+          <strong>Admin:</strong> ${esc(user.email)}
+        `;
+      }
+
+      if (adminGrid) adminGrid.classList.remove('hidden');
+      if (topActions) topActions.classList.remove('hidden');
+      if (subtitle) subtitle.textContent = 'Manage rent listings, reports, memberships and analytics.';
+    }
+
+    async function checkAdminAccess() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        showBlocked(`
+          <strong>Session error.</strong>
+          <p>${esc(error.message)}</p>
+        `);
+        return;
+      }
+
+      const user = data.session?.user || null;
+
+      if (!user) {
+        showBlocked(`
+          <strong>Admin access blocked.</strong>
+          <p>This page is only for SoniaBuddy super admin. Login button is disabled here.</p>
+        `);
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        showBlocked(`
+          <strong>Access denied.</strong>
+          <p>${esc(user.email)} is not allowed for this admin page.</p>
+        `);
+        return;
+      }
+
+      showAdmin(user);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.reload();
+      });
+
+      await checkAdminAccess();
+    });
+  </script>
 
   <style>
-    :global(body) {
-      background: #12072f;
-    }
-
-    .sb-admin-page {
+    .admin-page {
       min-height: 100vh;
-      padding: 2rem 1rem 4rem;
+      padding: 1rem 1rem 3rem;
       background:
-        radial-gradient(circle at top left, rgba(255, 122, 0, 0.22), transparent 28%),
-        linear-gradient(135deg, #12072f 0%, #17094b 52%, #250b38 100%);
-      color: #ffffff !important;
+        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
+        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      color: white;
     }
 
-    .sb-admin-container {
-      width: min(1120px, 100%);
+    .admin-container {
+      max-width: 1180px;
       margin: 0 auto;
     }
 
-    .sb-admin-header {
+    .admin-header {
       display: flex;
-      align-items: flex-start;
       justify-content: space-between;
       gap: 1rem;
-      margin-bottom: 1.4rem;
+      align-items: flex-start;
+      margin-bottom: 1rem;
     }
 
-    .sb-eyebrow {
+    .eyebrow {
       margin: 0 0 0.35rem;
-      color: #ff8a00 !important;
-      font-size: 0.78rem;
+      color: #ff8a00;
+      font-size: 0.75rem;
       font-weight: 900;
-      text-transform: uppercase;
       letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
-    .sb-admin-header h1 {
-      margin: 0 0 0.5rem;
-      color: #ffffff !important;
-      font-size: clamp(1.8rem, 5vw, 2.8rem);
-      line-height: 1.05;
-      font-weight: 1000;
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      color: white;
     }
 
-    .sb-admin-header p {
+    .admin-header p {
       margin: 0;
-      max-width: 650px;
-      color: rgba(255, 255, 255, 0.78) !important;
-      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.94rem;
     }
 
-    .sb-top-btn,
-    .sb-open-btn {
+    .top-actions {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 42px;
-      padding: 0.7rem 1rem;
-      border-radius: 0.85rem;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: #ffffff !important;
-      background: rgba(255, 255, 255, 0.08);
+      min-height: 34px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.65rem;
+      border: 0;
+      font-weight: 900;
       text-decoration: none;
+      cursor: pointer;
+      font-size: 0.78rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .btn-outline {
+      color: white;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .notice-card,
+    .admin-card {
+      border-radius: 0.9rem;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .notice-card {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .notice-card p {
+      margin: 0.35rem 0 0;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .admin-card {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      color: white;
+      text-decoration: none;
+    }
+
+    .admin-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 1rem;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 107, 0, 0.16);
+      font-size: 1.5rem;
+    }
+
+    .admin-card h2 {
+      margin: 0 0 0.3rem;
+      color: white;
+      font-size: 1rem;
+    }
+
+    .admin-card p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .open-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 0.45rem 0.8rem;
+      border-radius: 0.75rem;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      font-size: 0.78rem;
       font-weight: 900;
       white-space: nowrap;
     }
 
-    .sb-admin-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1rem;
-    }
-
-    .sb-admin-card {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: 1rem;
-      min-height: 125px;
-      padding: 1rem;
-      border-radius: 1.1rem;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(255, 255, 255, 0.08);
-      color: #ffffff !important;
-      text-decoration: none;
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
-    }
-
-    .sb-admin-card:hover {
-      border-color: rgba(255, 138, 0, 0.55);
-      background: rgba(255, 255, 255, 0.12);
-      transform: translateY(-1px);
-    }
-
-    .sb-admin-icon {
-      width: 52px;
-      height: 52px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 16px;
-      background: rgba(255, 122, 0, 0.18);
-      font-size: 1.45rem;
-    }
-
-    .sb-admin-card h2 {
-      margin: 0 0 0.35rem;
-      color: #ffffff !important;
-      font-size: 1.05rem;
-      font-weight: 1000;
-    }
-
-    .sb-admin-card p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.76) !important;
-      font-size: 0.9rem;
-      line-height: 1.45;
-    }
-
-    .sb-open-btn {
-      min-height: 38px;
-      padding: 0.55rem 0.9rem;
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-      border: 0;
-    }
-
     @media (max-width: 760px) {
-      .sb-admin-header {
+      .admin-page {
+        padding: 0.8rem 0.75rem 2rem;
+      }
+
+      .admin-header {
         flex-direction: column;
       }
 
-      .sb-top-btn {
+      .top-actions,
+      .top-actions .btn {
         width: 100%;
       }
 
-      .sb-admin-grid {
+      .admin-grid {
         grid-template-columns: 1fr;
       }
 
-      .sb-admin-card {
-        grid-template-columns: auto 1fr;
+      .admin-card {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        padding: 0.85rem;
       }
 
-      .sb-open-btn {
-        grid-column: 1 / -1;
-        width: 100%;
+      .admin-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 0.75rem;
+        font-size: 1.25rem;
+      }
+
+      .open-pill {
+        min-height: 30px;
+        padding: 0.35rem 0.6rem;
       }
     }
   </style>

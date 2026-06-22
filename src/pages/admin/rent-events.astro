@@ -4,33 +4,42 @@ import '../../styles/admin-compact.css';
 ---
 
 <BaseLayout
-  title="Rent Events Admin - WBBusTime"
-  description="Admin analytics for rent listing views, calls, WhatsApp clicks and user actions."
+  title="Rent Events Admin - SoniaBuddy"
+  description="Admin rent listing view, call, WhatsApp and details tracking."
 >
   <section class="admin-page">
     <div class="admin-container">
       <div class="admin-header">
         <div>
-          <p class="eyebrow">Rent Analytics</p>
+          <p class="eyebrow">SoniaBuddy Admin</p>
           <h1>Rent Events</h1>
-          <p>Track listing views, call clicks, WhatsApp clicks, details clicks and photo opens.</p>
+          <p>Track listing views, calls, WhatsApp clicks, details clicks and photo opens.</p>
         </div>
 
         <div class="top-actions">
-          <a class="btn btn-outline" href="/admin">Admin Home</a>
           <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
         </div>
       </div>
 
       <div id="auth-box" class="notice-card">
-        <strong>Checking admin login...</strong>
+        <strong>Checking admin access...</strong>
       </div>
 
       <div id="message-box" class="message hidden"></div>
 
-      <div class="stats-grid">
+      <div class="filter-card">
+        <button class="filter-btn active" type="button" data-filter="all">All</button>
+        <button class="filter-btn" type="button" data-filter="listing_view">Views</button>
+        <button class="filter-btn" type="button" data-filter="call_click">Calls</button>
+        <button class="filter-btn" type="button" data-filter="whatsapp_click">WhatsApp</button>
+        <button class="filter-btn" type="button" data-filter="view_details_click">Details</button>
+        <button class="filter-btn" type="button" data-filter="photo_open">Photos</button>
+        <button class="filter-btn" type="button" data-filter="membership_click">Membership</button>
+      </div>
+
+      <div id="stats-grid" class="stats-grid">
         <div class="stat-card">
-          <span>Total Events</span>
+          <span>Total</span>
           <strong id="stat-total">0</strong>
         </div>
         <div class="stat-card">
@@ -45,48 +54,43 @@ import '../../styles/admin-compact.css';
           <span>WhatsApp</span>
           <strong id="stat-whatsapp">0</strong>
         </div>
+        <div class="stat-card">
+          <span>Details</span>
+          <strong id="stat-details">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Photos</span>
+          <strong id="stat-photos">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Membership</span>
+          <strong id="stat-membership">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Listings</span>
+          <strong id="stat-listings">0</strong>
+        </div>
       </div>
 
-      <div class="filter-card">
-        <button class="filter-btn active" type="button" data-filter="all">All</button>
-        <button class="filter-btn" type="button" data-filter="listing_view">Views</button>
-        <button class="filter-btn" type="button" data-filter="call_click">Calls</button>
-        <button class="filter-btn" type="button" data-filter="whatsapp_click">WhatsApp</button>
-        <button class="filter-btn" type="button" data-filter="view_details_click">Details</button>
-        <button class="filter-btn" type="button" data-filter="photo_open">Photos</button>
-        <button class="filter-btn" type="button" data-filter="membership_click">Membership</button>
+      <div class="section-row">
+        <h2>Listing summary</h2>
+        <p id="summary-count">0 listings</p>
       </div>
 
       <div id="loader" class="notice-card">Loading events...</div>
+      <div id="summary-grid" class="summary-grid"></div>
 
-      <div class="table-card">
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Event</th>
-                <th>Vehicle</th>
-                <th>Rent Type</th>
-                <th>Listing ID</th>
-                <th>User Agent</th>
-              </tr>
-            </thead>
-            <tbody id="events-body">
-              <tr>
-                <td colspan="6">Loading...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <details class="raw-events-card">
+        <summary>Raw events</summary>
+        <div id="events-list" class="events-list"></div>
+      </details>
     </div>
   </section>
 
   <script>
     import { supabase } from '../../lib/supabase';
 
-    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
 
     let currentUser = null;
     let events = [];
@@ -102,12 +106,16 @@ import '../../styles/admin-compact.css';
     }
 
     function isAdmin() {
-      return currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+      return Boolean(
+        currentUser?.email &&
+        ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
+      );
     }
 
     function showMessage(text, type = 'info') {
       const box = document.getElementById('message-box');
       if (!box) return;
+
       box.textContent = text;
       box.className = `message ${type}`;
     }
@@ -117,8 +125,9 @@ import '../../styles/admin-compact.css';
       if (box) box.classList.add('hidden');
     }
 
-    function formatTime(value) {
+    function formatDateTime(value) {
       if (!value) return '-';
+
       try {
         return new Intl.DateTimeFormat('en-IN', {
           day: '2-digit',
@@ -131,89 +140,240 @@ import '../../styles/admin-compact.css';
       }
     }
 
+    function eventType(event) {
+      return (
+        event.event_type ||
+        event.type ||
+        event.event_name ||
+        event.action ||
+        'event'
+      );
+    }
+
     function eventLabel(type) {
-      const map = {
-        listing_view: 'Listing View',
-        call_click: 'Call Click',
-        whatsapp_click: 'WhatsApp Click',
-        photo_open: 'Photo Open',
-        view_details_click: 'Details Click',
-        membership_click: 'Membership Click',
-        ad_impression: 'Ad Impression',
-        ad_click: 'Ad Click',
+      const labels = {
+        listing_view: 'View',
+        call_click: 'Call',
+        whatsapp_click: 'WhatsApp',
+        view_details_click: 'Details',
+        photo_open: 'Photo',
+        membership_click: 'Membership',
       };
 
-      return map[type] || type || '-';
+      return labels[type] || type;
     }
 
     function eventClass(type) {
       if (type === 'call_click') return 'event-call';
       if (type === 'whatsapp_click') return 'event-whatsapp';
       if (type === 'listing_view') return 'event-view';
+      if (type === 'view_details_click') return 'event-details';
+      if (type === 'photo_open') return 'event-photo';
       if (type === 'membership_click') return 'event-membership';
-      if (type === 'ad_click' || type === 'ad_impression') return 'event-ad';
-      return 'event-normal';
+      return 'event-other';
+    }
+
+    function compactUa(userAgent) {
+      const ua = String(userAgent || '').toLowerCase();
+
+      const browser = ua.includes('edg')
+        ? 'Edge'
+        : ua.includes('chrome')
+          ? 'Chrome'
+          : ua.includes('safari')
+            ? 'Safari'
+            : ua.includes('firefox')
+              ? 'Firefox'
+              : 'Browser';
+
+      const device = ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')
+        ? 'Mobile'
+        : 'Desktop';
+
+      return `${browser} / ${device}`;
+    }
+
+    function shortId(id) {
+      const value = String(id || '');
+      if (!value) return '-';
+      return value.length > 8 ? value.slice(0, 8) : value;
     }
 
     function filteredEvents() {
       if (activeFilter === 'all') return events;
-      return events.filter((item) => item.event_type === activeFilter);
+      return events.filter((event) => eventType(event) === activeFilter);
+    }
+
+    function countByType(rows, type) {
+      return rows.filter((event) => eventType(event) === type).length;
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = String(value);
     }
 
     function updateStats() {
-      const total = events.length;
-      const views = events.filter((e) => e.event_type === 'listing_view').length;
-      const calls = events.filter((e) => e.event_type === 'call_click').length;
-      const whatsapp = events.filter((e) => e.event_type === 'whatsapp_click').length;
+      const rows = filteredEvents();
+      const listingIds = new Set(
+        rows.map((event) => event.listing_id || event.rent_listing_id || event.listingId).filter(Boolean)
+      );
 
-      const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = String(value);
-      };
-
-      setText('stat-total', total);
-      setText('stat-views', views);
-      setText('stat-calls', calls);
-      setText('stat-whatsapp', whatsapp);
+      setText('stat-total', rows.length);
+      setText('stat-views', countByType(rows, 'listing_view'));
+      setText('stat-calls', countByType(rows, 'call_click'));
+      setText('stat-whatsapp', countByType(rows, 'whatsapp_click'));
+      setText('stat-details', countByType(rows, 'view_details_click'));
+      setText('stat-photos', countByType(rows, 'photo_open'));
+      setText('stat-membership', countByType(rows, 'membership_click'));
+      setText('stat-listings', listingIds.size);
     }
 
-    function renderEvents() {
+    function groupByListing(rows) {
+      const map = new Map();
+
+      rows.forEach((event) => {
+        const listingId =
+          event.listing_id ||
+          event.rent_listing_id ||
+          event.listingId ||
+          'unknown';
+
+        if (!map.has(listingId)) {
+          map.set(listingId, {
+            listingId,
+            vehicleType: event.vehicle_type || '-',
+            city: event.city || event.city_name || event.base_city_name || '-',
+            rentType: event.rent_type || event.purpose || '-',
+            views: 0,
+            calls: 0,
+            whatsapp: 0,
+            details: 0,
+            photos: 0,
+            membership: 0,
+            total: 0,
+            lastAt: '',
+          });
+        }
+
+        const item = map.get(listingId);
+        const type = eventType(event);
+
+        item.total += 1;
+        if (type === 'listing_view') item.views += 1;
+        if (type === 'call_click') item.calls += 1;
+        if (type === 'whatsapp_click') item.whatsapp += 1;
+        if (type === 'view_details_click') item.details += 1;
+        if (type === 'photo_open') item.photos += 1;
+        if (type === 'membership_click') item.membership += 1;
+
+        const createdAt = event.created_at || event.inserted_at || event.timestamp;
+        if (!item.lastAt || new Date(createdAt) > new Date(item.lastAt)) {
+          item.lastAt = createdAt;
+        }
+      });
+
+      return Array.from(map.values()).sort((a, b) => {
+        return new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime();
+      });
+    }
+
+    function renderSummary() {
+      const grid = document.getElementById('summary-grid');
+      const count = document.getElementById('summary-count');
+      if (!grid) return;
+
+      const rows = filteredEvents();
+      const grouped = groupByListing(rows);
+
+      if (count) count.textContent = `${grouped.length} listings`;
+
+      if (!isAdmin()) {
+        grid.innerHTML = '';
+        return;
+      }
+
+      if (!grouped.length) {
+        grid.innerHTML = `
+          <div class="notice-card">
+            <strong>No events found.</strong>
+            <p>Try another filter or refresh.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = grouped.map((item) => `
+        <article class="listing-event-card">
+          <div class="event-card-head">
+            <div>
+              <h3>${esc(item.vehicleType || 'Rent listing')}</h3>
+              <p>Listing: ${esc(shortId(item.listingId))} · ${esc(item.city)}</p>
+            </div>
+            <span class="last-activity">${formatDateTime(item.lastAt)}</span>
+          </div>
+
+          <div class="event-metrics">
+            <span><strong>${item.views}</strong> Views</span>
+            <span><strong>${item.calls}</strong> Calls</span>
+            <span><strong>${item.whatsapp}</strong> WhatsApp</span>
+            <span><strong>${item.details}</strong> Details</span>
+            <span><strong>${item.photos}</strong> Photos</span>
+            <span><strong>${item.membership}</strong> Membership</span>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderRawEvents() {
+      const list = document.getElementById('events-list');
+      if (!list) return;
+
+      const rows = filteredEvents()
+        .slice()
+        .sort((a, b) => {
+          const aDate = a.created_at || a.inserted_at || a.timestamp || '';
+          const bDate = b.created_at || b.inserted_at || b.timestamp || '';
+          return new Date(bDate).getTime() - new Date(aDate).getTime();
+        })
+        .slice(0, 100);
+
+      if (!isAdmin()) {
+        list.innerHTML = '';
+        return;
+      }
+
+      if (!rows.length) {
+        list.innerHTML = `<div class="notice-card"><strong>No raw events.</strong></div>`;
+        return;
+      }
+
+      list.innerHTML = rows.map((event) => {
+        const type = eventType(event);
+        const createdAt = event.created_at || event.inserted_at || event.timestamp;
+        const listingId = event.listing_id || event.rent_listing_id || event.listingId || '-';
+
+        return `
+          <div class="event-row">
+            <span class="event-pill ${eventClass(type)}">${eventLabel(type)}</span>
+            <span>${formatDateTime(createdAt)}</span>
+            <span>Listing ${esc(shortId(listingId))}</span>
+            <span>${esc(event.vehicle_type || '-')}</span>
+            <span>${esc(event.city || event.city_name || '-')}</span>
+            <span>${esc(compactUa(event.user_agent || event.ua || ''))}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAll() {
       updateStats();
 
       const loader = document.getElementById('loader');
-      const body = document.getElementById('events-body');
-
       if (loader) loader.classList.add('hidden');
-      if (!body) return;
 
-      if (!isAdmin()) {
-        body.innerHTML = `<tr><td colspan="6">Admin login required.</td></tr>`;
-        return;
-      }
-
-      const rows = filteredEvents();
-
-      if (!rows.length) {
-        body.innerHTML = `<tr><td colspan="6">No events found.</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = rows.map((item) => `
-        <tr>
-          <td>${esc(formatTime(item.created_at))}</td>
-          <td>
-            <span class="event-pill ${eventClass(item.event_type)}">
-              ${esc(eventLabel(item.event_type))}
-            </span>
-          </td>
-          <td>${esc(item.vehicle_type || '-')}</td>
-          <td>${esc(item.rent_type || '-')}</td>
-          <td>
-            <span class="mono">${esc(item.listing_id || '-')}</span>
-          </td>
-          <td class="ua">${esc(item.user_agent || '-')}</td>
-        </tr>
-      `).join('');
+      renderSummary();
+      renderRawEvents();
     }
 
     async function refreshSession() {
@@ -223,7 +383,9 @@ import '../../styles/admin-compact.css';
 
       if (error) {
         currentUser = null;
-        if (authBox) authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        if (authBox) {
+          authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        }
         return;
       }
 
@@ -232,21 +394,10 @@ import '../../styles/admin-compact.css';
       if (!currentUser) {
         if (authBox) {
           authBox.innerHTML = `
-            <strong>Admin login required.</strong>
-            <p>Please login with Google first.</p>
-            <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
+            <strong>Admin access blocked.</strong>
+            <p>This page is only for SoniaBuddy super admin. Login button is disabled here.</p>
           `;
         }
-
-        document.getElementById('login-btn')?.addEventListener('click', async () => {
-          await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo: `${window.location.origin}/admin/rent-events`,
-            },
-          });
-        });
-
         return;
       }
 
@@ -283,34 +434,28 @@ import '../../styles/admin-compact.css';
       }
 
       if (!isAdmin()) {
+        events = [];
         if (loader) loader.classList.add('hidden');
-        renderEvents();
+        renderAll();
         return;
       }
 
       const { data, error } = await supabase
         .from('rent_listing_events')
-        .select(`
-          id,
-          listing_id,
-          event_type,
-          city_id,
-          vehicle_type,
-          rent_type,
-          user_agent,
-          created_at
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
-        .limit(300);
+        .limit(500);
 
       if (error) {
+        events = [];
         if (loader) loader.classList.add('hidden');
         showMessage(error.message, 'error');
+        renderAll();
         return;
       }
 
       events = Array.isArray(data) ? data : [];
-      renderEvents();
+      renderAll();
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -318,10 +463,13 @@ import '../../styles/admin-compact.css';
 
       document.querySelectorAll('.filter-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-btn').forEach((item) => item.classList.remove('active'));
+          document.querySelectorAll('.filter-btn').forEach((item) => {
+            item.classList.remove('active');
+          });
+
           btn.classList.add('active');
           activeFilter = btn.dataset.filter || 'all';
-          renderEvents();
+          renderAll();
         });
       });
 
@@ -333,7 +481,7 @@ import '../../styles/admin-compact.css';
   <style>
     .admin-page {
       min-height: 100vh;
-      padding: 2rem 1rem 4rem;
+      padding: 1rem 1rem 3rem;
       background:
         radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
         linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
@@ -341,7 +489,7 @@ import '../../styles/admin-compact.css';
     }
 
     .admin-container {
-      max-width: 1150px;
+      max-width: 1180px;
       margin: 0 auto;
     }
 
@@ -356,25 +504,27 @@ import '../../styles/admin-compact.css';
     .eyebrow {
       margin: 0 0 0.35rem;
       color: #ff8a00;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
     h1 {
-      margin: 0 0 0.4rem;
-      font-size: clamp(1.7rem, 4vw, 2.4rem);
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.7rem, 4vw, 2.35rem);
+      color: white;
     }
 
     .admin-header p {
       margin: 0;
       color: rgba(255, 255, 255, 0.72);
+      font-size: 0.92rem;
     }
 
     .top-actions {
       display: flex;
-      gap: 0.6rem;
+      gap: 0.55rem;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
@@ -383,14 +533,16 @@ import '../../styles/admin-compact.css';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 38px;
-      padding: 0.55rem 0.9rem;
-      border-radius: 0.75rem;
+      min-height: 34px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.65rem;
       border: 0;
       font-weight: 900;
       text-decoration: none;
       cursor: pointer;
-      font-size: 0.86rem;
+      font-size: 0.78rem;
+      line-height: 1;
+      white-space: nowrap;
     }
 
     .btn-primary {
@@ -405,9 +557,9 @@ import '../../styles/admin-compact.css';
     }
 
     .btn-small {
-      min-height: 30px;
-      padding: 0.4rem 0.7rem;
-      font-size: 0.78rem;
+      min-height: 28px;
+      padding: 0.38rem 0.65rem;
+      font-size: 0.72rem;
       margin-left: 0.5rem;
     }
 
@@ -415,14 +567,15 @@ import '../../styles/admin-compact.css';
     .message,
     .filter-card,
     .stat-card,
-    .table-card {
-      border-radius: 1rem;
+    .listing-event-card,
+    .raw-events-card {
+      border-radius: 0.9rem;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: rgba(255, 255, 255, 0.07);
     }
 
     .notice-card {
-      padding: 1rem;
+      padding: 0.9rem 1rem;
       margin-bottom: 1rem;
       color: rgba(255, 255, 255, 0.82);
     }
@@ -447,43 +600,22 @@ import '../../styles/admin-compact.css';
       border-color: rgba(59, 130, 246, 0.3);
     }
 
+    .message.success {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+
     .message.error {
       color: #fca5a5;
       background: rgba(239, 68, 68, 0.12);
       border-color: rgba(239, 68, 68, 0.3);
     }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.8rem;
-      margin-bottom: 1rem;
-    }
-
-    .stat-card {
-      padding: 1rem;
-      text-align: center;
-    }
-
-    .stat-card span {
-      display: block;
-      color: rgba(255, 255, 255, 0.66);
-      font-size: 0.8rem;
-      font-weight: 800;
-      margin-bottom: 0.35rem;
-    }
-
-    .stat-card strong {
-      display: block;
-      color: #ff8a00;
-      font-size: 1.8rem;
-      line-height: 1;
-    }
-
     .filter-card {
-      padding: 0.7rem;
+      padding: 0.65rem;
       display: flex;
-      gap: 0.5rem;
+      gap: 0.45rem;
       flex-wrap: wrap;
       margin-bottom: 1rem;
     }
@@ -493,10 +625,10 @@ import '../../styles/admin-compact.css';
       background: rgba(255, 255, 255, 0.06);
       color: rgba(255, 255, 255, 0.76);
       border-radius: 999px;
-      padding: 0.45rem 0.75rem;
+      padding: 0.42rem 0.7rem;
       font-weight: 900;
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.76rem;
     }
 
     .filter-btn.active {
@@ -505,94 +637,203 @@ import '../../styles/admin-compact.css';
       border-color: transparent;
     }
 
-    .table-card {
-      overflow: hidden;
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.65rem;
+      margin-bottom: 1rem;
     }
 
-    .table-scroll {
-      width: 100%;
-      overflow-x: auto;
+    .stat-card {
+      padding: 0.75rem;
+      text-align: center;
     }
 
-    table {
-      width: 100%;
-      min-width: 850px;
-      border-collapse: collapse;
+    .stat-card span {
+      display: block;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 0.76rem;
+      font-weight: 800;
+      margin-bottom: 0.28rem;
     }
 
-    th,
-    td {
-      padding: 0.8rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      text-align: left;
-      vertical-align: top;
-      font-size: 0.86rem;
+    .stat-card strong {
+      display: block;
+      color: #ff8a00;
+      font-size: 1.35rem;
+      line-height: 1;
     }
 
-    th {
+    .section-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: baseline;
+      margin: 1rem 0 0.75rem;
+    }
+
+    .section-row h2 {
+      margin: 0;
+      color: white;
+      font-size: 1.1rem;
+    }
+
+    .section-row p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.85rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .listing-event-card {
+      padding: 0.75rem;
+    }
+
+    .event-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin-bottom: 0.65rem;
+    }
+
+    .event-card-head h3 {
+      margin: 0 0 0.2rem;
+      color: white;
+      font-size: 0.95rem;
+      line-height: 1.15;
+    }
+
+    .event-card-head p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 0.74rem;
+    }
+
+    .last-activity {
+      white-space: nowrap;
+      border-radius: 999px;
+      padding: 0.25rem 0.5rem;
+      background: rgba(255, 255, 255, 0.08);
       color: rgba(255, 255, 255, 0.78);
+      font-size: 0.7rem;
       font-weight: 900;
-      background: rgba(255, 255, 255, 0.06);
     }
 
-    td {
+    .event-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+
+    .event-metrics span {
+      border-radius: 0.5rem;
+      padding: 0.45rem 0.5rem;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 0.72rem;
+    }
+
+    .event-metrics strong {
+      display: block;
+      color: #ff8a00;
+      font-size: 1rem;
+      line-height: 1;
+      margin-bottom: 0.15rem;
+    }
+
+    .raw-events-card {
+      padding: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .raw-events-card summary {
+      cursor: pointer;
+      font-weight: 900;
+      color: white;
+    }
+
+    .events-list {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+    }
+
+    .event-row {
+      display: grid;
+      grid-template-columns: 100px 120px 110px 1fr 1fr 120px;
+      gap: 0.45rem;
+      align-items: center;
+      padding: 0.48rem;
+      border-radius: 0.55rem;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       color: rgba(255, 255, 255, 0.78);
+      font-size: 0.72rem;
+      word-break: break-word;
     }
 
     .event-pill {
       display: inline-flex;
-      align-items: center;
+      justify-content: center;
       border-radius: 999px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.75rem;
+      padding: 0.25rem 0.45rem;
+      font-size: 0.64rem;
       font-weight: 900;
+      color: white;
       white-space: nowrap;
     }
 
-    .event-view {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.15);
-    }
-
     .event-call {
-      color: #fde68a;
-      background: rgba(250, 204, 21, 0.14);
+      background: rgba(249, 115, 22, 0.85);
     }
 
     .event-whatsapp {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.14);
+      background: rgba(34, 197, 94, 0.85);
+    }
+
+    .event-view {
+      background: rgba(59, 130, 246, 0.85);
+    }
+
+    .event-details {
+      background: rgba(168, 85, 247, 0.85);
+    }
+
+    .event-photo {
+      background: rgba(236, 72, 153, 0.85);
     }
 
     .event-membership {
-      color: #c4b5fd;
-      background: rgba(139, 92, 246, 0.15);
+      background: rgba(234, 179, 8, 0.85);
     }
 
-    .event-ad {
-      color: #fdba74;
-      background: rgba(249, 115, 22, 0.15);
+    .event-other {
+      background: rgba(148, 163, 184, 0.85);
     }
 
-    .event-normal {
-      color: rgba(255, 255, 255, 0.78);
-      background: rgba(255, 255, 255, 0.08);
+    @media (min-width: 820px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .event-metrics {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
     }
 
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.75rem;
-      word-break: break-all;
-    }
+    @media (max-width: 760px) {
+      .admin-page {
+        padding: 0.8rem 0.75rem 2rem;
+      }
 
-    .ua {
-      max-width: 360px;
-      color: rgba(255, 255, 255, 0.55);
-      font-size: 0.78rem;
-      line-height: 1.35;
-    }
-
-    @media (max-width: 720px) {
       .admin-header {
         flex-direction: column;
       }
@@ -604,6 +845,10 @@ import '../../styles/admin-compact.css';
 
       .stats-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .event-row {
+        grid-template-columns: 1fr 1fr;
       }
     }
   </style>

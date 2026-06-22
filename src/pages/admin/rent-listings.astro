@@ -4,39 +4,38 @@ import '../../styles/admin-compact.css';
 ---
 
 <BaseLayout
-  title="Rent Listings Admin - WBBusTime"
-  description="Admin manage rent listings, verification, status and photos."
+  title="Rent Listings Admin - SoniaBuddy"
+  description="Admin manage rent listings, verification, rejection, status and photos."
 >
   <section class="admin-page">
     <div class="admin-container">
       <div class="admin-header">
         <div>
-          <p class="eyebrow">Rent Admin</p>
+          <p class="eyebrow">SoniaBuddy Admin</p>
           <h1>Rent Listings</h1>
-          <p>Verify badge, cancel fake listing, restore listing and check owner details.</p>
+          <p>Verify badge, reject fake listings, restore listings and check owner details.</p>
         </div>
 
         <div class="top-actions">
-          <a class="btn btn-outline" href="/admin">Admin Home</a>
           <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
         </div>
       </div>
 
       <div id="auth-box" class="notice-card">
-        <strong>Checking admin login...</strong>
+        <strong>Checking admin access...</strong>
       </div>
 
       <div id="message-box" class="message hidden"></div>
 
-      <div class="filter-card">
+      <div id="admin-filter-card" class="filter-card hidden">
         <button class="filter-btn active" type="button" data-filter="all">All</button>
         <button class="filter-btn" type="button" data-filter="active">Active</button>
-        <button class="filter-btn" type="button" data-filter="cancelled">Cancelled</button>
+        <button class="filter-btn" type="button" data-filter="rejected">Rejected</button>
         <button class="filter-btn" type="button" data-filter="verified">Verified</button>
         <button class="filter-btn" type="button" data-filter="unverified">Unverified</button>
       </div>
 
-      <div id="stats-grid" class="stats-grid">
+      <div id="stats-grid" class="stats-grid hidden">
         <div class="stat-card">
           <span>Total</span>
           <strong id="stat-total">0</strong>
@@ -46,8 +45,8 @@ import '../../styles/admin-compact.css';
           <strong id="stat-active">0</strong>
         </div>
         <div class="stat-card">
-          <span>Cancelled</span>
-          <strong id="stat-cancelled">0</strong>
+          <span>Rejected</span>
+          <strong id="stat-rejected">0</strong>
         </div>
         <div class="stat-card">
           <span>Verified</span>
@@ -55,7 +54,7 @@ import '../../styles/admin-compact.css';
         </div>
       </div>
 
-      <div id="loader" class="notice-card">Loading listings...</div>
+      <div id="loader" class="notice-card hidden">Loading listings...</div>
       <div id="listings-grid" class="listings-grid"></div>
     </div>
   </section>
@@ -63,7 +62,7 @@ import '../../styles/admin-compact.css';
   <script>
     import { supabase } from '../../lib/supabase';
 
-    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
     const PHOTO_BUCKET = 'rent-listing-photos';
 
     let currentUser = null;
@@ -82,6 +81,7 @@ import '../../styles/admin-compact.css';
     function photoUrl(path) {
       if (!path) return '';
       if (path.startsWith('http://') || path.startsWith('https://')) return path;
+
       const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
       return data.publicUrl;
     }
@@ -89,6 +89,7 @@ import '../../styles/admin-compact.css';
     function showMessage(text, type = 'info') {
       const box = document.getElementById('message-box');
       if (!box) return;
+
       box.textContent = text;
       box.className = `message ${type}`;
     }
@@ -99,18 +100,21 @@ import '../../styles/admin-compact.css';
     }
 
     function isAdmin() {
-      return currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+      return Boolean(
+        currentUser?.email &&
+        ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
+      );
     }
 
     function statusClass(status) {
       if (status === 'active') return 'status-active';
-      if (status === 'cancelled') return 'status-cancelled';
       if (status === 'rejected') return 'status-rejected';
       return 'status-pending';
     }
 
     function formatDate(value) {
       if (!value) return '-';
+
       try {
         return new Intl.DateTimeFormat('en-IN', {
           day: '2-digit',
@@ -130,9 +134,14 @@ import '../../styles/admin-compact.css';
           ${[0, 1, 2, 3].map((index) => {
             const photo = items[index];
             const url = photo ? photoUrl(photo) : '';
+
             return `
               <button class="photo-box" type="button" data-photo-url="${esc(url)}">
-                ${url ? `<img src="${esc(url)}" alt="Vehicle photo ${index + 1}" loading="lazy" />` : `<span>📷</span>`}
+                ${
+                  url
+                    ? `<img src="${esc(url)}" alt="Vehicle photo ${index + 1}" loading="lazy" />`
+                    : `<span>📷</span>`
+                }
               </button>
             `;
           }).join('')}
@@ -141,18 +150,30 @@ import '../../styles/admin-compact.css';
     }
 
     function filteredListings() {
-      if (activeFilter === 'active') return listings.filter((l) => l.status === 'active');
-      if (activeFilter === 'cancelled') return listings.filter((l) => l.status === 'cancelled');
-      if (activeFilter === 'verified') return listings.filter((l) => l.is_verified === true);
-      if (activeFilter === 'unverified') return listings.filter((l) => l.is_verified !== true);
+      if (activeFilter === 'active') {
+        return listings.filter((listing) => listing.status === 'active');
+      }
+
+      if (activeFilter === 'rejected') {
+        return listings.filter((listing) => listing.status === 'rejected');
+      }
+
+      if (activeFilter === 'verified') {
+        return listings.filter((listing) => listing.is_verified === true);
+      }
+
+      if (activeFilter === 'unverified') {
+        return listings.filter((listing) => listing.is_verified !== true);
+      }
+
       return listings;
     }
 
     function updateStats() {
       const total = listings.length;
-      const active = listings.filter((l) => l.status === 'active').length;
-      const cancelled = listings.filter((l) => l.status === 'cancelled').length;
-      const verified = listings.filter((l) => l.is_verified === true).length;
+      const active = listings.filter((listing) => listing.status === 'active').length;
+      const rejected = listings.filter((listing) => listing.status === 'rejected').length;
+      const verified = listings.filter((listing) => listing.is_verified === true).length;
 
       const setText = (id, value) => {
         const el = document.getElementById(id);
@@ -161,49 +182,59 @@ import '../../styles/admin-compact.css';
 
       setText('stat-total', total);
       setText('stat-active', active);
-      setText('stat-cancelled', cancelled);
+      setText('stat-rejected', rejected);
       setText('stat-verified', verified);
     }
 
     function renderListingCard(listing) {
       const photos = Array.isArray(listing.photos) ? listing.photos : [];
-      const serviceCount = Array.isArray(listing.service_city_ids) ? listing.service_city_ids.length : 0;
-      const purposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
+      const serviceCount = Array.isArray(listing.service_city_ids)
+        ? listing.service_city_ids.length
+        : 0;
+      const purposes = Array.isArray(listing.purposes)
+        ? listing.purposes.filter(Boolean)
+        : [];
+
+      const status = listing.status || '-';
+      const verifiedText = listing.is_verified ? 'Verified' : 'Not verified';
+      const vehicleLine = [
+        listing.vehicle_type || 'Vehicle',
+        listing.seats ? `${listing.seats} seats` : '',
+        listing.reg_number || '',
+      ].filter(Boolean).join(' • ');
 
       return `
-        <article class="listing-card" data-listing-id="${esc(listing.id)}">
-          <div class="listing-top">
-            <div>
-              <div class="title-row">
-                <h2>${esc(listing.vehicle_model || listing.vehicle_type || 'Rental vehicle')}</h2>
-                <span class="status-pill ${statusClass(listing.status)}">${esc(listing.status || 'active')}</span>
-                ${listing.is_verified ? `<span class="verified-pill">✓ Verified</span>` : `<span class="unverified-pill">Not verified</span>`}
+        <article class="listing-card admin-listing-row" data-listing-id="${esc(listing.id)}">
+          <div class="admin-listing-media">
+            ${renderPhotos(photos)}
+          </div>
+
+          <div class="admin-listing-main">
+            <div class="admin-listing-title-row">
+              <div>
+                <h3>${esc(listing.vehicle_model || listing.vehicle_type || 'Rent vehicle')}</h3>
+                <p class="admin-listing-sub">${esc(vehicleLine)}</p>
               </div>
 
-              <p class="subline">
-                ${esc(listing.vehicle_type || '-')}
-                ${listing.seats ? ` · ${esc(listing.seats)} seats` : ''}
-                ${listing.reg_number ? ` · ${esc(listing.reg_number)}` : ''}
-              </p>
+              <div class="admin-badges">
+                <span class="status-pill ${statusClass(status)}">${esc(status)}</span>
+                <span class="verify-pill ${listing.is_verified ? 'ok' : ''}">${verifiedText}</span>
+              </div>
+            </div>
+
+            <div class="admin-info-line">
+              <span><strong>Owner</strong> ${esc(listing.owner_name || '-')}</span>
+              <span><strong>Email</strong> ${esc(listing.owner_email || '-')}</span>
+              <span><strong>Phone</strong> ${esc(listing.owner_phone || '-')}</span>
+              <span><strong>WhatsApp</strong> ${esc(listing.owner_whatsapp || '-')}</span>
+              <span><strong>Price</strong> ${esc(listing.price_text || '-')}</span>
+              <span><strong>Service cities</strong> ${serviceCount}</span>
+              <span><strong>Purposes</strong> ${esc(purposes.join(' • ') || '-')}</span>
+              <span><strong>Created</strong> ${formatDate(listing.created_at)}</span>
             </div>
           </div>
 
-          ${renderPhotos(photos)}
-
-          <div class="info-grid">
-            <p><strong>Owner:</strong> ${esc(listing.owner_name || '-')}</p>
-            <p><strong>Email:</strong> ${esc(listing.owner_email || '-')}</p>
-            <p><strong>Phone:</strong> ${esc(listing.owner_phone || '-')}</p>
-            <p><strong>WhatsApp:</strong> ${esc(listing.owner_whatsapp || '-')}</p>
-            <p><strong>Price:</strong> ${esc(listing.price_text || '-')}</p>
-            <p><strong>Service cities:</strong> ${serviceCount}</p>
-            <p><strong>Purposes:</strong> ${esc(purposes.join(' • ') || '-')}</p>
-            <p><strong>Created:</strong> ${esc(formatDate(listing.created_at))}</p>
-          </div>
-
-          ${listing.description ? `<p class="desc">${esc(listing.description)}</p>` : ''}
-
-          <div class="action-row">
+          <div class="listing-actions admin-listing-actions">
             ${
               listing.is_verified
                 ? `<button class="btn btn-outline verify-btn" type="button" data-verified="false" data-listing-id="${esc(listing.id)}">Remove Verified</button>`
@@ -211,12 +242,10 @@ import '../../styles/admin-compact.css';
             }
 
             ${
-              listing.status === 'cancelled'
+              listing.status === 'rejected'
                 ? `<button class="btn btn-primary status-btn" type="button" data-status="active" data-listing-id="${esc(listing.id)}">Restore Active</button>`
-                : `<button class="btn btn-danger status-btn" type="button" data-status="cancelled" data-listing-id="${esc(listing.id)}">Cancel Listing</button>`
+                : `<button class="btn btn-danger status-btn" type="button" data-status="rejected" data-listing-id="${esc(listing.id)}">Reject</button>`
             }
-
-            <a class="btn btn-outline" href="/owner/rent-dashboard">Owner Dashboard</a>
           </div>
         </article>
       `;
@@ -258,7 +287,9 @@ import '../../styles/admin-compact.css';
 
       if (error) {
         currentUser = null;
-        if (authBox) authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        if (authBox) {
+          authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        }
         return;
       }
 
@@ -267,21 +298,14 @@ import '../../styles/admin-compact.css';
       if (!currentUser) {
         if (authBox) {
           authBox.innerHTML = `
-            <strong>Admin login required.</strong>
-            <p>Please login with Google first.</p>
-            <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
+            <strong>Admin access blocked.</strong>
+            <p>This page is only for SoniaBuddy super admin. Login button is disabled here.</p>
           `;
         }
-
-        document.getElementById('login-btn')?.addEventListener('click', async () => {
-          await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo: `${window.location.origin}/admin/rent-listings`,
-            },
-          });
-        });
-
+        document.getElementById('admin-filter-card')?.classList.add('hidden');
+document.getElementById('stats-grid')?.classList.add('hidden');
+document.getElementById('loader')?.classList.add('hidden');
+document.getElementById('listings-grid')?.replaceChildren();
         return;
       }
 
@@ -301,7 +325,8 @@ import '../../styles/admin-compact.css';
           <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>
         `;
       }
-
+      document.getElementById('admin-filter-card')?.classList.remove('hidden');
+document.getElementById('stats-grid')?.classList.remove('hidden');
       document.getElementById('logout-btn')?.addEventListener('click', async () => {
         await supabase.auth.signOut();
         window.location.reload();
@@ -397,7 +422,7 @@ import '../../styles/admin-compact.css';
     async function updateListingStatus(listingId, status) {
       if (!isAdmin()) return;
 
-      const label = status === 'cancelled' ? 'cancel this listing' : 'restore this listing';
+      const label = status === 'rejected' ? 'reject this listing' : 'restore this listing';
       if (!confirm(`Are you sure you want to ${label}?`)) return;
 
       showMessage('Updating listing status...', 'info');
@@ -424,7 +449,10 @@ import '../../styles/admin-compact.css';
 
       document.querySelectorAll('.filter-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-btn').forEach((item) => item.classList.remove('active'));
+          document.querySelectorAll('.filter-btn').forEach((item) => {
+            item.classList.remove('active');
+          });
+
           btn.classList.add('active');
           activeFilter = btn.dataset.filter || 'all';
           renderListings();
@@ -433,6 +461,7 @@ import '../../styles/admin-compact.css';
 
       document.addEventListener('click', (event) => {
         const target = event.target;
+        if (!(target instanceof Element)) return;
 
         const photoBtn = target.closest('.photo-box');
         if (photoBtn) {
@@ -465,7 +494,7 @@ import '../../styles/admin-compact.css';
   <style>
     .admin-page {
       min-height: 100vh;
-      padding: 2rem 1rem 4rem;
+      padding: 1rem 1rem 3rem;
       background:
         radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
         linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
@@ -473,7 +502,7 @@ import '../../styles/admin-compact.css';
     }
 
     .admin-container {
-      max-width: 1100px;
+      max-width: 1180px;
       margin: 0 auto;
     }
 
@@ -488,25 +517,27 @@ import '../../styles/admin-compact.css';
     .eyebrow {
       margin: 0 0 0.35rem;
       color: #ff8a00;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 900;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
     h1 {
-      margin: 0 0 0.4rem;
-      font-size: clamp(1.7rem, 4vw, 2.4rem);
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.7rem, 4vw, 2.35rem);
+      color: white;
     }
 
     .admin-header p {
       margin: 0;
       color: rgba(255, 255, 255, 0.72);
+      font-size: 0.92rem;
     }
 
     .top-actions {
       display: flex;
-      gap: 0.6rem;
+      gap: 0.55rem;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
@@ -515,14 +546,16 @@ import '../../styles/admin-compact.css';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 38px;
-      padding: 0.55rem 0.9rem;
-      border-radius: 0.75rem;
+      min-height: 34px;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.65rem;
       border: 0;
       font-weight: 900;
       text-decoration: none;
       cursor: pointer;
-      font-size: 0.86rem;
+      font-size: 0.78rem;
+      line-height: 1;
+      white-space: nowrap;
     }
 
     .btn-primary {
@@ -537,15 +570,15 @@ import '../../styles/admin-compact.css';
     }
 
     .btn-danger {
-      color: #fecaca;
-      background: rgba(239, 68, 68, 0.16);
-      border: 1px solid rgba(239, 68, 68, 0.34);
+      color: white;
+      background: rgba(239, 68, 68, 0.7);
+      border: 1px solid rgba(239, 68, 68, 0.35);
     }
 
     .btn-small {
-      min-height: 30px;
-      padding: 0.4rem 0.7rem;
-      font-size: 0.78rem;
+      min-height: 28px;
+      padding: 0.38rem 0.65rem;
+      font-size: 0.72rem;
       margin-left: 0.5rem;
     }
 
@@ -554,13 +587,13 @@ import '../../styles/admin-compact.css';
     .filter-card,
     .stat-card,
     .listing-card {
-      border-radius: 1rem;
+      border-radius: 0.9rem;
       border: 1px solid rgba(255, 255, 255, 0.14);
       background: rgba(255, 255, 255, 0.07);
     }
 
     .notice-card {
-      padding: 1rem;
+      padding: 0.9rem 1rem;
       margin-bottom: 1rem;
       color: rgba(255, 255, 255, 0.82);
     }
@@ -598,9 +631,9 @@ import '../../styles/admin-compact.css';
     }
 
     .filter-card {
-      padding: 0.7rem;
+      padding: 0.65rem;
       display: flex;
-      gap: 0.5rem;
+      gap: 0.45rem;
       flex-wrap: wrap;
       margin-bottom: 1rem;
     }
@@ -610,10 +643,10 @@ import '../../styles/admin-compact.css';
       background: rgba(255, 255, 255, 0.06);
       color: rgba(255, 255, 255, 0.76);
       border-radius: 999px;
-      padding: 0.45rem 0.75rem;
+      padding: 0.42rem 0.7rem;
       font-weight: 900;
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.76rem;
     }
 
     .filter-btn.active {
@@ -625,109 +658,59 @@ import '../../styles/admin-compact.css';
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.8rem;
+      gap: 0.65rem;
       margin-bottom: 1rem;
     }
 
     .stat-card {
-      padding: 1rem;
+      padding: 0.75rem;
       text-align: center;
     }
 
     .stat-card span {
       display: block;
       color: rgba(255, 255, 255, 0.66);
-      font-size: 0.8rem;
+      font-size: 0.76rem;
       font-weight: 800;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.28rem;
     }
 
     .stat-card strong {
       display: block;
       color: #ff8a00;
-      font-size: 1.8rem;
+      font-size: 1.35rem;
       line-height: 1;
     }
 
     .listings-grid {
       display: grid;
-      gap: 1rem;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
     }
 
-    .listing-card {
-      padding: 1rem;
+    .admin-listing-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.65rem;
+      padding: 0.75rem;
+      min-height: auto;
     }
 
-    .listing-top {
-      margin-bottom: 0.85rem;
-    }
-
-    .title-row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .title-row h2 {
-      margin: 0;
-      font-size: 1.1rem;
-    }
-
-    .subline {
-      margin: 0.35rem 0 0;
-      color: rgba(255, 255, 255, 0.68);
-      font-size: 0.88rem;
-    }
-
-    .status-pill,
-    .verified-pill,
-    .unverified-pill {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 0.25rem 0.6rem;
-      font-size: 0.72rem;
-      font-weight: 900;
-    }
-
-    .status-active {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.15);
-    }
-
-    .status-cancelled,
-    .status-rejected {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.15);
-    }
-
-    .status-pending {
-      color: #fde68a;
-      background: rgba(250, 204, 21, 0.14);
-    }
-
-    .verified-pill {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.15);
-    }
-
-    .unverified-pill {
-      color: rgba(255, 255, 255, 0.72);
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .photo-grid {
+    .admin-listing-media .photo-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.45rem;
-      margin-bottom: 0.85rem;
+      gap: 0.35rem;
+      width: 100%;
+      margin: 0;
     }
 
-    .photo-box {
-      aspect-ratio: 1;
+    .admin-listing-media .photo-box {
+      width: 100%;
+      height: 54px;
+      aspect-ratio: auto;
       border: 0;
-      border-radius: 0.75rem;
+      border-radius: 0.55rem;
+      padding: 0;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.07);
       cursor: pointer;
@@ -735,48 +718,162 @@ import '../../styles/admin-compact.css';
       align-items: center;
       justify-content: center;
       color: rgba(255, 255, 255, 0.45);
+      font-size: 0.7rem;
     }
 
-    .photo-box img {
+    .admin-listing-media .photo-box img {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
 
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem 1rem;
-      margin-bottom: 0.85rem;
+    .admin-listing-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.65rem;
+      margin-bottom: 0.55rem;
     }
 
-    .info-grid p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 0.86rem;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-
-    .info-grid strong {
+    .admin-listing-title-row h3 {
+      margin: 0 0 0.2rem;
+      font-size: 0.95rem;
+      line-height: 1.15;
       color: white;
     }
 
-    .desc {
-      margin: 0 0 0.9rem;
+    .admin-listing-sub {
+      margin: 0;
+      font-size: 0.75rem;
+      line-height: 1.25;
       color: rgba(255, 255, 255, 0.76);
-      font-size: 0.88rem;
-      line-height: 1.45;
     }
 
-    .action-row {
+    .admin-badges {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.55rem;
+      gap: 0.3rem;
+      justify-content: flex-end;
+    }
+
+    .status-pill,
+    .verify-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0.18rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.64rem;
+      font-weight: 900;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.82);
+      white-space: nowrap;
+    }
+
+    .status-active {
+      background: rgba(34, 197, 94, 0.15);
+      color: #86efac;
+    }
+
+    .status-rejected {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+    }
+
+    .status-pending {
+      background: rgba(250, 204, 21, 0.14);
+      color: #fde68a;
+    }
+
+    .verify-pill.ok {
+      background: rgba(34, 197, 94, 0.16);
+      color: #86efac;
+    }
+
+    .admin-info-line {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem;
+    }
+
+    .admin-info-line span {
+      min-width: 0;
+      padding: 0.42rem 0.5rem;
+      border-radius: 0.5rem;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 0.72rem;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .admin-info-line strong {
+      display: block;
+      margin-bottom: 0.12rem;
+      color: white;
+      font-size: 0.64rem;
+      opacity: 0.75;
+    }
+
+    .admin-listing-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .admin-listing-actions .btn,
+    .admin-listing-actions button,
+    .admin-listing-actions a {
+      width: auto;
+      min-height: 30px;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.55rem;
+      font-size: 0.72rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    @media (min-width: 820px) {
+      .admin-listing-row {
+        grid-template-columns: 132px minmax(0, 1fr) 150px;
+        align-items: start;
+        gap: 0.85rem;
+      }
+
+      .admin-listing-media .photo-grid {
+        grid-template-columns: repeat(2, 58px);
+        width: 120px;
+      }
+
+      .admin-listing-media .photo-box {
+        width: 58px;
+        height: 48px;
+      }
+
+      .admin-info-line {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .admin-listing-actions {
+        justify-content: flex-end;
+        align-content: flex-start;
+      }
+
+      .admin-listing-actions .btn {
+        width: 100%;
+      }
     }
 
     @media (max-width: 720px) {
+      .admin-page {
+        padding: 0.8rem 0.75rem 2rem;
+      }
+
       .admin-header {
         flex-direction: column;
       }
@@ -790,12 +887,8 @@ import '../../styles/admin-compact.css';
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .info-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .action-row .btn {
-        flex: 1 1 calc(50% - 0.55rem);
+      .admin-info-line {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
   </style>
