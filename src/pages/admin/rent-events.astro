@@ -1,0 +1,609 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Rent Events Admin - WBBusTime"
+  description="Admin analytics for rent listing views, calls, WhatsApp clicks and user actions."
+>
+  <section class="admin-page">
+    <div class="admin-container">
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">Rent Analytics</p>
+          <h1>Rent Events</h1>
+          <p>Track listing views, call clicks, WhatsApp clicks, details clicks and photo opens.</p>
+        </div>
+
+        <div class="top-actions">
+          <a class="btn btn-outline" href="/admin">Admin Home</a>
+          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div id="auth-box" class="notice-card">
+        <strong>Checking admin login...</strong>
+      </div>
+
+      <div id="message-box" class="message hidden"></div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span>Total Events</span>
+          <strong id="stat-total">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Views</span>
+          <strong id="stat-views">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Calls</span>
+          <strong id="stat-calls">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>WhatsApp</span>
+          <strong id="stat-whatsapp">0</strong>
+        </div>
+      </div>
+
+      <div class="filter-card">
+        <button class="filter-btn active" type="button" data-filter="all">All</button>
+        <button class="filter-btn" type="button" data-filter="listing_view">Views</button>
+        <button class="filter-btn" type="button" data-filter="call_click">Calls</button>
+        <button class="filter-btn" type="button" data-filter="whatsapp_click">WhatsApp</button>
+        <button class="filter-btn" type="button" data-filter="view_details_click">Details</button>
+        <button class="filter-btn" type="button" data-filter="photo_open">Photos</button>
+        <button class="filter-btn" type="button" data-filter="membership_click">Membership</button>
+      </div>
+
+      <div id="loader" class="notice-card">Loading events...</div>
+
+      <div class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Vehicle</th>
+                <th>Rent Type</th>
+                <th>Listing ID</th>
+                <th>User Agent</th>
+              </tr>
+            </thead>
+            <tbody id="events-body">
+              <tr>
+                <td colspan="6">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
+
+    let currentUser = null;
+    let events = [];
+    let activeFilter = 'all';
+
+    function esc(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function isAdmin() {
+      return currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+    }
+
+    function showMessage(text, type = 'info') {
+      const box = document.getElementById('message-box');
+      if (!box) return;
+      box.textContent = text;
+      box.className = `message ${type}`;
+    }
+
+    function hideMessage() {
+      const box = document.getElementById('message-box');
+      if (box) box.classList.add('hidden');
+    }
+
+    function formatTime(value) {
+      if (!value) return '-';
+      try {
+        return new Intl.DateTimeFormat('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(value));
+      } catch {
+        return '-';
+      }
+    }
+
+    function eventLabel(type) {
+      const map = {
+        listing_view: 'Listing View',
+        call_click: 'Call Click',
+        whatsapp_click: 'WhatsApp Click',
+        photo_open: 'Photo Open',
+        view_details_click: 'Details Click',
+        membership_click: 'Membership Click',
+        ad_impression: 'Ad Impression',
+        ad_click: 'Ad Click',
+      };
+
+      return map[type] || type || '-';
+    }
+
+    function eventClass(type) {
+      if (type === 'call_click') return 'event-call';
+      if (type === 'whatsapp_click') return 'event-whatsapp';
+      if (type === 'listing_view') return 'event-view';
+      if (type === 'membership_click') return 'event-membership';
+      if (type === 'ad_click' || type === 'ad_impression') return 'event-ad';
+      return 'event-normal';
+    }
+
+    function filteredEvents() {
+      if (activeFilter === 'all') return events;
+      return events.filter((item) => item.event_type === activeFilter);
+    }
+
+    function updateStats() {
+      const total = events.length;
+      const views = events.filter((e) => e.event_type === 'listing_view').length;
+      const calls = events.filter((e) => e.event_type === 'call_click').length;
+      const whatsapp = events.filter((e) => e.event_type === 'whatsapp_click').length;
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      };
+
+      setText('stat-total', total);
+      setText('stat-views', views);
+      setText('stat-calls', calls);
+      setText('stat-whatsapp', whatsapp);
+    }
+
+    function renderEvents() {
+      updateStats();
+
+      const loader = document.getElementById('loader');
+      const body = document.getElementById('events-body');
+
+      if (loader) loader.classList.add('hidden');
+      if (!body) return;
+
+      if (!isAdmin()) {
+        body.innerHTML = `<tr><td colspan="6">Admin login required.</td></tr>`;
+        return;
+      }
+
+      const rows = filteredEvents();
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="6">No events found.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map((item) => `
+        <tr>
+          <td>${esc(formatTime(item.created_at))}</td>
+          <td>
+            <span class="event-pill ${eventClass(item.event_type)}">
+              ${esc(eventLabel(item.event_type))}
+            </span>
+          </td>
+          <td>${esc(item.vehicle_type || '-')}</td>
+          <td>${esc(item.rent_type || '-')}</td>
+          <td>
+            <span class="mono">${esc(item.listing_id || '-')}</span>
+          </td>
+          <td class="ua">${esc(item.user_agent || '-')}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function refreshSession() {
+      const authBox = document.getElementById('auth-box');
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        currentUser = null;
+        if (authBox) authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        return;
+      }
+
+      currentUser = data.session?.user || null;
+
+      if (!currentUser) {
+        if (authBox) {
+          authBox.innerHTML = `
+            <strong>Admin login required.</strong>
+            <p>Please login with Google first.</p>
+            <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
+          `;
+        }
+
+        document.getElementById('login-btn')?.addEventListener('click', async () => {
+          await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: `${window.location.origin}/admin/rent-events`,
+            },
+          });
+        });
+
+        return;
+      }
+
+      if (!isAdmin()) {
+        if (authBox) {
+          authBox.innerHTML = `
+            <strong>Access denied.</strong>
+            <p>${esc(currentUser.email)} is not allowed for this admin page.</p>
+          `;
+        }
+        return;
+      }
+
+      if (authBox) {
+        authBox.innerHTML = `
+          <strong>Admin:</strong> ${esc(currentUser.email)}
+          <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>
+        `;
+      }
+
+      document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.reload();
+      });
+    }
+
+    async function loadEvents() {
+      hideMessage();
+
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.textContent = 'Loading events...';
+        loader.classList.remove('hidden');
+      }
+
+      if (!isAdmin()) {
+        if (loader) loader.classList.add('hidden');
+        renderEvents();
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('rent_listing_events')
+        .select(`
+          id,
+          listing_id,
+          event_type,
+          city_id,
+          vehicle_type,
+          rent_type,
+          user_agent,
+          created_at
+        `)
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (error) {
+        if (loader) loader.classList.add('hidden');
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      events = Array.isArray(data) ? data : [];
+      renderEvents();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('refresh-btn')?.addEventListener('click', loadEvents);
+
+      document.querySelectorAll('.filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach((item) => item.classList.remove('active'));
+          btn.classList.add('active');
+          activeFilter = btn.dataset.filter || 'all';
+          renderEvents();
+        });
+      });
+
+      await refreshSession();
+      await loadEvents();
+    });
+  </script>
+
+  <style>
+    .admin-page {
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      background:
+        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
+        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      color: white;
+    }
+
+    .admin-container {
+      max-width: 1150px;
+      margin: 0 auto;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #ff8a00;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 0.4rem;
+      font-size: clamp(1.7rem, 4vw, 2.4rem);
+    }
+
+    .admin-header p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0.55rem 0.9rem;
+      border-radius: 0.75rem;
+      border: 0;
+      font-weight: 900;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 0.86rem;
+    }
+
+    .btn-primary {
+      color: white;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+    }
+
+    .btn-outline {
+      color: white;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .btn-small {
+      min-height: 30px;
+      padding: 0.4rem 0.7rem;
+      font-size: 0.78rem;
+      margin-left: 0.5rem;
+    }
+
+    .notice-card,
+    .message,
+    .filter-card,
+    .stat-card,
+    .table-card {
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .notice-card {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .notice-card p {
+      margin: 0.35rem 0 0;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .message {
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      font-weight: 900;
+    }
+
+    .message.info {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .message.error {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+
+    .stat-card {
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-card span {
+      display: block;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 0.8rem;
+      font-weight: 800;
+      margin-bottom: 0.35rem;
+    }
+
+    .stat-card strong {
+      display: block;
+      color: #ff8a00;
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+
+    .filter-card {
+      padding: 0.7rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.76);
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .filter-btn.active {
+      color: white;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      border-color: transparent;
+    }
+
+    .table-card {
+      overflow: hidden;
+    }
+
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 850px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.86rem;
+    }
+
+    th {
+      color: rgba(255, 255, 255, 0.78);
+      font-weight: 900;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    td {
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .event-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .event-view {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    .event-call {
+      color: #fde68a;
+      background: rgba(250, 204, 21, 0.14);
+    }
+
+    .event-whatsapp {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.14);
+    }
+
+    .event-membership {
+      color: #c4b5fd;
+      background: rgba(139, 92, 246, 0.15);
+    }
+
+    .event-ad {
+      color: #fdba74;
+      background: rgba(249, 115, 22, 0.15);
+    }
+
+    .event-normal {
+      color: rgba(255, 255, 255, 0.78);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      word-break: break-all;
+    }
+
+    .ua {
+      max-width: 360px;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 720px) {
+      .admin-header {
+        flex-direction: column;
+      }
+
+      .top-actions,
+      .top-actions .btn {
+        width: 100%;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</BaseLayout>

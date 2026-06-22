@@ -1,0 +1,205 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const adminCards = [
+  {
+  title: 'Rent Events',
+  desc: 'Views, call clicks, WhatsApp clicks and listing analytics.',
+  href: '/admin/rent-events',
+  icon: '📈',
+},
+    {
+  title: 'Rent Listings',
+  desc: 'Verify badge, cancel/restore listings and check owner details.',
+  href: '/admin/rent-listings',
+  icon: '✅',
+},
+  {
+    title: 'Rent Memberships',
+    desc: 'Verified Badge, Visibility Boost, payment/admin activation.',
+    href: '/admin/rent-memberships',
+    icon: '💳',
+  },
+  {
+    title: 'Rent Reports',
+    desc: 'User reports, reject report, resolve, cancel fake listing.',
+    href: '/admin/rent-reports',
+    icon: '🚩',
+  },
+  {
+    title: 'Owner Dashboard',
+    desc: 'Owner listing dashboard check.',
+    href: '/owner/rent-dashboard',
+    icon: '📊',
+  },
+  {
+    title: 'Rent Vehicle Page',
+    desc: 'Public rent search, register, report button test.',
+    href: '/rent-vehicle',
+    icon: '🚗',
+  },
+];
+---
+
+<BaseLayout
+  title="Admin Panel - WBBusTime"
+  description="Admin tools for rent listings, reports, memberships and dashboard."
+>
+  <section class="admin-page">
+    <div class="admin-container">
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">WBBusTime Admin</p>
+          <h1>Admin Control Panel</h1>
+          <p>
+            Rent listing reports, verified badge, visibility boost and owner dashboard tools.
+          </p>
+        </div>
+
+        <a class="btn btn-outline" href="/">Back to Home</a>
+      </div>
+
+      <div class="admin-grid">
+        {adminCards.map((card) => (
+          <a class="admin-card" href={card.href}>
+            <span class="admin-icon">{card.icon}</span>
+            <h2>{card.title}</h2>
+            <p>{card.desc}</p>
+            <span class="open-link">Open →</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .admin-page {
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      background:
+        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
+        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      color: white;
+    }
+
+    .admin-container {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #ff8a00;
+      font-size: 0.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .admin-header h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.7rem, 4vw, 2.5rem);
+      line-height: 1.05;
+    }
+
+    .admin-header p {
+      margin: 0;
+      max-width: 620px;
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.5;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0.65rem 1rem;
+      border-radius: 0.8rem;
+      font-weight: 900;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-outline {
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .admin-card {
+      display: block;
+      padding: 1.25rem;
+      border-radius: 1.1rem;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+      color: white;
+      text-decoration: none;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .admin-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 138, 0, 0.45);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .admin-icon {
+      display: inline-flex;
+      width: 42px;
+      height: 42px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: rgba(255, 107, 0, 0.16);
+      font-size: 1.35rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .admin-card h2 {
+      margin: 0 0 0.45rem;
+      font-size: 1.1rem;
+    }
+
+    .admin-card p {
+      margin: 0 0 1rem;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .open-link {
+      color: #ff8a00;
+      font-size: 0.9rem;
+      font-weight: 900;
+    }
+
+    @media (max-width: 720px) {
+      .admin-header {
+        flex-direction: column;
+      }
+
+      .admin-header .btn {
+        width: 100%;
+      }
+
+      .admin-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</BaseLayout>

@@ -1,0 +1,801 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Rent Listings Admin - WBBusTime"
+  description="Admin manage rent listings, verification, status and photos."
+>
+  <section class="admin-page">
+    <div class="admin-container">
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">Rent Admin</p>
+          <h1>Rent Listings</h1>
+          <p>Verify badge, cancel fake listing, restore listing and check owner details.</p>
+        </div>
+
+        <div class="top-actions">
+          <a class="btn btn-outline" href="/admin">Admin Home</a>
+          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div id="auth-box" class="notice-card">
+        <strong>Checking admin login...</strong>
+      </div>
+
+      <div id="message-box" class="message hidden"></div>
+
+      <div class="filter-card">
+        <button class="filter-btn active" type="button" data-filter="all">All</button>
+        <button class="filter-btn" type="button" data-filter="active">Active</button>
+        <button class="filter-btn" type="button" data-filter="cancelled">Cancelled</button>
+        <button class="filter-btn" type="button" data-filter="verified">Verified</button>
+        <button class="filter-btn" type="button" data-filter="unverified">Unverified</button>
+      </div>
+
+      <div id="stats-grid" class="stats-grid">
+        <div class="stat-card">
+          <span>Total</span>
+          <strong id="stat-total">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Active</span>
+          <strong id="stat-active">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Cancelled</span>
+          <strong id="stat-cancelled">0</strong>
+        </div>
+        <div class="stat-card">
+          <span>Verified</span>
+          <strong id="stat-verified">0</strong>
+        </div>
+      </div>
+
+      <div id="loader" class="notice-card">Loading listings...</div>
+      <div id="listings-grid" class="listings-grid"></div>
+    </div>
+  </section>
+
+  <script>
+    import { supabase } from '../../lib/supabase';
+
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
+    const PHOTO_BUCKET = 'rent-listing-photos';
+
+    let currentUser = null;
+    let listings = [];
+    let activeFilter = 'all';
+
+    function esc(value) {
+      return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function photoUrl(path) {
+      if (!path) return '';
+      if (path.startsWith('http://') || path.startsWith('https://')) return path;
+      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    }
+
+    function showMessage(text, type = 'info') {
+      const box = document.getElementById('message-box');
+      if (!box) return;
+      box.textContent = text;
+      box.className = `message ${type}`;
+    }
+
+    function hideMessage() {
+      const box = document.getElementById('message-box');
+      if (box) box.classList.add('hidden');
+    }
+
+    function isAdmin() {
+      return currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase());
+    }
+
+    function statusClass(status) {
+      if (status === 'active') return 'status-active';
+      if (status === 'cancelled') return 'status-cancelled';
+      if (status === 'rejected') return 'status-rejected';
+      return 'status-pending';
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      try {
+        return new Intl.DateTimeFormat('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }).format(new Date(value));
+      } catch {
+        return '-';
+      }
+    }
+
+    function renderPhotos(photos) {
+      const items = Array.isArray(photos) ? photos.slice(0, 4) : [];
+
+      return `
+        <div class="photo-grid">
+          ${[0, 1, 2, 3].map((index) => {
+            const photo = items[index];
+            const url = photo ? photoUrl(photo) : '';
+            return `
+              <button class="photo-box" type="button" data-photo-url="${esc(url)}">
+                ${url ? `<img src="${esc(url)}" alt="Vehicle photo ${index + 1}" loading="lazy" />` : `<span>📷</span>`}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function filteredListings() {
+      if (activeFilter === 'active') return listings.filter((l) => l.status === 'active');
+      if (activeFilter === 'cancelled') return listings.filter((l) => l.status === 'cancelled');
+      if (activeFilter === 'verified') return listings.filter((l) => l.is_verified === true);
+      if (activeFilter === 'unverified') return listings.filter((l) => l.is_verified !== true);
+      return listings;
+    }
+
+    function updateStats() {
+      const total = listings.length;
+      const active = listings.filter((l) => l.status === 'active').length;
+      const cancelled = listings.filter((l) => l.status === 'cancelled').length;
+      const verified = listings.filter((l) => l.is_verified === true).length;
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(value);
+      };
+
+      setText('stat-total', total);
+      setText('stat-active', active);
+      setText('stat-cancelled', cancelled);
+      setText('stat-verified', verified);
+    }
+
+    function renderListingCard(listing) {
+      const photos = Array.isArray(listing.photos) ? listing.photos : [];
+      const serviceCount = Array.isArray(listing.service_city_ids) ? listing.service_city_ids.length : 0;
+      const purposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
+
+      return `
+        <article class="listing-card" data-listing-id="${esc(listing.id)}">
+          <div class="listing-top">
+            <div>
+              <div class="title-row">
+                <h2>${esc(listing.vehicle_model || listing.vehicle_type || 'Rental vehicle')}</h2>
+                <span class="status-pill ${statusClass(listing.status)}">${esc(listing.status || 'active')}</span>
+                ${listing.is_verified ? `<span class="verified-pill">✓ Verified</span>` : `<span class="unverified-pill">Not verified</span>`}
+              </div>
+
+              <p class="subline">
+                ${esc(listing.vehicle_type || '-')}
+                ${listing.seats ? ` · ${esc(listing.seats)} seats` : ''}
+                ${listing.reg_number ? ` · ${esc(listing.reg_number)}` : ''}
+              </p>
+            </div>
+          </div>
+
+          ${renderPhotos(photos)}
+
+          <div class="info-grid">
+            <p><strong>Owner:</strong> ${esc(listing.owner_name || '-')}</p>
+            <p><strong>Email:</strong> ${esc(listing.owner_email || '-')}</p>
+            <p><strong>Phone:</strong> ${esc(listing.owner_phone || '-')}</p>
+            <p><strong>WhatsApp:</strong> ${esc(listing.owner_whatsapp || '-')}</p>
+            <p><strong>Price:</strong> ${esc(listing.price_text || '-')}</p>
+            <p><strong>Service cities:</strong> ${serviceCount}</p>
+            <p><strong>Purposes:</strong> ${esc(purposes.join(' • ') || '-')}</p>
+            <p><strong>Created:</strong> ${esc(formatDate(listing.created_at))}</p>
+          </div>
+
+          ${listing.description ? `<p class="desc">${esc(listing.description)}</p>` : ''}
+
+          <div class="action-row">
+            ${
+              listing.is_verified
+                ? `<button class="btn btn-outline verify-btn" type="button" data-verified="false" data-listing-id="${esc(listing.id)}">Remove Verified</button>`
+                : `<button class="btn btn-primary verify-btn" type="button" data-verified="true" data-listing-id="${esc(listing.id)}">Mark Verified</button>`
+            }
+
+            ${
+              listing.status === 'cancelled'
+                ? `<button class="btn btn-primary status-btn" type="button" data-status="active" data-listing-id="${esc(listing.id)}">Restore Active</button>`
+                : `<button class="btn btn-danger status-btn" type="button" data-status="cancelled" data-listing-id="${esc(listing.id)}">Cancel Listing</button>`
+            }
+
+            <a class="btn btn-outline" href="/owner/rent-dashboard">Owner Dashboard</a>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderListings() {
+      updateStats();
+
+      const loader = document.getElementById('loader');
+      const grid = document.getElementById('listings-grid');
+
+      if (loader) loader.classList.add('hidden');
+      if (!grid) return;
+
+      if (!isAdmin()) {
+        grid.innerHTML = '';
+        return;
+      }
+
+      const rows = filteredListings();
+
+      if (!rows.length) {
+        grid.innerHTML = `
+          <div class="notice-card">
+            <strong>No listings found.</strong>
+            <p>Change filter or refresh.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = rows.map(renderListingCard).join('');
+    }
+
+    async function refreshSession() {
+      const authBox = document.getElementById('auth-box');
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        currentUser = null;
+        if (authBox) authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
+        return;
+      }
+
+      currentUser = data.session?.user || null;
+
+      if (!currentUser) {
+        if (authBox) {
+          authBox.innerHTML = `
+            <strong>Admin login required.</strong>
+            <p>Please login with Google first.</p>
+            <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
+          `;
+        }
+
+        document.getElementById('login-btn')?.addEventListener('click', async () => {
+          await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: `${window.location.origin}/admin/rent-listings`,
+            },
+          });
+        });
+
+        return;
+      }
+
+      if (!isAdmin()) {
+        if (authBox) {
+          authBox.innerHTML = `
+            <strong>Access denied.</strong>
+            <p>${esc(currentUser.email)} is not allowed for this admin page.</p>
+          `;
+        }
+        return;
+      }
+
+      if (authBox) {
+        authBox.innerHTML = `
+          <strong>Admin:</strong> ${esc(currentUser.email)}
+          <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>
+        `;
+      }
+
+      document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.reload();
+      });
+    }
+
+    async function loadListings() {
+      hideMessage();
+
+      const loader = document.getElementById('loader');
+      if (loader) {
+        loader.textContent = 'Loading listings...';
+        loader.classList.remove('hidden');
+      }
+
+      if (!isAdmin()) {
+        if (loader) loader.classList.add('hidden');
+        renderListings();
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('rent_listings')
+        .select(`
+          id,
+          owner_user_id,
+          owner_email,
+          owner_name,
+          owner_phone,
+          owner_whatsapp,
+          reg_number,
+          vehicle_type,
+          vehicle_model,
+          seats,
+          purposes,
+          base_city_id,
+          service_city_ids,
+          price_text,
+          photos,
+          description,
+          status,
+          created_at,
+          updated_at,
+          is_verified,
+          verified_at,
+          verified_by
+        `)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        if (loader) loader.classList.add('hidden');
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      listings = Array.isArray(data) ? data : [];
+      renderListings();
+    }
+
+    async function updateVerified(listingId, verified) {
+      if (!isAdmin()) return;
+
+      showMessage(verified ? 'Marking verified...' : 'Removing verified...', 'info');
+
+      const payload = verified
+        ? {
+            is_verified: true,
+            verified_at: new Date().toISOString(),
+            verified_by: currentUser.id,
+            updated_at: new Date().toISOString(),
+          }
+        : {
+            is_verified: false,
+            verified_at: null,
+            verified_by: null,
+            updated_at: new Date().toISOString(),
+          };
+
+      const { error } = await supabase
+        .from('rent_listings')
+        .update(payload)
+        .eq('id', listingId);
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      showMessage(verified ? 'Listing verified.' : 'Verified removed.', 'success');
+      await loadListings();
+    }
+
+    async function updateListingStatus(listingId, status) {
+      if (!isAdmin()) return;
+
+      const label = status === 'cancelled' ? 'cancel this listing' : 'restore this listing';
+      if (!confirm(`Are you sure you want to ${label}?`)) return;
+
+      showMessage('Updating listing status...', 'info');
+
+      const { error } = await supabase
+        .from('rent_listings')
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', listingId);
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      showMessage(`Listing status updated to ${status}.`, 'success');
+      await loadListings();
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('refresh-btn')?.addEventListener('click', loadListings);
+
+      document.querySelectorAll('.filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach((item) => item.classList.remove('active'));
+          btn.classList.add('active');
+          activeFilter = btn.dataset.filter || 'all';
+          renderListings();
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+
+        const photoBtn = target.closest('.photo-box');
+        if (photoBtn) {
+          const url = photoBtn.dataset.photoUrl;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+
+        const verifyBtn = target.closest('.verify-btn');
+        if (verifyBtn) {
+          const listingId = verifyBtn.dataset.listingId;
+          const verified = verifyBtn.dataset.verified === 'true';
+          if (listingId) updateVerified(listingId, verified);
+          return;
+        }
+
+        const statusBtn = target.closest('.status-btn');
+        if (statusBtn) {
+          const listingId = statusBtn.dataset.listingId;
+          const status = statusBtn.dataset.status;
+          if (listingId && status) updateListingStatus(listingId, status);
+        }
+      });
+
+      await refreshSession();
+      await loadListings();
+    });
+  </script>
+
+  <style>
+    .admin-page {
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      background:
+        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
+        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
+      color: white;
+    }
+
+    .admin-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #ff8a00;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 0.4rem;
+      font-size: clamp(1.7rem, 4vw, 2.4rem);
+    }
+
+    .admin-header p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0.55rem 0.9rem;
+      border-radius: 0.75rem;
+      border: 0;
+      font-weight: 900;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 0.86rem;
+    }
+
+    .btn-primary {
+      color: white;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+    }
+
+    .btn-outline {
+      color: white;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .btn-danger {
+      color: #fecaca;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.34);
+    }
+
+    .btn-small {
+      min-height: 30px;
+      padding: 0.4rem 0.7rem;
+      font-size: 0.78rem;
+      margin-left: 0.5rem;
+    }
+
+    .notice-card,
+    .message,
+    .filter-card,
+    .stat-card,
+    .listing-card {
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .notice-card {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .notice-card p {
+      margin: 0.35rem 0 0;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .message {
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      font-weight: 900;
+    }
+
+    .message.info {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .message.success {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.12);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .message.error {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .filter-card {
+      padding: 0.7rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.76);
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .filter-btn.active {
+      color: white;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      border-color: transparent;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+
+    .stat-card {
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-card span {
+      display: block;
+      color: rgba(255, 255, 255, 0.66);
+      font-size: 0.8rem;
+      font-weight: 800;
+      margin-bottom: 0.35rem;
+    }
+
+    .stat-card strong {
+      display: block;
+      color: #ff8a00;
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+
+    .listings-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .listing-card {
+      padding: 1rem;
+    }
+
+    .listing-top {
+      margin-bottom: 0.85rem;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .title-row h2 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .subline {
+      margin: 0.35rem 0 0;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 0.88rem;
+    }
+
+    .status-pill,
+    .verified-pill,
+    .unverified-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.72rem;
+      font-weight: 900;
+    }
+
+    .status-active {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.15);
+    }
+
+    .status-cancelled,
+    .status-rejected {
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .status-pending {
+      color: #fde68a;
+      background: rgba(250, 204, 21, 0.14);
+    }
+
+    .verified-pill {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    .unverified-pill {
+      color: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .photo-box {
+      aspect-ratio: 1;
+      border: 0;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.07);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem 1rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .info-grid p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.86rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .info-grid strong {
+      color: white;
+    }
+
+    .desc {
+      margin: 0 0 0.9rem;
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+
+    @media (max-width: 720px) {
+      .admin-header {
+        flex-direction: column;
+      }
+
+      .top-actions,
+      .top-actions .btn {
+        width: 100%;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .action-row .btn {
+        flex: 1 1 calc(50% - 0.55rem);
+      }
+    }
+  </style>
+</BaseLayout>
