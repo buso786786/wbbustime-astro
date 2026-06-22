@@ -1,12 +1,13 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import '../../styles/admin-compact.css';
 ---
 
 <BaseLayout
   title="Rent Memberships Admin - SoniaBuddy"
   description="Admin page for rent verified badge, visibility boost, payment status and ad activation."
 >
-  <section class="rent-admin-page">
+  <section class="rent-admin-page admin-page">
     <div class="rent-admin-container">
       <div class="admin-topbar">
         <div>
@@ -15,9 +16,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <p class="subtitle">Verify payment, activate verified badge, start visibility boost and stop memberships.</p>
         </div>
         <div class="top-actions">
-          <a class="btn btn-outline" href="/admin">Back Admin</a>
-          <a class="btn btn-outline" href="/owner/rent-dashboard">Owner Dashboard</a>
-        </div>
+  <a class="btn btn-outline" href="/admin">← Admin Home</a>
+  <button id="refresh-top-btn" class="btn btn-primary" type="button">Refresh</button>
+</div>
       </div>
 
       <div id="auth-card" class="panel auth-panel">
@@ -307,7 +308,10 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
               </div>
               <div class="badges">
                 <span class="badge ${badgeClass(membership.status)}">${esc(membership.status)}</span>
-                <span class="badge ${paymentBadgeClass(membership.payment_status)}">payment: ${esc(membership.payment_status || '-')}</span>
+                ${membership.plan_type === 'free_trial'
+  ? `<span class="badge badge-active">free trial</span>`
+  : `<span class="badge ${paymentBadgeClass(membership.payment_status)}">payment: ${esc(membership.payment_status || '-')}</span>`
+}
                 ${isFeatured ? `<span class="badge badge-ad">ads: ${esc(membership.ads_status || '-')}</span>` : ''}
                 ${listing.is_verified ? `<span class="badge badge-active">✓ listing verified</span>` : ''}
               </div>
@@ -332,10 +336,10 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           </div>
 
           <div class="card-actions">
-            ${canActivate ? `<button class="btn btn-primary activate-btn" type="button">Mark Paid + Activate 90 days</button>` : ''}
-            ${canStop ? `<button class="btn btn-warning stop-btn" type="button">Stop / Expire</button>` : ''}
-            ${membership.status !== 'cancelled' ? `<button class="btn btn-danger cancel-btn" type="button">Cancel</button>` : ''}
-          </div>
+  ${canActivate ? `<button class="btn btn-primary membership-action-btn" type="button" data-action="activate" data-membership-id="${esc(membership.id)}" data-listing-id="${esc(membership.listing_id)}">Activate</button>` : ''}
+  ${canStop ? `<button class="btn btn-warning membership-action-btn" type="button" data-action="stop" data-membership-id="${esc(membership.id)}" data-listing-id="${esc(membership.listing_id)}">Stop / Expire</button>` : ''}
+  ${membership.status !== 'cancelled' ? `<button class="btn btn-danger membership-action-btn" type="button" data-action="cancel" data-membership-id="${esc(membership.id)}" data-listing-id="${esc(membership.listing_id)}">Cancel</button>` : ''}
+</div>
         </article>
       `;
     }
@@ -478,31 +482,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       document.getElementById('login-btn')?.addEventListener('click', loginWithGoogle);
       document.getElementById('logout-btn')?.addEventListener('click', logout);
       document.getElementById('refresh-btn')?.addEventListener('click', loadMemberships);
+      document.getElementById('refresh-top-btn')?.addEventListener('click', loadMemberships);
       document.getElementById('status-filter')?.addEventListener('change', loadMemberships);
 
       document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        const card = target.closest('.membership-card');
-        if (!card) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
 
-        const membershipId = card.dataset.membershipId;
-        const listingId = card.dataset.listingId;
+  const actionBtn = target.closest('.membership-action-btn');
+  if (!actionBtn) return;
 
-        if (target.closest('.activate-btn') && membershipId) {
-          activateMembership(membershipId, listingId);
-          return;
-        }
+  const action = actionBtn.dataset.action;
+  const membershipId = actionBtn.dataset.membershipId;
+  const listingId = actionBtn.dataset.listingId;
 
-        if (target.closest('.stop-btn') && membershipId) {
-          stopMembership(membershipId);
-          return;
-        }
+  if (!membershipId) {
+    showMessage('Missing membership ID.', 'error');
+    return;
+  }
 
-        if (target.closest('.cancel-btn') && membershipId) {
-          cancelMembership(membershipId);
-        }
-      });
+  if (action === 'activate') {
+    activateMembership(membershipId, listingId);
+    return;
+  }
+
+  if (action === 'stop') {
+    stopMembership(membershipId, listingId);
+    return;
+  }
+
+  if (action === 'cancel') {
+    cancelMembership(membershipId, listingId);
+  }
+});
 
       await loadMemberships();
     });
