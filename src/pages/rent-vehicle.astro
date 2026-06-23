@@ -34,6 +34,7 @@ type RentListing = {
   created_at: string | null;
   updated_at: string | null;
   is_verified: boolean | null;
+  is_promoted?: boolean;
 };
 
 const cities = (await listRentCities({ onlyActive: true })) as RentCity[];
@@ -68,7 +69,50 @@ if (listingsError) {
 }
 
 const listings = (listingsData ?? []) as RentListing[];
+const listingIds = listings.map((listing) => listing.id);
 
+let membershipsData: any[] = [];
+let membershipsError: any = null;
+
+if (listingIds.length) {
+  const result = await supabase
+    .from("rent_memberships")
+    .select(`
+      listing_id,
+      plan_type,
+      status,
+      ads_status,
+      starts_at,
+      expires_at
+    `)
+    .in("listing_id", listingIds)
+    .eq("plan_type", "featured")
+    .eq("status", "active")
+    .eq("ads_status", "active");
+
+  membershipsData = result.data ?? [];
+  membershipsError = result.error;
+}
+
+if (membershipsError) {
+  console.error("Rent memberships fetch error:", membershipsError);
+}
+
+const nowMs = Date.now();
+
+const promotedListingIds = new Set(
+  membershipsData
+    .filter((membership) => {
+      const startsOk =
+        !membership.starts_at || new Date(membership.starts_at).getTime() <= nowMs;
+
+      const expiresOk =
+        membership.expires_at && new Date(membership.expires_at).getTime() > nowMs;
+
+      return startsOk && expiresOk;
+    })
+    .map((membership) => membership.listing_id)
+);
 function cityName(city: RentCity | undefined | null) {
   if (!city) return "";
   return city.name_en || city.name_bn || city.name || "";
@@ -104,7 +148,8 @@ const listingsForClient = listings.map((listing) => {
     .filter(Boolean) as RentCity[];
 
   return {
-    ...listing,
+        ...listing,
+    is_promoted: promotedListingIds.has(listing.id),
     base_city_name: cityName(baseCity),
     service_city_names: serviceCities.map(cityName),
     photo_urls: (listing.photos ?? []).slice(0, 4).map(publicPhotoUrl),
@@ -215,7 +260,9 @@ const listingsForClient = listings.map((listing) => {
           <h2 class="rent-section-heading">Available rentals</h2>
           <p class="rent-count-text"><strong id="result-count">0</strong> <span id="result-label">listings</span></p>
         </div>
-
+        <p id="rent-result-summary" class="rent-result-summary">
+          Select a city to see matching rentals.
+        </p>
         {listingsError && (
           <div class="error-box">Rent listings fetch error. Check Supabase columns/RLS.</div>
         )}
@@ -682,14 +729,8 @@ function applyRentLanguage() {
   updateSearchButton();
 }
 
-    if (typeParam && typeToVehicle[typeParam]) {
-      state.vehicleType = typeToVehicle[typeParam];
-    }
-
-    if (typeParam && typeToPurpose[typeParam]) {
-      state.purpose = typeToPurpose[typeParam];
-    }
-
+        // Default search should show all vehicle types and all purposes.
+    // User can tap vehicle/purpose chips to filter manually.
     function esc(value) {
       return String(value || "")
         .replaceAll("&", "&amp;")
@@ -937,7 +978,56 @@ searchInput.addEventListener("keydown", (event) => {
 
       return true;
     }
+        function getCityPriority(listing) {
+      if (!state.mainCity) return 99;
 
+      const mainCityId = state.mainCity.id;
+      const nearbyCityIds = state.nearbyCities.map((city) => city.id);
+
+      const serviceIds = Array.isArray(listing.service_city_ids)
+        ? listing.service_city_ids
+        : [];
+
+      if (listing.base_city_id === mainCityId) {
+        return 1;
+      }
+
+      if (serviceIds.includes(mainCityId)) {
+        return 2;
+      }
+
+      const nearbyMatch =
+        nearbyCityIds.includes(listing.base_city_id) ||
+        serviceIds.some((id) => nearbyCityIds.includes(id));
+
+      if (nearbyMatch) {
+        return 3;
+      }
+
+      return 99;
+    }
+
+    function sortRentListings(a, b) {
+      const cityA = getCityPriority(a);
+      const cityB = getCityPriority(b);
+
+      if (cityA !== cityB) return cityA - cityB;
+
+      const adA = a.is_promoted ? 0 : 1;
+      const adB = b.is_promoted ? 0 : 1;
+
+      if (adA !== adB) return adA - adB;
+
+      const verifiedA = a.is_verified ? 0 : 1;
+      const verifiedB = b.is_verified ? 0 : 1;
+
+      if (verifiedA !== verifiedB) return verifiedA - verifiedB;
+
+      const updatedA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const updatedB = new Date(b.updated_at || b.created_at || 0).getTime();
+
+      return updatedB - updatedA;
+    }
     function renderPhotos(listing) {
       const photos = Array.isArray(listing.photo_urls)
         ? listing.photo_urls.slice(0, 4)
@@ -974,8 +1064,20 @@ searchInput.addEventListener("keydown", (event) => {
 
   const mainCity = listing.base_city_name || serviceNames[0] || "West Bengal";
   const ownerName = listing.owner_name || "Rental provider";
-  const firstPhoto = Array.isArray(listing.photo_urls) && listing.photo_urls[0] ? listing.photo_urls[0] : "";
+  const firstPhoto =
+    Array.isArray(listing.photo_urls) && listing.photo_urls[0]
+      ? listing.photo_urls[0]
+      : "";
 
+  const adLabel = listing.is_promoted
+    ? `<span class="rent-ad-badge">Ad</span>`
+    : "";
+      const verifiedLabel = listing.is_verified
+    ? `<span class="rent-verified-badge">Verified</span>`
+    : "";
+
+  
+    
   return `
     <article class="rent-pro-card" data-listing-id="${esc(listing.id)}">
       <div class="rent-card-head">
@@ -994,9 +1096,18 @@ searchInput.addEventListener("keydown", (event) => {
           </div>
         </div>
 
-        <button class="rent-report-btn" type="button" data-listing-id="${esc(listing.id)}">
-          ⚐ ${rentT("Report")}
-        </button>
+                <div class="rent-card-right">
+          ${adLabel}
+          ${verifiedLabel}
+
+                    <button class="rent-alert-btn" type="button">
+            ⚠ Safety
+          </button>
+
+          <button class="rent-report-btn" type="button" data-listing-id="${esc(listing.id)}">
+            ⚐ ${rentT("Report")}
+          </button>
+        </div>
       </div>
 
       ${renderPhotos(listing)}
@@ -1014,9 +1125,7 @@ searchInput.addEventListener("keydown", (event) => {
         ${listing.description ? `<p class="rent-desc-line">${esc(listing.description)}</p>` : ""}
       </div>
 
-      <div class="rent-warning-note">
-        ${rentT("Please confirm price, vehicle, date and availability directly with the owner before booking. SoniaBuddy is only a listing platform and is not responsible for owner pricing or service.")}
-      </div>
+            
 
       <div class="rent-pro-actions">
         ${
@@ -1032,14 +1141,30 @@ searchInput.addEventListener("keydown", (event) => {
         }
 
         <button class="rent-action-btn rent-detail-btn" type="button" data-listing-id="${esc(listing.id)}">
-         ${rentT("Details")}
+          ${rentT("Details")}
         </button>
       </div>
     </article>
   `;
 }
+       function updateResultSummary() {
+      const box = document.getElementById("rent-result-summary");
+      if (!box) return;
 
+      const mainCity = state.mainCity ? getDisplayName(state.mainCity) : "";
+      const nearby = state.nearbyCities.map(getDisplayName).filter(Boolean);
+      const vehicle = state.vehicleType || "All vehicles";
+      const purpose = state.purpose || "All purposes";
+
+      if (!mainCity) {
+        box.textContent = "Select a city to see matching rentals.";
+        return;
+      }
+
+      box.textContent = `Showing rentals for ${mainCity}${nearby.length ? ` + nearby: ${nearby.join(", ")}` : ""} · Vehicle: ${vehicle} · Purpose: ${purpose}`;
+    }
     function renderListings(forceSearch = false) {
+        updateResultSummary();
   const grid = document.getElementById("rental-cards-grid");
   const resultCount = document.getElementById("result-count");
   if (!grid) return;
@@ -1074,7 +1199,7 @@ searchInput.addEventListener("keydown", (event) => {
     return;
   }
 
-  const filtered = listings.filter(listingMatches);
+    const filtered = listings.filter(listingMatches).sort(sortRentListings);
 
   if (resultCount) resultCount.textContent = String(filtered.length);
 
@@ -1777,6 +1902,14 @@ document.getElementById("submit-listing-btn")?.addEventListener("click", () => {
           }
           return;
         }
+        const alertBtn = target.closest(".rent-alert-btn");
+        if (alertBtn) {
+          alert(
+            "Please confirm final rent, vehicle, date, pickup point and availability directly with the owner before booking. SoniaBuddy is only a listing platform and is not responsible for owner pricing or service."
+          );
+          return;
+        }
+
         const reportBtn = target.closest(".rent-report-btn");
 if (reportBtn) {
   const listingId = reportBtn.dataset.listingId;
@@ -2923,6 +3056,406 @@ if (reportBtn) {
 }
 .rent-lang-toggle {
   display: none !important;
+}
+.rent-card-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.rent-ad-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 138, 0, 0.18);
+  border: 1px solid rgba(255, 138, 0, 0.45);
+  color: #ffb24d;
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+}
+/* FINAL RENT CARD LAYOUT FIX - DESKTOP + MOBILE */
+.rental-cards-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 1rem !important;
+  max-width: 740px !important;
+  margin: 0 auto 1.5rem !important;
+}
+
+.rent-pro-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0.85rem !important;
+  border-radius: 1.25rem !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  border: 1px solid rgba(255, 255, 255, 0.13) !important;
+  color: white !important;
+  overflow: hidden !important;
+}
+
+.rent-card-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+  margin-bottom: 0.85rem !important;
+}
+
+.rent-owner-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.7rem !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.rent-avatar {
+  width: 58px !important;
+  height: 58px !important;
+  flex: 0 0 58px !important;
+}
+
+.rent-card-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  flex-shrink: 0 !important;
+}
+
+.rent-pro-card .photo-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0.45rem !important;
+  width: 100% !important;
+  margin: 0 0 0.85rem !important;
+}
+
+.rent-pro-card .photo-btn,
+.rent-pro-card .photo-empty {
+  width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 0.9rem !important;
+}
+
+.rent-pro-info {
+  display: block !important;
+  width: 100% !important;
+  margin-top: 0 !important;
+}
+
+.rent-pro-info p {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 0.35rem !important;
+  line-height: 1.35 !important;
+}
+
+.rent-warning-note {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-top: 0.75rem !important;
+  white-space: normal !important;
+}
+
+.rent-pro-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 0.45rem !important;
+  width: 100% !important;
+  margin-top: 0.8rem !important;
+}
+
+.rent-action-btn {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.rent-ad-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 24px !important;
+  padding: 0.22rem 0.5rem !important;
+  border-radius: 999px !important;
+  background: rgba(255, 138, 0, 0.18) !important;
+  border: 1px solid rgba(255, 138, 0, 0.45) !important;
+  color: #ffb24d !important;
+  font-size: 0.7rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+@media (max-width: 640px) {
+  .rental-cards-grid {
+    max-width: 100% !important;
+    gap: 0.75rem !important;
+  }
+
+  .rent-pro-card {
+    padding: 0.65rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .rent-card-head {
+    margin-bottom: 0.6rem !important;
+  }
+
+  .rent-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    flex-basis: 44px !important;
+  }
+
+  .rent-pro-card .photo-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.35rem !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  .rent-pro-info p {
+    font-size: 0.78rem !important;
+  }
+
+  .rent-warning-note {
+    font-size: 0.68rem !important;
+    padding: 0.6rem 0.7rem !important;
+  }
+
+  .rent-pro-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.4rem !important;
+  }
+
+  .rent-action-btn {
+    min-height: 32px !important;
+    padding: 0.45rem 0.35rem !important;
+    font-size: 0.72rem !important;
+  }
+}
+.rent-result-summary {
+  max-width: 740px;
+  margin: -0.5rem auto 1rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.rent-verified-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 24px !important;
+  padding: 0.22rem 0.5rem !important;
+  border-radius: 999px !important;
+  background: rgba(34, 197, 94, 0.18) !important;
+  border: 1px solid rgba(34, 197, 94, 0.45) !important;
+  color: #86efac !important;
+  font-size: 0.7rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+/* FINAL MODERN AD + VERIFIED + DISCLAIMER POLISH */
+
+.rent-card-right {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  flex-shrink: 0 !important;
+}
+
+.rent-ad-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+  padding: 0.22rem 0.62rem !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #7c4a00, #ffb300, #ff7a00) !important;
+  border: 1px solid rgba(255, 190, 60, 0.75) !important;
+  color: #180900 !important;
+  font-size: 0.72rem !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  box-shadow: 0 0 0 rgba(255, 179, 0, 0.45);
+  animation: adPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes adPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 179, 0, 0.42);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(255, 179, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 179, 0, 0);
+  }
+}
+
+.rent-verified-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+  padding: 0.22rem 0.62rem !important;
+  border-radius: 999px !important;
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(52, 211, 153, 0.5) !important;
+  color: #9fffd0 !important;
+  font-size: 0.72rem !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+}
+
+.rent-report-btn {
+  min-height: 30px !important;
+  padding: 0.32rem 0.75rem !important;
+  border-radius: 999px !important;
+}
+
+.rent-warning-note {
+  margin-top: 0.75rem !important;
+  padding: 0.55rem 0.75rem !important;
+  border-radius: 0.75rem !important;
+  background: rgba(255, 107, 0, 0.12) !important;
+  border: 1px solid rgba(255, 107, 0, 0.28) !important;
+  color: rgba(255, 235, 215, 0.9) !important;
+  font-size: 0.75rem !important;
+  line-height: 1.35 !important;
+}
+
+@media (max-width: 640px) {
+  .rent-card-right {
+    gap: 0.3rem !important;
+  }
+
+  .rent-ad-badge,
+  .rent-verified-badge {
+    min-height: 23px !important;
+    padding: 0.18rem 0.48rem !important;
+    font-size: 0.66rem !important;
+  }
+
+  .rent-report-btn {
+    min-height: 26px !important;
+    padding: 0.25rem 0.55rem !important;
+    font-size: 0.68rem !important;
+  }
+
+  .rent-warning-note {
+    padding: 0.48rem 0.6rem !important;
+    font-size: 0.68rem !important;
+  }
+}
+/* PREMIUM BADGES + SAFETY BUTTON */
+
+.rent-card-right {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.38rem !important;
+  flex-wrap: wrap !important;
+  flex-shrink: 0 !important;
+}
+
+.rent-ad-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+  padding: 0.22rem 0.62rem !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #3a2200 0%, #d6a12b 45%, #fff1a8 55%, #b56b00 100%) !important;
+  border: 1px solid rgba(255, 220, 120, 0.8) !important;
+  color: #160900 !important;
+  font-size: 0.72rem !important;
+  font-weight: 1000 !important;
+  letter-spacing: 0.02em !important;
+  box-shadow: 0 0 18px rgba(255, 183, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  animation: premiumAdPulse 1.9s ease-in-out infinite;
+}
+
+@keyframes premiumAdPulse {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 rgba(255, 183, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+  65% {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 7px rgba(255, 183, 0, 0), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 rgba(255, 183, 0, 0), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+}
+
+.rent-verified-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 26px !important;
+  padding: 0.22rem 0.62rem !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, rgba(0, 92, 61, 0.95), rgba(16, 185, 129, 0.95)) !important;
+  border: 1px solid rgba(115, 255, 198, 0.55) !important;
+  color: #e9fff5 !important;
+  font-size: 0.72rem !important;
+  font-weight: 1000 !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+.rent-alert-btn {
+  min-height: 28px !important;
+  padding: 0.28rem 0.68rem !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 96, 96, 0.55) !important;
+  background: linear-gradient(135deg, rgba(120, 24, 24, 0.92), rgba(255, 87, 34, 0.95)) !important;
+  color: #fff5f2 !important;
+  font-size: 0.72rem !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 18px rgba(255, 87, 34, 0.14) !important;
+}
+
+.rent-alert-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.rent-report-btn {
+  min-height: 28px !important;
+  padding: 0.28rem 0.68rem !important;
+  border-radius: 999px !important;
+  font-size: 0.72rem !important;
+}
+
+.rent-warning-note {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .rent-card-right {
+    gap: 0.28rem !important;
+  }
+
+  .rent-ad-badge,
+  .rent-verified-badge,
+  .rent-alert-btn,
+  .rent-report-btn {
+    min-height: 24px !important;
+    padding: 0.2rem 0.45rem !important;
+    font-size: 0.64rem !important;
+  }
 }
   </style>
 </BaseLayout>
