@@ -7,8 +7,6 @@ import '../../styles/admin-compact.css';
   title="Vehicle Listing Dashboard - SoniaBuddy"
   description="Manage your vehicle listings, verified badge, visibility boost and enquiry analytics."
 >
-  
-
   <section class="dashboard-page">
     <div class="container dashboard-container">
       <div class="dashboard-header">
@@ -32,6 +30,28 @@ import '../../styles/admin-compact.css';
 
       <div id="dashboard-message" class="dashboard-message hidden"></div>
 
+      <div id="owner-brand-panel" class="owner-brand-panel hidden">
+        <div class="brand-cover"></div>
+        <div class="brand-main-row">
+          <div id="owner-brand-avatar" class="owner-brand-avatar"><span>🏢</span></div>
+          <div class="brand-copy">
+            <h2 id="owner-brand-display">Owner Brand</h2>
+            <p>One brand name and logo for this owner. This same logo will show on all your vehicle cards.</p>
+          </div>
+        </div>
+        <div class="brand-form-row">
+          <label>
+            Brand / Company Name
+            <input id="owner-brand-name-input" type="text" placeholder="e.g., Majhi Travels" />
+          </label>
+          <label>
+            Logo Photo
+            <input id="owner-brand-logo-input" type="file" accept="image/*" />
+          </label>
+          <button id="save-owner-brand-btn" class="btn btn-primary btn-small" type="button">Save Brand</button>
+        </div>
+      </div>
+
       <div class="free-notice">
         <span class="notice-icon">🎉</span>
         <div class="notice-content">
@@ -52,7 +72,6 @@ import '../../styles/admin-compact.css';
           <p class="plan-description">Trust badge only. No ads boost included.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="verified">▶ See features</button>
         </div>
-
         <div class="plan-card">
           <h3>🚀 Small Vehicle Visibility</h3>
           <div class="plan-price">₹199</div>
@@ -60,7 +79,6 @@ import '../../styles/admin-compact.css';
           <p class="plan-description">For Toto and Auto. Sponsored visibility + ad tracking.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="small">▶ See features</button>
         </div>
-
         <div class="plan-card">
           <h3>🚀 Car / Pickup / Ambulance Visibility</h3>
           <div class="plan-price">₹1000</div>
@@ -68,7 +86,6 @@ import '../../styles/admin-compact.css';
           <p class="plan-description">Sponsored visibility for car, pickup and ambulance.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="medium">▶ See features</button>
         </div>
-
         <div class="plan-card">
           <h3>🚀 Bus Visibility</h3>
           <div class="plan-price">₹1500</div>
@@ -81,8 +98,8 @@ import '../../styles/admin-compact.css';
       <div class="dashboard-actions">
         <a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a>
         <a href="#my-listings" class="btn btn-outline">View My Vehicle Listings</a>
+        <button id="refresh-stats-btn" class="btn btn-outline" type="button">🔄 Refresh Stats</button>
       </div>
-
       <div id="feature-note" class="feature-note hidden"></div>
 
       <div class="section-title" id="my-listings">
@@ -102,6 +119,10 @@ import '../../styles/admin-compact.css';
     let currentListings = [];
     let eventCountsByListing = {};
     let membershipRequests = [];
+    let activeMembershipsByListing = {};
+    let allAdMembershipsByListing = {};
+    let eventsByListing = {};
+    let ownerProfile = null;
 
     function esc(value) {
       return String(value || '')
@@ -116,6 +137,13 @@ import '../../styles/admin-compact.css';
       return String(value || '').replace(/\D/g, '');
     }
 
+    function photoUrl(path) {
+      if (!path) return '';
+      if (path.startsWith('http://') || path.startsWith('https://')) return path;
+      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    }
+
     function showMessage(message, type = 'info') {
       const box = document.getElementById('dashboard-message');
       if (!box) return;
@@ -125,53 +153,8 @@ import '../../styles/admin-compact.css';
     }
 
     function hideMessage() {
-      function showActionMessage(button, text, type = 'success') {
-  const card = button?.closest('.payment-card, .listing-card');
-  if (!card) {
-    showMessage(text, type);
-    return;
-  }
-
-  let box = card.querySelector('.inline-action-message');
-
-  if (!box) {
-    box = document.createElement('div');
-    box.className = 'inline-action-message';
-    card.appendChild(box);
-  }
-
-  box.textContent = text;
-  box.className = `inline-action-message ${type}`;
-
-  setTimeout(() => {
-    box.remove();
-  }, 4500);
-}
       const box = document.getElementById('dashboard-message');
       if (box) box.classList.add('hidden');
-    }
-
-    function showFeatureNote(type) {
-      const box = document.getElementById('feature-note');
-      if (!box) return;
-
-      const notes = {
-        verified: 'Verified Badge is a trust badge only. Admin/payment activation will come later. It does not guarantee calls or bookings.',
-        small: 'Small Vehicle Visibility is for Toto/Auto paid boost. Paid ads tracking is pending until payment activation.',
-        medium: 'Car/Pickup/Ambulance Visibility will start only after payment integration is connected.',
-        bus: 'Bus Visibility will start only after payment integration is connected.',
-      };
-
-      box.textContent = notes[type] || 'Feature details coming soon.';
-      box.classList.remove('hidden');
-      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    function photoUrl(path) {
-      if (!path) return '';
-      if (path.startsWith('http://') || path.startsWith('https://')) return path;
-      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
-      return data.publicUrl;
     }
 
     function formatDate(value) {
@@ -224,22 +207,13 @@ import '../../styles/admin-compact.css';
 
     function visibilityPlanForListing(listing) {
       const type = String(listing.vehicle_type || '').toLowerCase();
-
-      if (type === 'toto' || type === 'auto') {
-        return { plan_type: 'small_visibility', amount_inr: 199, label: 'Small Vehicle Visibility' };
-      }
-
-      if (type === 'bus') {
-        return { plan_type: 'bus_visibility', amount_inr: 1500, label: 'Bus Visibility' };
-      }
-
+      if (type === 'toto' || type === 'auto') return { plan_type: 'small_visibility', amount_inr: 199, label: 'Small Vehicle Visibility' };
+      if (type === 'bus') return { plan_type: 'bus_visibility', amount_inr: 1500, label: 'Bus Visibility' };
       return { plan_type: 'car_pickup_ambulance_visibility', amount_inr: 1000, label: 'Car / Pickup / Ambulance Visibility' };
     }
 
     function hasMembershipRequest(listingId, planType) {
-      return membershipRequests.some((item) => {
-        return item.listing_id === listingId && item.plan_type === planType && item.status !== 'cancelled';
-      });
+      return membershipRequests.some((item) => item.listing_id === listingId && item.plan_type === planType && item.status !== 'cancelled');
     }
 
     function renderRequestButton(listing, planType, amount, label, extraClass = '') {
@@ -247,9 +221,94 @@ import '../../styles/admin-compact.css';
       const text = requested ? 'Requested' : `${label} · ₹${amount}`;
       const disabled = requested ? 'disabled' : '';
       const disabledClass = requested ? 'btn-disabled' : '';
-
       return `<button class="btn btn-primary btn-small request-plan-btn ${extraClass} ${disabledClass}" type="button" data-listing-id="${esc(listing.id)}" data-plan-type="${esc(planType)}" data-amount="${amount}" ${disabled}>${esc(text)}</button>`;
     }
+
+    function getActiveMemberships(listingId) {
+      return activeMembershipsByListing[listingId] || [];
+    }
+
+    function getVerifiedMembership(listingId) {
+      return getActiveMemberships(listingId).find((item) => item.plan_type === 'verified' || item.plan_type === 'verified_badge') || null;
+    }
+
+    function getAdMembership(listingId) {
+      return getActiveMemberships(listingId).find((item) => item.plan_type === 'featured' && item.ads_status === 'active') || null;
+    }
+
+    function campaignStartMs(campaign) {
+      const value = campaign?.starts_at || campaign?.created_at;
+      const ms = value ? new Date(value).getTime() : 0;
+      return Number.isFinite(ms) ? ms : 0;
+    }
+
+    function campaignEndMs(campaign) {
+      const value = campaign?.expires_at;
+      const ms = value ? new Date(value).getTime() : Number.MAX_SAFE_INTEGER;
+      return Number.isFinite(ms) ? ms : Number.MAX_SAFE_INTEGER;
+    }
+
+    function eventInsideCampaign(event, campaign) {
+      if (!event?.created_at || !campaign) return false;
+      const eventMs = new Date(event.created_at).getTime();
+      if (!Number.isFinite(eventMs)) return false;
+      return eventMs >= campaignStartMs(campaign) && eventMs <= campaignEndMs(campaign);
+    }
+
+    function adStatsForCampaign(listingId, campaign) {
+      if (!campaign) return { impressions: 0, clicks: 0, ctr: 0 };
+
+      const events = eventsByListing[listingId] || [];
+      let impressions = 0;
+      let clicks = 0;
+
+      events.forEach((event) => {
+        if (!eventInsideCampaign(event, campaign)) return;
+        if (event.event_type === 'ad_impression') impressions += 1;
+        if (event.event_type === 'ad_click') clicks += 1;
+      });
+
+      const ctr = impressions > 0 ? Math.round((clicks / impressions) * 100) : 0;
+      return { impressions, clicks, ctr };
+    }
+
+    function currentAdStats(listingId) {
+      const activeAd = getAdMembership(listingId);
+      if (!activeAd) return { impressions: 0, clicks: 0, ctr: 0 };
+      return adStatsForCampaign(listingId, activeAd);
+    }
+
+    function renderAdsHistory(listingId, activeAd) {
+      const campaigns = allAdMembershipsByListing[listingId] || [];
+
+      const oldCampaigns = campaigns
+        .filter((item) => item.plan_type === 'featured')
+        .filter((item) => !activeAd || item.id !== activeAd.id)
+        .sort((a, b) => campaignStartMs(b) - campaignStartMs(a));
+
+      if (!oldCampaigns.length) {
+        return '<p class="ads-history-empty">No old ads history yet.</p>';
+      }
+
+      return oldCampaigns.map((campaign) => {
+        const stats = adStatsForCampaign(listingId, campaign);
+        const start = formatDate(campaign.starts_at || campaign.created_at);
+        const end = formatDate(campaign.expires_at);
+
+        return `
+          <div class="ads-history-row">
+            <div>
+              <strong>${esc(start || '-')} → ${esc(end || '-')}</strong>
+              <span>${esc(campaign.status || '-')} / ${esc(campaign.ads_status || '-')}</span>
+            </div>
+            <div><b>${stats.impressions}</b><span>Imp</span></div>
+            <div><b>${stats.clicks}</b><span>Clicks</span></div>
+            <div><b>${stats.ctr}%</b><span>CTR</span></div>
+          </div>
+        `;
+      }).join('');
+    }
+
 
     function renderListingCard(listing) {
       const photos = Array.isArray(listing.photos) ? listing.photos : [];
@@ -258,6 +317,7 @@ import '../../styles/admin-compact.css';
         if (!url) return `<div class="listing-photo-empty">+</div>`;
         return `<button type="button" class="listing-photo-thumb dashboard-photo-open" data-photo-url="${esc(url)}"><img src="${esc(url)}" alt="${esc(listingTitle(listing))} photo ${index + 1}" loading="lazy" /></button>`;
       }).join('');
+
       const phone = onlyDigits(listing.owner_phone);
       const whatsappRaw = onlyDigits(listing.owner_whatsapp || listing.owner_phone);
       const whatsapp = whatsappRaw.length === 10 ? `91${whatsappRaw}` : whatsappRaw;
@@ -267,78 +327,74 @@ import '../../styles/admin-compact.css';
       const stats = normalStats(listing);
       const visibilityPlan = visibilityPlanForListing(listing);
       const trialExpiry = addMonths(listing.created_at, 3);
+      const brandName = ownerProfile?.company_name || listing.owner_name || listingTitle(listing);
+      const brandLogoUrl = ownerProfile?.company_logo ? photoUrl(ownerProfile.company_logo) : '';
+      const firstPhotoUrl = photoUrl(photos[0]);
+      const avatarUrl = brandLogoUrl || firstPhotoUrl;
+      const verified = getVerifiedMembership(listing.id);
+      const ad = getAdMembership(listing.id);
+      const hasVerifiedRequest = hasMembershipRequest(listing.id, 'verified_badge');
+      const hasBoostRequest = hasMembershipRequest(listing.id, visibilityPlan.plan_type);
+      const currentAds = currentAdStats(listing.id);
+      const adImpressions = currentAds.impressions;
+      const adClicks = currentAds.clicks;
+      const ctr = currentAds.ctr;
+      const adsHistoryHtml = renderAdsHistory(listing.id, ad);
+
+      const verifiedBadge = verified
+        ? `<span class="listing-badge badge-verified">✓ Verified Active · ${esc(formatDate(verified.expires_at))}</span>`
+        : hasVerifiedRequest
+          ? `<span class="listing-badge badge-verified-requested">✓ Verified Requested</span>`
+          : '';
+
+      const adBadge = ad
+        ? `<span class="listing-badge badge-boost">🚀 Ads Active · ${esc(formatDate(ad.expires_at))}</span>`
+        : hasBoostRequest
+          ? `<span class="listing-badge badge-boost-requested">🚀 Ads Requested</span>`
+          : '';
 
       return `
         <article class="dashboard-listing-card" data-listing-id="${esc(listing.id)}">
           <div class="listing-head">
-            <div class="listing-photo-grid">${photoCells}</div>
-
+            <div class="listing-brand-avatar">
+              ${avatarUrl ? `<img src="${esc(avatarUrl)}" alt="${esc(brandName)}" loading="lazy" />` : `<span>🚕</span>`}
+            </div>
             <div class="listing-head-content">
               <div class="listing-title-row">
                 <div>
-                  <h3>${esc(listingTitle(listing))}</h3>
-                  <p class="listing-main-line">
-                    ${esc(listing.vehicle_type || 'Vehicle')}
-                    ${listing.seats ? ` · ${esc(listing.seats)} seats` : ''}
-                    ${listing.reg_number ? ` · ${esc(listing.reg_number)}` : ''}
-                  </p>
+                  <h3>${esc(brandName)}</h3>
+                  <p class="listing-main-line">${esc(listing.vehicle_type || 'Vehicle')}${listing.seats ? ` · ${esc(listing.seats)} seats` : ''}${listing.reg_number ? ` · ${esc(listing.reg_number)}` : ''}</p>
                 </div>
                 <span class="listing-status ${statusClass(status)}">${esc(status)}</span>
               </div>
-
-              <p class="listing-sub-line"><strong>Owner:</strong> ${esc(listing.owner_name || '-')}</p>
-              <p class="listing-sub-line"><strong>Price:</strong> ${esc(listing.price_text || '-')}</p>
-              ${purposes.length ? `<p class="listing-sub-line"><strong>Purpose:</strong> ${esc(purposes.join(' • '))}</p>` : ''}
-              ${listing.description ? `<p class="listing-desc">${esc(listing.description)}</p>` : ''}
-
-              <div class="listing-meta">
+              <div class="listing-meta listing-status-badges">
                 <span class="listing-badge badge-free">Free Trial</span>
-                ${listing.is_verified === true ? `<span class="listing-badge badge-verified">✓ Verified</span>` : ''}
+                ${verifiedBadge}
+                ${adBadge}
                 <span class="listing-badge">Photos: ${photos.length}</span>
                 <span class="listing-badge">Service cities: ${serviceIds.length}</span>
                 ${listing.created_at ? `<span class="listing-badge">${esc(formatDate(listing.created_at))}</span>` : ''}
               </div>
+              <p class="listing-sub-line"><strong>Owner:</strong> ${esc(listing.owner_name || '-')}</p>
+              <p class="listing-sub-line"><strong>Price:</strong> ${esc(listing.price_text || '-')}</p>
+              ${purposes.length ? `<p class="listing-sub-line"><strong>Purpose:</strong> ${esc(purposes.join(' • '))}</p>` : ''}
+              ${listing.description ? `<p class="listing-desc">${esc(listing.description)}</p>` : ''}
+              <div class="listing-photo-strip">${photoCells}</div>
             </div>
           </div>
 
           <div class="listing-edit-row">
-          <div class="contact-edit-box hidden" id="contact-edit-${esc(listing.id)}">
-  <div class="contact-edit-grid">
-    <label>
-      Phone
-      <input
-        type="tel"
-        class="edit-phone-input"
-        data-listing-id="${esc(listing.id)}"
-        value="${esc(listing.owner_phone || '')}"
-        placeholder="10 digit phone"
-      />
-    </label>
-
-    <label>
-      WhatsApp
-      <input
-        type="tel"
-        class="edit-whatsapp-input"
-        data-listing-id="${esc(listing.id)}"
-        value="${esc(listing.owner_whatsapp || '')}"
-        placeholder="10 digit WhatsApp"
-      />
-    </label>
-  </div>
-
-  <div class="contact-edit-actions">
-    <button class="btn btn-primary btn-small save-contact-btn" type="button" data-listing-id="${esc(listing.id)}">
-      Save Contact
-    </button>
-    <button class="btn btn-outline btn-small cancel-contact-edit-btn" type="button" data-listing-id="${esc(listing.id)}">
-      Cancel
-    </button>
-  </div>
-</div>
-            <button class="btn btn-outline btn-small edit-contact-btn" type="button" data-listing-id="${esc(listing.id)}">
-  ✎ Edit Contact
-</button>
+            <div class="contact-edit-box hidden" id="contact-edit-${esc(listing.id)}">
+              <div class="contact-edit-grid">
+                <label>Phone<input type="tel" class="edit-phone-input" data-listing-id="${esc(listing.id)}" value="${esc(listing.owner_phone || '')}" placeholder="10 digit phone" /></label>
+                <label>WhatsApp<input type="tel" class="edit-whatsapp-input" data-listing-id="${esc(listing.id)}" value="${esc(listing.owner_whatsapp || '')}" placeholder="10 digit WhatsApp" /></label>
+              </div>
+              <div class="contact-edit-actions">
+                <button class="btn btn-primary btn-small save-contact-btn" type="button" data-listing-id="${esc(listing.id)}">Save Contact</button>
+                <button class="btn btn-outline btn-small cancel-contact-edit-btn" type="button" data-listing-id="${esc(listing.id)}">Cancel</button>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-small edit-contact-btn" type="button" data-listing-id="${esc(listing.id)}">✎ Edit Contact</button>
           </div>
 
           <div class="performance-box">
@@ -352,15 +408,22 @@ import '../../styles/admin-compact.css';
             </div>
           </div>
 
-          <div class="ads-box">
+          <div class="ads-box ${ad ? 'ads-box-active' : ''}">
             <div class="ads-title-row">
-              <h4>⭐ Visibility / Ads Performance</h4>
-              <span class="ads-badge">No ads data</span>
+              <h4>⭐ Current Ads Performance</h4>
+              <span class="ads-badge">${ad ? 'Ads running' : hasBoostRequest ? 'Ads requested' : 'Ads off'}</span>
             </div>
             <div class="ads-grid">
-              <div class="mini-stat"><span>👁 Ad impressions</span><strong>0</strong></div>
-              <div class="mini-stat"><span>📊 Ad clicks</span><strong>0</strong></div>
-              <div class="mini-stat"><span>☆ CTR</span><strong>0%</strong></div>
+              <div class="mini-stat"><span>👁 Ad impressions</span><strong>${adImpressions}</strong></div>
+              <div class="mini-stat"><span>📊 Ad clicks</span><strong>${adClicks}</strong></div>
+              <div class="mini-stat"><span>☆ CTR</span><strong>${ctr}%</strong></div>
+            </div>
+            <div class="ads-tools-row">
+              <button class="btn btn-outline btn-small ads-history-toggle" type="button" data-listing-id="${esc(listing.id)}">📜 Ads History</button>
+              ${ad ? `<button class="btn btn-danger btn-small expire-ads-btn" type="button" data-listing-id="${esc(listing.id)}">Stop Ads</button>` : ''}
+            </div>
+            <div id="ads-history-${esc(listing.id)}" class="ads-history-box hidden">
+              ${adsHistoryHtml}
             </div>
           </div>
 
@@ -368,25 +431,16 @@ import '../../styles/admin-compact.css';
             <div class="payment-card">
               <h3>🗓️ Verified Badge</h3>
               <p class="payment-amount">₹299 · 3 months</p>
-              <p class="payment-status">Status: ${hasMembershipRequest(listing.id, 'verified_badge') ? 'Requested' : 'Not active'}</p>
+              <p class="payment-status">Status: ${verified ? 'Active' : hasVerifiedRequest ? 'Requested' : 'Not active'}</p>
               <p class="free-expiry">Free listing trial expiry: ${esc(trialExpiry || '-')}</p>
-              <div class="collapsible-row">▶ See features & disclaimer</div>
-              <label class="checkbox-label">
-                <input type="checkbox" class="verified-disclaimer" data-listing-id="${esc(listing.id)}" />
-                <span>I understand this badge helps users trust my listing. Calls and bookings depend on user demand, location and availability.</span>
-              </label>
+              <label class="checkbox-label"><input type="checkbox" class="verified-disclaimer" data-listing-id="${esc(listing.id)}" /><span>I understand this badge helps users trust my listing. Calls and bookings depend on user demand, location and availability.</span></label>
               ${renderRequestButton(listing, 'verified_badge', 299, 'Get Verified Badge')}
             </div>
-
             <div class="payment-card boost-card">
               <h3>⭐ Visibility Boost</h3>
               <p class="selected-plan">Auto selected plan: ${esc(visibilityPlan.label)} · ₹${visibilityPlan.amount_inr}</p>
-              <p class="payment-status">Status: ${hasMembershipRequest(listing.id, visibilityPlan.plan_type) ? 'Requested' : 'Not active'}</p>
-              <div class="collapsible-row">▶ See features & disclaimer</div>
-              <label class="checkbox-label">
-                <input type="checkbox" class="visibility-disclaimer" data-listing-id="${esc(listing.id)}" />
-                <span>I understand boost can help my listing appear with more visibility. Results depend on city, vehicle type and user demand.</span>
-              </label>
+              <p class="payment-status">Status: ${ad ? 'Active' : hasBoostRequest ? 'Requested' : 'Not active'}</p>
+              <label class="checkbox-label"><input type="checkbox" class="visibility-disclaimer" data-listing-id="${esc(listing.id)}" /><span>I understand boost can help my listing appear with more visibility. Results depend on city, vehicle type and user demand.</span></label>
               ${renderRequestButton(listing, visibilityPlan.plan_type, visibilityPlan.amount_inr, 'Boost Visibility')}
             </div>
           </div>
@@ -397,8 +451,21 @@ import '../../styles/admin-compact.css';
             <a class="btn btn-outline btn-small" href="/rent-vehicle?tab=register">Add New</a>
             ${status !== 'cancelled' ? `<button class="btn btn-danger btn-small delete-listing-btn" type="button" data-listing-id="${esc(listing.id)}">Delete</button>` : ''}
           </div>
-        </article>
-      `;
+        </article>`;
+    }
+
+    function renderOwnerBrandPanel() {
+      const panel = document.getElementById('owner-brand-panel');
+      const avatar = document.getElementById('owner-brand-avatar');
+      const display = document.getElementById('owner-brand-display');
+      const input = document.getElementById('owner-brand-name-input');
+      if (!panel || !currentUser?.email) return;
+      const name = ownerProfile?.company_name || 'Owner Brand';
+      const logo = ownerProfile?.company_logo ? photoUrl(ownerProfile.company_logo) : '';
+      panel.classList.remove('hidden');
+      if (display) display.textContent = name;
+      if (input) input.value = ownerProfile?.company_name || '';
+      if (avatar) avatar.innerHTML = logo ? `<img src="${esc(logo)}" alt="${esc(name)}" />` : '<span>🏢</span>';
     }
 
     function renderListings() {
@@ -406,46 +473,24 @@ import '../../styles/admin-compact.css';
       const loader = document.getElementById('listings-loader');
       if (loader) loader.classList.add('hidden');
       if (!grid) return;
-
       if (!currentUser) {
-        grid.innerHTML = `
-          <div class="empty-card">
-            <h3>Login required</h3>
-            <p>Please login with Google to view your vehicle listings.</p>
-          </div>
-        `;
+        grid.innerHTML = '<div class="empty-card"><h3>Login required</h3><p>Please login with Google to view your vehicle listings.</p></div>';
         return;
       }
-
       const visibleListings = currentListings.filter((item) => item.status !== 'cancelled');
-
       if (!visibleListings.length) {
-        grid.innerHTML = `
-          <div class="empty-card">
-            <h3>No listings yet</h3>
-            <p>Create your first vehicle listing and it will appear here.</p>
-            <a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a>
-          </div>
-        `;
+        grid.innerHTML = '<div class="empty-card"><h3>No listings yet</h3><p>Create your first vehicle listing and it will appear here.</p><a href="/rent-vehicle?tab=register" class="btn btn-primary">+ Add New Vehicle Listing</a></div>';
         return;
       }
-
       grid.innerHTML = visibleListings.map(renderListingCard).join('');
     }
 
     async function refreshSession() {
       const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Session error:', error);
-        currentUser = null;
-      } else {
-        currentUser = data.session?.user || null;
-      }
-
+      currentUser = error ? null : data.session?.user || null;
       const loginEmail = document.getElementById('login-email');
       const loginBtn = document.getElementById('login-btn');
       const logoutBtn = document.getElementById('logout-btn');
-
       if (currentUser?.email) {
         if (loginEmail) loginEmail.textContent = currentUser.email;
         loginBtn?.classList.add('hidden');
@@ -455,31 +500,22 @@ import '../../styles/admin-compact.css';
         loginBtn?.classList.remove('hidden');
         logoutBtn?.classList.add('hidden');
       }
-
       return currentUser;
     }
 
     async function loginWithGoogle() {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/owner/rent-dashboard`,
-        },
-      });
-
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/owner/rent-dashboard` } });
       if (error) showMessage(error.message, 'error');
     }
 
     async function logout() {
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
-      }
-
+      if (error) return showMessage(error.message, 'error');
       currentUser = null;
       currentListings = [];
+      ownerProfile = null;
       await refreshSession();
+      renderOwnerBrandPanel();
       renderListings();
       showMessage('Logged out successfully.', 'success');
     }
@@ -490,62 +526,55 @@ import '../../styles/admin-compact.css';
         loader.textContent = 'Loading your listings...';
         loader.classList.remove('hidden');
       }
-
       if (!currentUser?.id) {
         currentListings = [];
         renderListings();
         return;
       }
-
       const { data, error } = await supabase
         .from('rent_listings')
-        .select(`
-          id,
-          owner_user_id,
-          owner_email,
-          owner_name,
-          owner_phone,
-          owner_whatsapp,
-          reg_number,
-          vehicle_type,
-          vehicle_model,
-          seats,
-          purposes,
-          base_city_id,
-          service_city_ids,
-          price_text,
-          photos,
-          description,
-          status,
-          created_at,
-          updated_at,
-          is_verified
-        `)
+        .select('id,owner_user_id,owner_email,owner_name,owner_phone,owner_whatsapp,reg_number,vehicle_type,vehicle_model,seats,purposes,base_city_id,service_city_ids,price_text,photos,description,status,created_at,updated_at,is_verified')
         .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
         .order('updated_at', { ascending: false });
-
       if (error) {
-        console.error('Load listings error:', error);
         showMessage(error.message, 'error');
         currentListings = [];
         renderListings();
         return;
       }
-
       currentListings = Array.isArray(data) ? data : [];
-      await Promise.all([loadEventCounts(), loadMembershipRequests()]);
+      await Promise.all([loadEventCounts(), loadMembershipRequests(), loadActiveMemberships(), loadOwnerProfile()]);
+      renderOwnerBrandPanel();
       hideMessage();
       renderListings();
     }
 
+    async function loadOwnerProfile() {
+      ownerProfile = null;
+      if (!currentUser?.email) return;
+      const { data, error } = await supabase
+        .from('rent_owner_profiles')
+        .select('owner_email,company_name,company_logo,status')
+        .eq('owner_email', currentUser.email)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (error) {
+        console.warn('Owner profile load failed:', error);
+        return;
+      }
+      ownerProfile = data || null;
+    }
+
     async function loadEventCounts() {
       eventCountsByListing = {};
+      eventsByListing = {};
+
       const listingIds = currentListings.map((item) => item.id).filter(Boolean);
       if (!listingIds.length) return;
 
       const { data, error } = await supabase
         .from('rent_listing_events')
-        .select('listing_id,event_type')
+        .select('listing_id,event_type,created_at')
         .in('listing_id', listingIds);
 
       if (error) {
@@ -554,59 +583,152 @@ import '../../styles/admin-compact.css';
       }
 
       (data || []).forEach((event) => {
-        const listingId = event.listing_id;
-        const eventType = event.event_type;
-        if (!listingId || !eventType) return;
-        if (!eventCountsByListing[listingId]) eventCountsByListing[listingId] = {};
-        eventCountsByListing[listingId][eventType] = (eventCountsByListing[listingId][eventType] || 0) + 1;
+        if (!event.listing_id || !event.event_type) return;
+
+        if (!eventsByListing[event.listing_id]) {
+          eventsByListing[event.listing_id] = [];
+        }
+        eventsByListing[event.listing_id].push(event);
+
+        if (!eventCountsByListing[event.listing_id]) {
+          eventCountsByListing[event.listing_id] = {};
+        }
+
+        eventCountsByListing[event.listing_id][event.event_type] =
+          (eventCountsByListing[event.listing_id][event.event_type] || 0) + 1;
       });
+    }
+
+async function refreshDashboardStats() {
+  const btn = document.getElementById('refresh-stats-btn');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+  }
+
+  try {
+    await loadEventCounts();
+    await loadActiveMemberships();
+    renderListings();
+    showMessage('Stats refreshed.', 'success');
+  } catch (error) {
+    console.warn('Refresh stats failed:', error);
+    showMessage('Stats refresh failed. Please try again.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔄 Refresh Stats';
+    }
+  }
+}
+
+    async function stopCurrentAds(listingId) {
+      const ad = getAdMembership(listingId);
+
+      if (!ad) {
+        showMessage('No active ads found for this listing.', 'info');
+        return;
+      }
+
+      if (!confirm('Stop ads for this listing? Current ads stats will become 0 and old data will move to history.')) {
+        return;
+      }
+
+      showMessage('Stopping ads...', 'info');
+
+      const now = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('rent_memberships')
+        .update({
+          ads_status: 'inactive',
+          expires_at: now,
+          updated_at: now,
+        })
+        .eq('id', ad.id);
+
+      if (error) {
+        showMessage(error.message, 'error');
+        return;
+      }
+
+      await loadActiveMemberships();
+      await loadEventCounts();
+      renderListings();
+
+      showMessage('Ads stopped. Current ads stats are now 0. Old campaign moved to history.', 'success');
     }
 
     async function loadMembershipRequests() {
       membershipRequests = [];
       if (!currentUser?.id) return;
-
       const { data, error } = await supabase
         .from('rent_membership_requests')
-        .select('id,listing_id,plan_type,amount_inr,status,created_at')
+        .select('id,listing_id,plan_type,amount_inr,status,created_at,duration_months')
         .eq('owner_user_id', currentUser.id)
         .order('created_at', { ascending: false });
-
       if (error) {
         console.warn('Membership request load failed:', error);
         return;
       }
-
       membershipRequests = Array.isArray(data) ? data : [];
     }
 
-    async function requestMembership(listingId, planType, amountInr, sourceButton = null) {
-      if (!currentUser?.id || !currentUser?.email) {
-        showMessage('Please login first.', 'error');
+    async function loadActiveMemberships() {
+      activeMembershipsByListing = {};
+      allAdMembershipsByListing = {};
+
+      const listingIds = currentListings.map((item) => item.id).filter(Boolean);
+      if (!listingIds.length) return;
+
+      const { data, error } = await supabase
+        .from('rent_memberships')
+        .select('id,listing_id,plan_type,status,ads_status,starts_at,expires_at,created_at,payment_status')
+        .in('listing_id', listingIds);
+
+      if (error) {
+        console.warn('Active membership load failed:', error);
         return;
       }
 
+      const now = Date.now();
+
+      (data || []).forEach((item) => {
+        if (!item.listing_id) return;
+
+        if (item.plan_type === 'featured') {
+          if (!allAdMembershipsByListing[item.listing_id]) {
+            allAdMembershipsByListing[item.listing_id] = [];
+          }
+          allAdMembershipsByListing[item.listing_id].push(item);
+        }
+
+        const startsOk =
+          !item.starts_at || new Date(item.starts_at).getTime() <= now;
+
+        const expiresOk =
+          item.expires_at && new Date(item.expires_at).getTime() > now;
+
+        if (item.status !== 'active' || !startsOk || !expiresOk) return;
+
+        if (!activeMembershipsByListing[item.listing_id]) {
+          activeMembershipsByListing[item.listing_id] = [];
+        }
+
+        activeMembershipsByListing[item.listing_id].push(item);
+      });
+    }
+
+    async function requestMembership(listingId, planType, amountInr) {
+      if (!currentUser?.id || !currentUser?.email) return showMessage('Please login first.', 'error');
       const listing = currentListings.find((item) => item.id === listingId);
-      if (!listing) {
-        showMessage('Listing not found.', 'error');
-        return;
-      }
-
+      if (!listing) return showMessage('Listing not found.', 'error');
       const checkboxClass = planType === 'verified_badge' ? '.verified-disclaimer' : '.visibility-disclaimer';
-      const checkbox = document.querySelector(`${checkboxClass}[data-listing-id="${listingId}"]`);
-
-      if (!checkbox?.checked) {
-        showMessage('Please tick disclaimer first.', 'error');
-        return;
-      }
-
-      if (hasMembershipRequest(listingId, planType)) {
-        showMessage('Request already exists for this plan.', 'info');
-        return;
-      }
-
+      const checkbox = document.querySelector(`${checkboxClass}[data-listing-id="${CSS.escape(listingId)}"]`);
+      if (!checkbox?.checked) return showMessage('Please tick disclaimer first.', 'error');
+      if (hasMembershipRequest(listingId, planType)) return showMessage('Request already exists for this plan.', 'info');
       showMessage('Saving request...', 'info');
-
       const { error } = await supabase.from('rent_membership_requests').insert({
         listing_id: listingId,
         owner_user_id: currentUser.id,
@@ -618,912 +740,915 @@ import '../../styles/admin-compact.css';
         note: 'Owner requested membership from dashboard. Payment gateway/admin activation pending.',
         updated_at: new Date().toISOString(),
       });
-
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
-      }
-
-      const successText =
-  planType === 'verified_badge'
-    ? 'Verified Badge request submitted. Admin will review and activate it.'
-    : 'Visibility Boost request submitted. Admin will review and activate it.';
-
-showMessage(successText, 'success');
-alert(successText);
+      if (error) return showMessage(error.message, 'error');
+      showMessage(planType === 'verified_badge' ? 'Verified Badge request submitted.' : 'Visibility Boost request submitted.', 'success');
       await loadMembershipRequests();
       renderListings();
     }
-function cleanPhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
 
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return digits.slice(2);
-  }
+    function cleanPhone(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+      if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+      return digits;
+    }
 
-  if (digits.length === 11 && digits.startsWith('0')) {
-    return digits.slice(1);
-  }
-
-  return digits;
-}
-
-async function saveListingContact(listingId) {
-  if (!currentUser?.id || !currentUser?.email) {
-    showMessage('Please login first.', 'error');
-    return;
-  }
-
-  const phoneInput = document.querySelector(`.edit-phone-input[data-listing-id="${listingId}"]`);
-  const whatsappInput = document.querySelector(`.edit-whatsapp-input[data-listing-id="${listingId}"]`);
-
-  const phone = cleanPhone(phoneInput?.value || '');
-  const whatsapp = cleanPhone(whatsappInput?.value || '');
-
-  if (!/^\d{10}$/.test(phone)) {
-    showMessage('Please enter valid 10 digit phone number.', 'error');
-    return;
-  }
-
-  if (!/^\d{10}$/.test(whatsapp)) {
-    showMessage('Please enter valid 10 digit WhatsApp number.', 'error');
-    return;
-  }
-
-  showMessage('Updating contact...', 'info');
-
-  const { error } = await supabase
-    .from('rent_listings')
-    .update({
-      owner_phone: phone,
-      owner_whatsapp: whatsapp,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', listingId)
-    .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`);
-
-  if (error) {
-    showMessage(error.message, 'error');
-    return;
-  }
-
-  showMessage('Contact updated successfully.', 'success');
-
-  await loadListings();
-}
-    async function deleteListing(listingId) {
-      if (!currentUser?.id) {
-        showMessage('Please login first.', 'error');
-        return;
-      }
-
-      if (!confirm('Delete this listing? It will be removed from public search.')) return;
-
-      showMessage('Deleting listing...', 'info');
-
-      const { data, error } = await supabase
+    async function saveListingContact(listingId) {
+      if (!currentUser?.id || !currentUser?.email) return showMessage('Please login first.', 'error');
+      const phoneInput = document.querySelector(`.edit-phone-input[data-listing-id="${CSS.escape(listingId)}"]`);
+      const whatsappInput = document.querySelector(`.edit-whatsapp-input[data-listing-id="${CSS.escape(listingId)}"]`);
+      const phone = cleanPhone(phoneInput?.value || '');
+      const whatsapp = cleanPhone(whatsappInput?.value || '');
+      if (!/^\d{10}$/.test(phone)) return showMessage('Please enter valid 10 digit phone number.', 'error');
+      if (!/^\d{10}$/.test(whatsapp)) return showMessage('Please enter valid 10 digit WhatsApp number.', 'error');
+      showMessage('Updating contact...', 'info');
+      const { error } = await supabase
         .from('rent_listings')
-        .update({
-          status: 'cancelled',
-          updated_at: new Date().toISOString(),
-        })
+        .update({ owner_phone: phone, owner_whatsapp: whatsapp, updated_at: new Date().toISOString() })
         .eq('id', listingId)
-        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
-        .select('id,status')
-        .single();
+        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`);
+      if (error) return showMessage(error.message, 'error');
+      showMessage('Contact updated successfully.', 'success');
+      await loadMyListings();
+    }
 
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
+    async function saveOwnerBrand() {
+      if (!currentUser?.id || !currentUser?.email) return showMessage('Please login first.', 'error');
+      const nameInput = document.getElementById('owner-brand-name-input');
+      const logoInput = document.getElementById('owner-brand-logo-input');
+      const companyName = String(nameInput?.value || '').trim();
+      const file = logoInput?.files?.[0] || null;
+      let companyLogo = ownerProfile?.company_logo || '';
+      try {
+        if (file) {
+          if (!file.type.startsWith('image/')) return showMessage('Please upload an image file.', 'error');
+          const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+          const path = `${currentUser.id}/logos/${Date.now()}-company-logo.${ext}`;
+          const { error: uploadError } = await supabase.storage.from(PHOTO_BUCKET).upload(path, file, {
+            cacheControl: '31536000',
+            upsert: false,
+            contentType: file.type || 'image/jpeg',
+          });
+          if (uploadError) throw uploadError;
+          companyLogo = path;
+        }
+        const { error } = await supabase.from('rent_owner_profiles').upsert(
+          {
+            owner_user_id: currentUser.id,
+            owner_email: currentUser.email,
+            company_name: companyName,
+            company_logo: companyLogo,
+            logo_bucket: PHOTO_BUCKET,
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'owner_email' }
+        );
+        if (error) throw error;
+        showMessage('Brand/logo saved successfully.', 'success');
+        await loadOwnerProfile();
+        renderOwnerBrandPanel();
+        renderListings();
+      } catch (error) {
+        console.error('Save brand error:', error);
+        showMessage(error?.message || 'Logo save failed.', 'error');
       }
+    }
 
-      currentListings = currentListings.map((item) => {
-        if (item.id === listingId) return { ...item, status: 'cancelled' };
-        return item;
-      });
-
+    async function deleteListing(listingId) {
+      if (!currentUser?.id) return showMessage('Please login first.', 'error');
+      if (!confirm('Delete this listing? It will be removed from public search.')) return;
+      showMessage('Deleting listing...', 'info');
+      const { error } = await supabase
+        .from('rent_listings')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', listingId)
+        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`);
+      if (error) return showMessage(error.message, 'error');
+      currentListings = currentListings.map((item) => item.id === listingId ? { ...item, status: 'cancelled' } : item);
       showMessage('Listing deleted from public search.', 'success');
       renderListings();
-      console.log('Deleted listing:', data);
+    }
+
+    function showFeatureNote(type) {
+      const box = document.getElementById('feature-note');
+      if (!box) return;
+      const notes = {
+        verified: 'Verified Badge is a trust badge only. Admin/payment activation will come later. It does not guarantee calls or bookings.',
+        small: 'Small Vehicle Visibility is for Toto/Auto paid boost. Paid ads tracking is pending until payment activation.',
+        medium: 'Car/Pickup/Ambulance Visibility will start only after payment integration is connected.',
+        bus: 'Bus Visibility will start only after payment integration is connected.',
+      };
+      box.textContent = notes[type] || 'Feature details coming soon.';
+      box.classList.remove('hidden');
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('login-btn')?.addEventListener('click', loginWithGoogle);
       document.getElementById('logout-btn')?.addEventListener('click', logout);
-
-      document.querySelectorAll('.plan-feature-btn').forEach((btn) => {
-        btn.addEventListener('click', () => showFeatureNote(btn.dataset.feature));
+      document.getElementById('refresh-stats-btn')?.addEventListener('click', refreshDashboardStats);
+      document.getElementById('save-owner-brand-btn')?.addEventListener('click', saveOwnerBrand);
+      document.getElementById('owner-brand-logo-input')?.addEventListener('change', (event) => {
+        const file = event.target?.files?.[0];
+        if (!file || !file.type.startsWith('image/')) return;
+        const avatar = document.getElementById('owner-brand-avatar');
+        if (avatar) avatar.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Selected logo preview" />`;
       });
-
-      document.addEventListener('click', (event) => {
+      document.querySelectorAll('.plan-feature-btn').forEach((btn) => btn.addEventListener('click', () => showFeatureNote(btn.dataset.feature)));
+      document.addEventListener('click', async (event) => {
         const target = event.target;
+
+        const historyBtn = target.closest('.ads-history-toggle');
+        if (historyBtn) {
+          const listingId = historyBtn.dataset.listingId;
+          const box = document.getElementById(`ads-history-${listingId}`);
+          box?.classList.toggle('hidden');
+          return;
+        }
+
+        const expireBtn = target.closest('.expire-ads-btn');
+        if (expireBtn) {
+          const listingId = expireBtn.dataset.listingId;
+          if (listingId) await stopCurrentAds(listingId);
+          return;
+        }
 
         const requestBtn = target.closest('.request-plan-btn');
         if (requestBtn && !requestBtn.disabled) {
           const listingId = requestBtn.dataset.listingId;
           const planType = requestBtn.dataset.planType;
           const amount = Number(requestBtn.dataset.amount || 0);
-          if (listingId && planType) requestMembership(listingId, planType, amount, requestBtn);
+          if (listingId && planType) requestMembership(listingId, planType, amount);
           return;
         }
         const editBtn = target.closest('.edit-contact-btn');
-if (editBtn) {
-  const listingId = editBtn.dataset.listingId;
-  const box = document.getElementById(`contact-edit-${listingId}`);
-  if (box) box.classList.toggle('hidden');
-  return;
-}
-
-const cancelEditBtn = target.closest('.cancel-contact-edit-btn');
-if (cancelEditBtn) {
-  const listingId = cancelEditBtn.dataset.listingId;
-  const box = document.getElementById(`contact-edit-${listingId}`);
-  if (box) box.classList.add('hidden');
-  return;
-}
-
-const saveContactBtn = target.closest('.save-contact-btn');
-if (saveContactBtn) {
-  const listingId = saveContactBtn.dataset.listingId;
-  if (listingId) saveListingContact(listingId);
-  return;
-}
+        if (editBtn) {
+          const box = document.getElementById(`contact-edit-${editBtn.dataset.listingId}`);
+          if (box) box.classList.toggle('hidden');
+          return;
+        }
+        const cancelEditBtn = target.closest('.cancel-contact-edit-btn');
+        if (cancelEditBtn) {
+          const box = document.getElementById(`contact-edit-${cancelEditBtn.dataset.listingId}`);
+          if (box) box.classList.add('hidden');
+          return;
+        }
+        const saveContactBtn = target.closest('.save-contact-btn');
+        if (saveContactBtn) {
+          const listingId = saveContactBtn.dataset.listingId;
+          if (listingId) saveListingContact(listingId);
+          return;
+        }
         const deleteBtn = target.closest('.delete-listing-btn');
         if (deleteBtn) {
           const listingId = deleteBtn.dataset.listingId;
           if (listingId) deleteListing(listingId);
           return;
         }
-
         const photoBtn = target.closest('.dashboard-photo-open');
         if (photoBtn) {
           const url = photoBtn.dataset.photoUrl;
           if (url) window.open(url, '_blank', 'noopener,noreferrer');
         }
       });
-
       await refreshSession();
-      await loadMyListings();
+await loadMyListings();
+
+setInterval(async () => {
+  if (!currentUser?.id || !currentListings.length) return;
+  await loadEventCounts();
+  await loadActiveMemberships();
+  renderListings();
+}, 15000);
     });
   </script>
 
   <style is:global>
-    .dashboard-page {
-      background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
-      min-height: 100vh;
-      padding: 2rem 0 4rem;
-      color: white;
-    }
+  :root {
+    --dash-bg: #0b0628;
+    --dash-panel: rgba(255, 255, 255, 0.055);
+    --dash-panel-2: rgba(255, 255, 255, 0.075);
+    --dash-border: rgba(255, 255, 255, 0.14);
+    --dash-text: #ffffff;
+    --dash-muted: rgba(255, 255, 255, 0.76);
+    --dash-orange: #ff7a00;
+  }
 
+  .dashboard-page {
+    min-height: 100vh;
+    padding: 0.75rem 0 1.75rem !important;
+    background: linear-gradient(135deg, #0b0628 0%, #120844 55%, #1a0e38 100%);
+    color: var(--dash-text);
+  }
+
+  .dashboard-container {
+    width: min(100%, 680px) !important;
+    max-width: 680px !important;
+    margin: 0 auto !important;
+    padding: 0 0.65rem !important;
+  }
+
+  .dashboard-page * {
+    box-sizing: border-box;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .dashboard-header {
+    display: grid !important;
+    grid-template-columns: 1fr auto;
+    gap: 0.65rem !important;
+    align-items: center !important;
+    margin: 0 0 0.65rem !important;
+  }
+
+  .header-content h1 {
+    margin: 0 0 0.18rem !important;
+    color: #fff !important;
+    font-size: 1.28rem !important;
+    line-height: 1.12 !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.03em;
+  }
+
+  .header-content p {
+    margin: 0 !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 30px !important;
+    padding: 0.38rem 0.68rem !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    font-weight: 850 !important;
+    font-size: 0.72rem !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .btn-primary,
+  .btn-orange {
+    color: #fff !important;
+    border-color: transparent !important;
+    background: linear-gradient(135deg, #ff6b00, #ff8a00) !important;
+  }
+
+  .btn-outline {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.035) !important;
+  }
+
+  .btn-danger {
+    color: #fecaca !important;
+    background: rgba(239, 68, 68, 0.18) !important;
+    border-color: rgba(239, 68, 68, 0.35) !important;
+  }
+
+  .btn-disabled,
+  .btn:disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+  }
+
+  .logged-in-card,
+  .free-notice,
+  .owner-brand-panel,
+  .plan-card,
+  .dashboard-listing-card,
+  .performance-box,
+  .ads-box,
+  .payment-card,
+  .empty-card,
+  .loading-card,
+  .dashboard-message,
+  .feature-note {
+    border: 1px solid var(--dash-border) !important;
+    border-radius: 0.9rem !important;
+    background: var(--dash-panel) !important;
+  }
+
+  .logged-in-card {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    padding: 0.65rem 0.75rem !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  .login-label {
+    margin: 0 0 0.2rem !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.68rem !important;
+    line-height: 1 !important;
+  }
+
+  .login-email {
+    margin: 0 !important;
+    color: #fff !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    word-break: break-all;
+  }
+
+  .auth-actions {
+    display: flex !important;
+    gap: 0.4rem !important;
+    flex-shrink: 0;
+  }
+
+  .dashboard-message,
+  .feature-note {
+    padding: 0.65rem 0.75rem !important;
+    margin-bottom: 0.65rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 850 !important;
+  }
+
+  .dashboard-message.info { background: rgba(59, 130, 246, 0.14) !important; color: #bfdbfe !important; }
+  .dashboard-message.success { background: rgba(34, 197, 94, 0.14) !important; color: #bbf7d0 !important; }
+  .dashboard-message.error { background: rgba(239, 68, 68, 0.14) !important; color: #fecaca !important; }
+
+  .owner-brand-panel {
+    margin-bottom: 0.7rem !important;
+    overflow: hidden !important;
+  }
+
+  .brand-cover {
+    height: 44px !important;
+    background: radial-gradient(circle at 16% 24%, rgba(255, 138, 0, 0.5), transparent 30%), linear-gradient(135deg, rgba(255, 107, 0, 0.52), rgba(36, 20, 88, 0.78)) !important;
+  }
+
+  .brand-main-row {
+    display: grid !important;
+    grid-template-columns: 46px 1fr !important;
+    gap: 0.6rem !important;
+    align-items: end !important;
+    margin-top: -22px !important;
+    padding: 0 0.7rem 0.55rem !important;
+  }
+
+  .owner-brand-avatar,
+  .listing-brand-avatar {
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 999px !important;
+    border: 2px solid rgba(255, 255, 255, 0.25) !important;
+    background: rgba(10, 7, 42, 0.95) !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+  }
+
+  .owner-brand-avatar img,
+  .listing-brand-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  .brand-copy h2 {
+    margin: 0 !important;
+    color: #fff !important;
+    font-size: 1rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .brand-copy p {
+    margin: 0.12rem 0 0 !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.72rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .brand-form-row {
+    display: grid !important;
+    grid-template-columns: 1fr 0.9fr auto !important;
+    gap: 0.45rem !important;
+    align-items: end !important;
+    padding: 0 0.7rem 0.7rem !important;
+  }
+
+  .brand-form-row label,
+  .contact-edit-grid label {
+    display: grid !important;
+    gap: 0.25rem !important;
+    color: #fff !important;
+    font-size: 0.68rem !important;
+    font-weight: 850 !important;
+  }
+
+  .brand-form-row input[type='text'],
+  .contact-edit-grid input {
+    min-height: 32px !important;
+    border-radius: 0.55rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    background: rgba(10, 7, 42, 0.72) !important;
+    color: #fff !important;
+    padding: 0.38rem 0.55rem !important;
+    font-size: 0.74rem !important;
+  }
+
+  .free-notice {
+    display: grid !important;
+    grid-template-columns: 34px 1fr !important;
+    gap: 0.55rem !important;
+    padding: 0.65rem 0.75rem !important;
+    margin-bottom: 0.7rem !important;
+    background: linear-gradient(135deg, rgba(255, 107, 0, 0.12), rgba(255, 138, 0, 0.07)) !important;
+    border-color: rgba(255, 107, 0, 0.26) !important;
+  }
+
+  .notice-icon {
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+  }
+
+  .notice-content h3 {
+    margin: 0 0 0.12rem !important;
+    color: #fff !important;
+    font-size: 0.92rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .notice-content p {
+    margin: 0 !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.72rem !important;
+    line-height: 1.32 !important;
+  }
+
+  .section-title {
+    margin: 0.75rem 0 0.5rem !important;
+  }
+
+  .section-title h2 {
+    margin: 0 !important;
+    color: #fff !important;
+    font-size: 1.08rem !important;
+    line-height: 1.15 !important;
+    font-weight: 900 !important;
+  }
+
+  .plan-cards {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.5rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .plan-card {
+    padding: 0.58rem !important;
+    border-radius: 0.78rem !important;
+  }
+
+  .plan-card h3 {
+    margin: 0 0 0.35rem !important;
+    color: #fff !important;
+    font-size: 0.68rem !important;
+    line-height: 1.22 !important;
+    min-height: 2.05em;
+  }
+
+  .plan-price {
+    margin: 0 !important;
+    color: var(--dash-orange) !important;
+    font-size: 1.02rem !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
+  }
+
+  .plan-duration,
+  .plan-description {
+    margin: 0.18rem 0 0 !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.6rem !important;
+    line-height: 1.22 !important;
+  }
+
+  .plan-feature-btn {
+    margin-top: 0.45rem !important;
+    width: 100% !important;
+    min-height: 26px !important;
+    padding: 0.28rem 0.38rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  .dashboard-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.45rem !important;
+    align-items: center !important;
+    margin: 0.65rem 0 0.75rem !important;
+  }
+
+  .dashboard-actions .btn,
+  #refresh-stats-btn {
+    width: 100% !important;
+  }
+
+  .my-listings-grid {
+    display: grid !important;
+    gap: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .loading-card,
+  .empty-card {
+    padding: 0.85rem !important;
+    color: #fff !important;
+  }
+
+  .dashboard-listing-card {
+    padding: 0.72rem !important;
+    border-radius: 0.92rem !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+  }
+
+  .listing-head {
+    display: grid !important;
+    grid-template-columns: 46px 1fr !important;
+    gap: 0.55rem !important;
+    align-items: start !important;
+  }
+
+  .listing-title-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: start !important;
+    gap: 0.5rem !important;
+  }
+
+  .listing-title-row h3,
+  .listing-head-content h3 {
+    margin: 0 0 0.15rem !important;
+    color: #fff !important;
+    font-size: 0.92rem !important;
+    line-height: 1.12 !important;
+  }
+
+  .listing-main-line,
+  .listing-sub-line,
+  .listing-desc {
+    margin: 0.18rem 0 !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.7rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .listing-sub-line strong {
+    color: #fff !important;
+  }
+
+  .listing-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.3rem !important;
+    align-items: center !important;
+    margin: 0.42rem 0 !important;
+  }
+
+  .listing-badge,
+  .listing-status,
+  .ads-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 22px !important;
+    padding: 0.16rem 0.45rem !important;
+    border-radius: 999px !important;
+    font-size: 0.6rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .status-active { background: rgba(34, 197, 94, 0.2) !important; color: #bbf7d0 !important; }
+  .status-cancelled,
+  .status-rejected { background: rgba(239, 68, 68, 0.18) !important; color: #fecaca !important; }
+  .status-pending { background: rgba(250, 204, 21, 0.16) !important; color: #fef3c7 !important; }
+
+  .badge-free { background: rgba(255, 107, 0, 0.2) !important; color: #fed7aa !important; }
+  .badge-verified,
+  .badge-verified-requested { background: rgba(34, 197, 94, 0.22) !important; color: #bbf7d0 !important; border: 1px solid rgba(34, 197, 94, 0.35) !important; }
+  .badge-boost,
+  .badge-boost-requested { background: rgba(250, 204, 21, 0.18) !important; color: #fde68a !important; border: 1px solid rgba(250, 204, 21, 0.35) !important; }
+
+  .listing-photo-strip {
+    display: grid !important;
+    grid-template-columns: repeat(4, 58px) !important;
+    gap: 0.35rem !important;
+    width: auto !important;
+    max-width: 100% !important;
+    margin-top: 0.5rem !important;
+  }
+
+  .listing-photo-thumb,
+  .listing-photo-empty {
+    width: 58px !important;
+    height: 58px !important;
+    aspect-ratio: 1 / 1 !important;
+    border: 0 !important;
+    border-radius: 0.52rem !important;
+    overflow: hidden !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    display: grid !important;
+    place-items: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .listing-photo-thumb img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  .listing-edit-row,
+  .listing-actions,
+  .contact-edit-actions,
+  .ads-tools-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.38rem !important;
+    align-items: center !important;
+    margin-top: 0.55rem !important;
+  }
+
+  .contact-edit-box {
+    width: 100% !important;
+    margin: 0.5rem 0 !important;
+    padding: 0.6rem !important;
+    border-radius: 0.72rem !important;
+    background: rgba(255, 255, 255, 0.055) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  }
+
+  .contact-edit-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.45rem !important;
+  }
+
+  .performance-box,
+  .ads-box,
+  .payment-card {
+    padding: 0.62rem !important;
+    border-radius: 0.82rem !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .performance-box h4,
+  .ads-box h4,
+  .payment-card h3 {
+    margin: 0 0 0.48rem !important;
+    color: #fff !important;
+    font-size: 0.88rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .performance-grid,
+  .ads-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.42rem !important;
+  }
+
+  .mini-stat {
+    min-height: 42px !important;
+    padding: 0.45rem !important;
+    border-radius: 0.65rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: rgba(10, 7, 42, 0.42) !important;
+  }
+
+  .mini-stat span {
+    display: block !important;
+    margin: 0 0 0.2rem !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.64rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .mini-stat strong {
+    display: block !important;
+    color: #fff !important;
+    font-size: 0.9rem !important;
+    line-height: 1 !important;
+  }
+
+  .ads-box {
+    background: rgba(255, 200, 0, 0.07) !important;
+    border-color: rgba(255, 200, 0, 0.35) !important;
+  }
+
+  .ads-box-active {
+    background: rgba(255, 200, 0, 0.1) !important;
+    border-color: rgba(250, 204, 21, 0.56) !important;
+  }
+
+  .ads-title-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .ads-badge {
+    background: rgba(255, 107, 0, 0.2) !important;
+    color: #fed7aa !important;
+  }
+
+  .ads-history-box {
+    margin-top: 0.55rem !important;
+    display: grid !important;
+    gap: 0.38rem !important;
+  }
+
+  .ads-history-box.hidden {
+    display: none !important;
+  }
+
+  .ads-history-row {
+    display: grid !important;
+    grid-template-columns: 1fr 58px 58px 58px !important;
+    gap: 0.4rem !important;
+    align-items: center !important;
+    padding: 0.45rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 0.65rem !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .ads-history-row strong,
+  .ads-history-row b {
+    color: #fff !important;
+    font-size: 0.72rem !important;
+  }
+
+  .ads-history-row span,
+  .ads-history-empty {
+    display: block !important;
+    color: var(--dash-muted) !important;
+    font-size: 0.62rem !important;
+  }
+
+  .payment-cards {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.55rem !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .payment-card {
+    background: rgba(255, 255, 255, 0.055) !important;
+  }
+
+  .boost-card {
+    background: rgba(255, 200, 0, 0.075) !important;
+    border-color: rgba(255, 200, 0, 0.32) !important;
+  }
+
+  .payment-amount,
+  .selected-plan {
+    margin: 0 0 0.35rem !important;
+    color: var(--dash-orange) !important;
+    font-size: 0.72rem !important;
+    line-height: 1.25 !important;
+    font-weight: 850 !important;
+  }
+
+  .payment-status,
+  .free-expiry,
+  .checkbox-label span {
+    color: var(--dash-muted) !important;
+    font-size: 0.66rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .checkbox-label {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 0.38rem !important;
+    margin: 0 0 0.5rem !important;
+    cursor: pointer !important;
+  }
+
+  .checkbox-label input {
+    width: 13px !important;
+    height: 13px !important;
+    margin-top: 0.05rem !important;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 760px) {
     .dashboard-container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 0 1rem;
+      width: 100% !important;
+      max-width: 100% !important;
     }
 
     .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-      gap: 1rem;
+      grid-template-columns: 1fr !important;
     }
 
-    .header-content h1 {
-      font-size: 1.75rem;
-      margin: 0 0 0.5rem;
-      color: white;
-    }
-
-    .header-content p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.95rem;
-    }
-
-    .logged-in-card,
-    .free-notice,
-    .plan-card,
-    .dashboard-listing-card,
-    .performance-box,
-    .ads-box,
-    .payment-card,
-    .empty-card,
-    .loading-card,
-    .dashboard-message,
-    .feature-note {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 1rem;
-    }
-
-    .logged-in-card {
-      padding: 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-      gap: 1rem;
-    }
-
-    .auth-actions {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-    }
-
-    .login-label {
-      margin: 0 0 0.25rem;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-    }
-
-    .login-email {
-      margin: 0;
-      color: white;
-      font-size: 1rem;
-      font-weight: 700;
-      word-break: break-word;
-    }
-
-    .dashboard-message,
-    .feature-note {
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      font-weight: 800;
-    }
-
-    .feature-note {
-      border-color: rgba(255, 107, 0, 0.35);
-      background: rgba(255, 107, 0, 0.12);
-      color: #fed7aa;
-    }
-
-    .dashboard-message.info {
-      border-color: rgba(59, 130, 246, 0.35);
-      background: rgba(59, 130, 246, 0.14);
-      color: #93c5fd;
-    }
-
-    .dashboard-message.success {
-      border-color: rgba(34, 197, 94, 0.35);
-      background: rgba(34, 197, 94, 0.14);
-      color: #86efac;
-    }
-
-    .dashboard-message.error {
-      border-color: rgba(239, 68, 68, 0.35);
-      background: rgba(239, 68, 68, 0.14);
-      color: #fca5a5;
-    }
-
-    .free-notice {
-      background: linear-gradient(135deg, rgba(255, 107, 0, 0.15), rgba(255, 138, 0, 0.1));
-      border-color: rgba(255, 107, 0, 0.3);
-      padding: 1.25rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .notice-icon {
-      font-size: 1.75rem;
-      flex-shrink: 0;
-    }
-
-    .notice-content h3 {
-      margin: 0 0 0.5rem;
-      color: #ff8a00;
-    }
-
-    .notice-content p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.75rem;
-      font-weight: 800;
-      text-decoration: none;
-      display: inline-block;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-      font-size: 0.95rem;
-      border: 0;
-    }
-
-    .btn-primary,
-    .btn-orange {
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-      color: white;
-      border: none;
-    }
-
-    .btn-outline {
-      background: transparent;
-      color: white;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-    }
-
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.18);
-      color: #fca5a5;
-      border: 1px solid rgba(239, 68, 68, 0.35);
-    }
-
-    .btn-small {
-      padding: 0.5rem 1rem;
-      font-size: 0.85rem;
-    }
-
-    .btn-disabled,
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .section-title {
-      margin: 0 0 1rem;
-    }
-
-    .section-title h2 {
-      margin: 0;
-      font-size: 1.25rem;
-      color: white;
+    .dashboard-header .btn {
+      width: 100% !important;
     }
 
     .plan-cards {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-bottom: 2rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 
-    .plan-card {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
+    .brand-form-row,
+    .payment-cards {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .dashboard-page {
+      padding-top: 0.55rem !important;
     }
 
-    .plan-card h3 {
-      margin: 0 0 0.5rem;
-      font-size: 1rem;
+    .dashboard-container {
+      padding: 0 0.5rem !important;
     }
 
-    .plan-price {
-      font-size: 1.75rem;
-      font-weight: 900;
-      margin-bottom: 0.25rem;
-      color: #ff8a00;
+    .header-content h1 {
+      font-size: 1.12rem !important;
     }
 
-    .plan-duration {
-      margin: 0 0 0.75rem;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-    }
-
-    .plan-description {
-      margin: 0 0 1rem;
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 0.85rem;
-      line-height: 1.4;
-      flex: 1;
+    .header-content p {
+      font-size: 0.72rem !important;
     }
 
     .dashboard-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 2rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 0.32rem !important;
     }
 
-    .my-listings-grid {
-      display: grid;
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .loading-card,
-    .empty-card {
-      padding: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .empty-card h3 {
-      margin: 0 0 0.5rem;
-    }
-
-    .empty-card p {
-      margin: 0 0 1rem;
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    .dashboard-listing-card {
-      padding: 1.25rem;
+    .dashboard-actions .btn,
+    #refresh-stats-btn {
+      min-height: 28px !important;
+      padding-left: 0.35rem !important;
+      padding-right: 0.35rem !important;
+      font-size: 0.62rem !important;
     }
 
     .listing-head {
-      display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: 1rem;
-      align-items: start;
+      grid-template-columns: 42px 1fr !important;
     }
 
-    .listing-image {
-      width: 90px;
-      height: 90px;
-      border-radius: 0.9rem;
-      background: rgba(255, 255, 255, 0.08);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+    .listing-brand-avatar {
+      width: 42px !important;
+      height: 42px !important;
     }
 
-    .listing-image img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-
-    .listing-photo-grid {
-      width: 110px;
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.35rem;
-      flex-shrink: 0;
+    .listing-photo-strip {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      width: 100% !important;
     }
 
     .listing-photo-thumb,
     .listing-photo-empty {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border: 0;
-      border-radius: 0.55rem;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      cursor: pointer;
-    }
-
-    .listing-photo-thumb img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .listing-placeholder {
-      font-size: 2rem;
-    }
-
-    .listing-title-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      align-items: start;
-      margin-bottom: 0.3rem;
-    }
-
-    .listing-head-content h3 {
-      margin: 0;
-      font-size: 1.1rem;
-    }
-
-    .listing-main-line,
-    .listing-sub-line,
-    .listing-desc {
-      margin: 0 0 0.45rem;
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 0.9rem;
-      line-height: 1.4;
-    }
-
-    .listing-sub-line strong {
-      color: white;
-    }
-
-    .listing-meta {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-top: 0.65rem;
-    }
-
-    .listing-status,
-    .listing-badge {
-      padding: 0.25rem 0.7rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 800;
-      background: rgba(255, 255, 255, 0.09);
-      color: rgba(255, 255, 255, 0.82);
-      white-space: nowrap;
-    }
-
-    .status-active {
-      background: rgba(34, 197, 94, 0.2);
-      color: #22c55e;
-    }
-
-    .status-cancelled,
-    .status-rejected {
-      background: rgba(239, 68, 68, 0.18);
-      color: #fca5a5;
-    }
-
-    .status-pending {
-      background: rgba(250, 204, 21, 0.16);
-      color: #fde68a;
-    }
-
-    .badge-free {
-      background: rgba(255, 107, 0, 0.2);
-      color: #ff8a00;
-    }
-
-    .badge-verified {
-      background: rgba(34, 197, 94, 0.2);
-      color: #22c55e;
-    }
-
-    .listing-edit-row {
-      margin-top: 0.85rem;
-    }
-
-    .performance-box {
-      margin-top: 1rem;
-      padding: 1rem;
-    }
-
-    .performance-box h4,
-    .ads-box h4 {
-      margin: 0 0 0.85rem;
-      font-size: 0.95rem;
-      color: white;
+      width: 100% !important;
+      height: auto !important;
     }
 
     .performance-grid,
     .ads-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.6rem;
-    }
-
-    .mini-stat {
-      background: rgba(10, 7, 42, 0.42);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 0.9rem;
-      padding: 0.75rem;
-      min-height: 48px;
-    }
-
-    .mini-stat span {
-      display: block;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 0.82rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .mini-stat strong {
-      color: white;
-      font-size: 1rem;
-    }
-
-    .ads-box {
-      margin-top: 1rem;
-      padding: 1rem;
-      border: 1px solid rgba(255, 200, 0, 0.45);
-      background: rgba(255, 200, 0, 0.08);
-    }
-
-    .ads-title-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: start;
-    }
-
-    .ads-badge {
-      display: inline-block;
-      background: rgba(255, 107, 0, 0.2);
-      color: #ff8a00;
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .payment-cards {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1rem;
-    }
-
-    .per-listing-payment {
-      margin-top: 1rem;
-    }
-
-    .payment-card {
-      padding: 1rem;
-    }
-
-    .boost-card {
-      border-color: rgba(255, 200, 0, 0.42);
-      background: rgba(255, 200, 0, 0.08);
-    }
-
-    .payment-card h3 {
-      margin: 0 0 0.5rem;
-      font-size: 1.05rem;
-    }
-
-    .payment-amount,
-    .selected-plan {
-      margin: 0 0 0.35rem;
-      color: #ff8a00;
-      font-weight: 700;
-    }
-
-    .payment-status,
-    .free-expiry {
-      margin: 0 0 0.75rem;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.85rem;
-    }
-
-    .collapsible-row {
-      background: rgba(255, 107, 0, 0.15);
-      border: 1px solid rgba(255, 107, 0, 0.3);
-      border-radius: 0.6rem;
-      padding: 0.65rem;
-      margin-bottom: 0.85rem;
-      color: #ff8a00;
-      font-size: 0.85rem;
-      font-weight: 800;
-    }
-
-    .checkbox-label {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-      cursor: pointer;
-      margin-bottom: 1rem;
-    }
-
-    .checkbox-label input[type='checkbox'] {
-      width: auto;
-      margin-top: 0.25rem;
-      flex-shrink: 0;
-    }
-
-    .checkbox-label span {
-      color: rgba(255, 255, 255, 0.85);
-      line-height: 1.4;
-      font-size: 0.85rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 
     .listing-actions {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.6rem;
-      margin-top: 1rem;
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 
     .listing-actions .btn,
-    .payment-card .btn {
-      width: 100%;
-      box-sizing: border-box;
+    .listing-edit-row .btn,
+    .ads-tools-row .btn {
+      width: 100% !important;
     }
 
-    @media (max-width: 1024px) {
-      .plan-cards,
-      .payment-cards {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .performance-grid,
-      .ads-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .ads-history-row {
+      grid-template-columns: 1fr !important;
     }
-
-    @media (max-width: 768px) {
-      .dashboard-page {
-        padding: 1.5rem 0 3rem;
-      }
-
-      .dashboard-header,
-      .logged-in-card {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .dashboard-header .btn,
-      .logged-in-card .btn,
-      .auth-actions {
-        width: 100%;
-      }
-
-      .auth-actions {
-        flex-direction: column;
-      }
-
-      .plan-cards,
-      .payment-cards,
-      .dashboard-actions {
-        grid-template-columns: 1fr;
-      }
-
-      .listing-head {
-        grid-template-columns: 1fr;
-      }
-
-      .listing-image {
-        width: 100%;
-        height: 150px;
-      }
-
-      .listing-photo-grid {
-        width: 100%;
-        grid-template-columns: repeat(4, 1fr);
-      }
-
-      .listing-title-row,
-      .ads-title-row {
-        flex-direction: column;
-      }
-
-      .performance-grid,
-      .ads-grid,
-      .listing-actions {
-        grid-template-columns: 1fr;
-      }
-    }
-    /* Owner dashboard tight action UI */
-.listing-edit-row,
-.listing-actions,
-.contact-edit-actions {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 0.45rem !important;
-  align-items: center !important;
-}
-
-.btn.btn-small,
-.listing-actions .btn,
-.listing-edit-row .btn,
-.contact-edit-actions .btn,
-.request-membership-btn {
-  width: auto !important;
-  min-height: 30px !important;
-  padding: 0.38rem 0.65rem !important;
-  border-radius: 0.55rem !important;
-  font-size: 0.72rem !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-}
-
-.payment-card .btn,
-.payment-card button {
-  min-height: 34px !important;
-  padding: 0.45rem 0.7rem !important;
-  font-size: 0.76rem !important;
-  border-radius: 0.6rem !important;
-}
-
-.checkbox-label {
-  align-items: flex-start !important;
-  gap: 0.55rem !important;
-}
-
-.checkbox-label span {
-  font-size: 0.78rem !important;
-  line-height: 1.35 !important;
-  font-weight: 700 !important;
-}
-
-.contact-edit-box {
-  margin-top: 0.65rem;
-  margin-bottom: 0.85rem;
-  padding: 0.75rem;
-  border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.contact-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-  margin-bottom: 0.65rem;
-}
-
-.contact-edit-grid label {
-  display: grid;
-  gap: 0.3rem;
-  color: white;
-  font-weight: 900;
-  font-size: 0.75rem;
-}
-
-.contact-edit-grid input {
-  width: 100%;
-  min-height: 34px;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 7, 42, 0.72);
-  color: white;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.82rem;
-  box-sizing: border-box;
-}
-
-@media (max-width: 640px) {
-  .contact-edit-grid {
-    grid-template-columns: 1fr;
   }
-
-  .listing-actions {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .listing-actions .btn {
-    width: 100% !important;
-  }
-
-  .payment-cards.per-listing-payment {
-    gap: 0.75rem !important;
-  }
-
-  .payment-card {
-    padding: 0.85rem !important;
-  }
-}
-.inline-action-message {
-  margin-top: 0.65rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.65rem;
-  font-size: 0.8rem;
-  font-weight: 900;
-  line-height: 1.35;
-}
-
-.inline-action-message.success {
-  background: rgba(34, 197, 94, 0.16);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #86efac;
-}
-
-.inline-action-message.error {
-  background: rgba(239, 68, 68, 0.16);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
-}
-
-.inline-action-message.info {
-  background: rgba(59, 130, 246, 0.16);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #93c5fd;
-}
-  </style>
+</style>
 </BaseLayout>

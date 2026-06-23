@@ -161,7 +161,7 @@ const listingsForClient = listings.map((listing) => {
   title="Rent with Driver in West Bengal"
   description="Find car, bus, toto, pickup van and ambulance rental with driver in West Bengal."
 >
-  <div class="debug-label">PAGE: RENT VEHICLE</div>
+  
 
   <section class="rent-page">
     <div class="container rent-container">
@@ -269,26 +269,6 @@ const listingsForClient = listings.map((listing) => {
 
         <div id="rental-cards-grid" class="rental-cards-grid"></div>
 
-        <div class="owner-cta-card">
-          <h3>Own a vehicle?</h3>
-          <p>Create a listing and get first 3 months free.</p>
-          <a href="/rent-vehicle?tab=register" class="btn btn-primary">Create Listing</a>
-        </div>
-
-        <div class="trust-cards">
-          <div class="trust-card">
-            <span class="trust-icon">🎉</span>
-            <p>First 3 months free</p>
-          </div>
-          <div class="trust-card">
-            <span class="trust-icon">🔒</span>
-            <p>Public contact after approval</p>
-          </div>
-          <div class="trust-card">
-            <span class="trust-icon">📍</span>
-            <p>City-based matching</p>
-          </div>
-        </div>
       </section>
 
       <section id="create-section" class="rent-panel hidden">
@@ -942,13 +922,104 @@ searchInput.addEventListener("keydown", (event) => {
       btn.disabled = !hasCity;
       btn.textContent = hasCity ? rentT("🔍 Search rentals") : rentT("🔍 Select a city to search");
     }
+const trackedRentViews = new Set();
 
+function getListingById(listingId) {
+  return listings.find((item) => String(item.id) === String(listingId)) || null;
+}
+
+async function trackRentListingEvent(listing, eventType) {
+  if (!listing?.id || !eventType) return;
+
+  const payload = {
+    listing_id: listing.id,
+    event_type: eventType,
+    city_id: listing.base_city_id || state.mainCity?.id || null,
+    vehicle_type: listing.vehicle_type || null,
+    rent_type: Array.isArray(listing.purposes) ? listing.purposes[0] || null : null,
+    user_agent: navigator.userAgent || null,
+  };
+
+  try {
+    const { error } = await supabase.from("rent_listing_events").insert(payload);
+    if (error) {
+      console.warn("Rent event track failed:", error.message, payload);
+    }
+  } catch (error) {
+    console.warn("Rent event track failed:", error, payload);
+  }
+}
+
+function setupRentCardAnalyticsObserver() {
+  const cards = document.querySelectorAll(".rent-pro-card[data-listing-id]");
+  if (!cards.length) return;
+
+  if (!("IntersectionObserver" in window)) {
+    cards.forEach((card) => {
+      const listing = getListingById(card.dataset.listingId);
+      if (!listing) return;
+
+      const viewKey = `${listing.id}:listing_view`;
+      if (!trackedRentViews.has(viewKey)) {
+        trackedRentViews.add(viewKey);
+        void trackRentListingEvent(listing, "listing_view");
+      }
+
+      if (listing.is_promoted) {
+        const adKey = `${listing.id}:ad_impression`;
+        if (!trackedRentViews.has(adKey)) {
+          trackedRentViews.add(adKey);
+          void trackRentListingEvent(listing, "ad_impression");
+        }
+      }
+    });
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+
+        const card = entry.target;
+        const listing = getListingById(card.dataset.listingId);
+
+        if (!listing) {
+          observer.unobserve(card);
+          return;
+        }
+
+        const viewKey = `${listing.id}:listing_view`;
+        if (!trackedRentViews.has(viewKey)) {
+          trackedRentViews.add(viewKey);
+          void trackRentListingEvent(listing, "listing_view");
+        }
+
+        if (listing.is_promoted) {
+          const adKey = `${listing.id}:ad_impression`;
+          if (!trackedRentViews.has(adKey)) {
+            trackedRentViews.add(adKey);
+            void trackRentListingEvent(listing, "ad_impression");
+          }
+        }
+
+        observer.unobserve(card);
+      });
+    },
+    { threshold: 0.35 }
+  );
+
+  cards.forEach((card) => {
+    const listingId = card.dataset.listingId;
+    if (!listingId || trackedRentViews.has(`${listingId}:listing_view`)) return;
+    observer.observe(card);
+  });
+}
     function whatsappNumber(listing) {
       const raw = onlyDigits(listing.owner_whatsapp || listing.owner_phone || "");
       if (raw.length === 10) return `91${raw}`;
       return raw;
     }
-
     function listingMatches(listing) {
       const cityIds = [
         state.mainCity?.id,
@@ -1214,6 +1285,7 @@ searchInput.addEventListener("keydown", (event) => {
   }
 
   grid.innerHTML = filtered.map(renderCard).join("");
+requestAnimationFrame(setupRentCardAnalyticsObserver);
 }
     function setupSingleChipGroup(groupId, stateKey) {
       const chips = Array.from(document.querySelectorAll(`#${groupId} .rent-chip`));
@@ -1253,6 +1325,7 @@ searchInput.addEventListener("keydown", (event) => {
 
     function showTab(activeTab) {
       const isCreate = activeTab === "create" || activeTab === "register";
+      document.body.classList.toggle("show-create-rent-form", isCreate);
 
       document.getElementById("find-tab")?.classList.toggle("active", !isCreate);
       document.getElementById("create-tab")?.classList.toggle("active", isCreate);
@@ -1807,6 +1880,36 @@ async function handlePostLoginRestore() {
     document.addEventListener("DOMContentLoaded", () => {
       showTab(tab);
       applyRentLanguage();
+      document.addEventListener("click", (event) => {
+  const card = event.target.closest(".rent-pro-card[data-listing-id]");
+  if (!card) return;
+
+  const listing = getListingById(card.dataset.listingId);
+  if (!listing) return;
+
+  if (event.target.closest(".rent-call-btn")) {
+    void trackRentListingEvent(listing, "call_click");
+    if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
+    return;
+  }
+
+  if (event.target.closest(".rent-wa-btn")) {
+    void trackRentListingEvent(listing, "whatsapp_click");
+    if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
+    return;
+  }
+
+  if (event.target.closest(".photo-btn")) {
+    void trackRentListingEvent(listing, "photo_open");
+    return;
+  }
+
+  if (event.target.closest(".rent-detail-btn")) {
+    void trackRentListingEvent(listing, "view_details_click");
+    if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
+    return;
+  }
+});
 
 document.addEventListener("click", (event) => {
   const langButton = event.target?.closest?.("button, a, [data-lang], [data-language]");
@@ -3457,5 +3560,23 @@ if (reportBtn) {
     font-size: 0.64rem !important;
   }
 }
+ /* FINAL: no duplicate owner/listing promo block below search results */
+#find-section .owner-cta-card,
+#find-section .trust-cards {
+  display: none !important;
+}
+/* FINAL FIX: find tab par create listing form/promo blocks kabhi show na ho */
+body:has(#find-tab.active) #create-section,
+body:has(#find-tab.active) .owner-cta-card,
+body:has(#find-tab.active) .trust-cards {
+  display: none !important;
+}
+
+/* fallback */
+#create-section.hidden,
+.rent-panel.hidden {
+  display: none !important;
+}
+  
   </style>
 </BaseLayout>
