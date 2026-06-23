@@ -1,0 +1,1042 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { supabase } from '../../lib/supabase';
+import '../../styles/rent-seo.css';
+
+const SITE_URL = 'https://soniabuddy.in';
+const PHOTO_BUCKET = 'rent-listing-photos';
+
+type RentCity = {
+  id: string;
+  name?: string | null;
+  name_en?: string | null;
+  name_bn?: string | null;
+};
+
+type RentListing = {
+  id: string;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_whatsapp: string | null;
+  vehicle_type: string | null;
+  vehicle_model: string | null;
+  seats: number | null;
+  purposes: string[] | null;
+  base_city_id: string | null;
+  service_city_ids: string[] | null;
+  price_text: string | null;
+  photos: string[] | null;
+  description: string | null;
+  status: string | null;
+  updated_at: string | null;
+  is_verified: boolean | null;
+};
+
+type VehicleInfo = {
+  key: string;
+  label: string;
+  title: string;
+  slugPart: string;
+  emoji: string;
+};
+
+type SeoPage = {
+  slug: string;
+  city: RentCity;
+  vehicleType: string;
+  vehicleKey: string;
+  vehicleLabel: string;
+  vehicleTitle: string;
+  emoji: string;
+  listings: RentListing[];
+};
+
+function cleanText(value: unknown) {
+  return String(value || '').trim();
+}
+
+function slugify(value: unknown) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function titleCase(value: unknown) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function cityName(city: RentCity | undefined | null) {
+  if (!city) return '';
+  return cleanText(city.name_en || city.name || city.name_bn);
+}
+
+function displayCityName(city: RentCity | undefined | null) {
+  return titleCase(cityName(city));
+}
+
+function vehicleInfo(value: unknown): VehicleInfo {
+  const v = cleanText(value).toLowerCase();
+
+  if (v.includes('ambulance')) {
+    return {
+      key: 'ambulance',
+      label: 'Ambulance',
+      title: 'Ambulance Service',
+      slugPart: 'ambulance-service',
+      emoji: '🚑',
+    };
+  }
+
+  if (v.includes('pickup')) {
+    return {
+      key: 'pickup-van',
+      label: 'Pickup Van',
+      title: 'Pickup Van Rental',
+      slugPart: 'pickup-van-rental',
+      emoji: '🚚',
+    };
+  }
+
+  if (v.includes('bus')) {
+    return {
+      key: 'bus',
+      label: 'Bus',
+      title: 'Bus Rental with Driver',
+      slugPart: 'bus-rental',
+      emoji: '🚌',
+    };
+  }
+
+  if (v.includes('toto')) {
+    return {
+      key: 'toto',
+      label: 'Toto',
+      title: 'Toto Rental',
+      slugPart: 'toto-rental',
+      emoji: '🛺',
+    };
+  }
+
+  if (v.includes('auto')) {
+    return {
+      key: 'auto',
+      label: 'Auto',
+      title: 'Auto Rental',
+      slugPart: 'auto-rental',
+      emoji: '🛺',
+    };
+  }
+
+  return {
+    key: 'car',
+    label: 'Car',
+    title: 'Car Rental with Driver',
+    slugPart: 'car-rental',
+    emoji: '🚗',
+  };
+}
+
+function listingCityIds(listing: RentListing) {
+  const ids = new Set<string>();
+
+  if (listing.base_city_id) ids.add(listing.base_city_id);
+
+  if (Array.isArray(listing.service_city_ids)) {
+    listing.service_city_ids.forEach((id) => {
+      if (id) ids.add(id);
+    });
+  }
+
+  return Array.from(ids);
+}
+
+function listingMatchesPage(listing: RentListing, cityId: string, vehicleKey: string) {
+  const vehicle = vehicleInfo(listing.vehicle_type);
+  return vehicle.key === vehicleKey && listingCityIds(listing).includes(cityId);
+}
+
+function collectPurposes(listings: RentListing[], vehicleLabel: string) {
+  const found = new Set<string>();
+
+  listings.forEach((listing) => {
+    if (Array.isArray(listing.purposes)) {
+      listing.purposes.forEach((purpose) => {
+        const p = titleCase(purpose);
+        if (p) found.add(p);
+      });
+    }
+  });
+
+  const staticPurposesByVehicle: Record<string, string[]> = {
+    Car: [
+      'Cheap Rent',
+      'Wedding',
+      'Tour',
+      'Local Trip',
+      'Outstation',
+      'Family Trip',
+      'Station Pickup',
+      'Airport Pickup',
+    ],
+    Bus: [
+      'Wedding',
+      'Tour',
+      'Group Travel',
+      'School Office',
+      'Picnic',
+      'Event Transport',
+      'Outstation',
+    ],
+    Toto: [
+      'Local Trip',
+      'Market Trip',
+      'Station Pickup',
+      'Short Distance',
+      'Daily Local Travel',
+    ],
+    Auto: [
+      'Local Trip',
+      'Station Pickup',
+      'Short Distance',
+      'Daily Local Travel',
+    ],
+    'Pickup Van': [
+      'Goods Transport',
+      'Parcel Delivery',
+      'House Shifting',
+      'Local Delivery',
+      'Small Business Delivery',
+    ],
+    Ambulance: [
+      'Emergency',
+      'Hospital Transfer',
+      'Patient Transport',
+      'Clinic Transfer',
+      'Nursing Home Transfer',
+    ],
+  };
+
+  const staticPurposes = staticPurposesByVehicle[vehicleLabel] || staticPurposesByVehicle.Car;
+
+  staticPurposes.forEach((purpose) => found.add(purpose));
+
+  return Array.from(found).slice(0, 8);
+}
+function purposeHeading(purpose: string, vehicleLabel: string, city: string) {
+  const p = titleCase(purpose);
+
+  if (vehicleLabel === 'Ambulance') return `${p} Ambulance Service in ${city}`;
+  if (vehicleLabel === 'Pickup Van') return `${p} Pickup Van Rental in ${city}`;
+  if (vehicleLabel === 'Bus') return `${p} Bus Rental in ${city}`;
+  if (vehicleLabel === 'Toto') return `${p} Toto Rental in ${city}`;
+  if (vehicleLabel === 'Auto') return `${p} Auto Rental in ${city}`;
+
+  return `${p} Car Rental in ${city}`;
+}
+
+function titleForListing(listing: RentListing) {
+  const vehicle = vehicleInfo(listing.vehicle_type);
+  const model = cleanText(listing.vehicle_model);
+  const seats = listing.seats ? `${listing.seats} seater` : '';
+
+  return [model || `${vehicle.label} rental`, seats].filter(Boolean).join(' · ');
+}
+
+function onlyDigits(value: unknown) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function whatsappNumber(listing: RentListing) {
+  const raw = onlyDigits(listing.owner_whatsapp || listing.owner_phone || '');
+  if (raw.length === 10) return `91${raw}`;
+  return raw;
+}
+
+function publicPhotoUrl(path: string | null | undefined) {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+
+  const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function firstPhoto(listing: RentListing) {
+  const photos = Array.isArray(listing.photos) ? listing.photos : [];
+  return publicPhotoUrl(photos[0]);
+}
+
+export async function getStaticPaths() {
+  try {
+    function localClean(value: unknown) {
+      return String(value || '').trim();
+    }
+
+    function localSlugify(value: unknown) {
+      return localClean(value)
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function localCityName(city: any) {
+      return localClean(city?.name_en || city?.name || city?.name_bn);
+    }
+
+    function localVehicle(value: unknown): VehicleInfo {
+      const v = localClean(value).toLowerCase();
+
+      if (v.includes('ambulance')) {
+        return { key: 'ambulance', label: 'Ambulance', title: 'Ambulance Service', slugPart: 'ambulance-service', emoji: '🚑' };
+      }
+
+      if (v.includes('pickup')) {
+        return { key: 'pickup-van', label: 'Pickup Van', title: 'Pickup Van Rental', slugPart: 'pickup-van-rental', emoji: '🚚' };
+      }
+
+      if (v.includes('bus')) {
+        return { key: 'bus', label: 'Bus', title: 'Bus Rental with Driver', slugPart: 'bus-rental', emoji: '🚌' };
+      }
+
+      if (v.includes('toto')) {
+        return { key: 'toto', label: 'Toto', title: 'Toto Rental', slugPart: 'toto-rental', emoji: '🛺' };
+      }
+
+      if (v.includes('auto')) {
+        return { key: 'auto', label: 'Auto', title: 'Auto Rental', slugPart: 'auto-rental', emoji: '🛺' };
+      }
+
+      return { key: 'car', label: 'Car', title: 'Car Rental with Driver', slugPart: 'car-rental', emoji: '🚗' };
+    }
+
+    function localListingCityIds(listing: any) {
+      const ids = new Set<string>();
+
+      if (listing?.base_city_id) ids.add(listing.base_city_id);
+
+      if (Array.isArray(listing?.service_city_ids)) {
+        listing.service_city_ids.forEach((id: string) => {
+          if (id) ids.add(id);
+        });
+      }
+
+      return Array.from(ids);
+    }
+
+    const { data: citiesData, error: cityError } = await supabase
+      .from('rent_cities')
+      .select('id,name,name_en,name_bn')
+      .eq('active', true);
+
+    if (cityError) {
+      console.error('RENT SEO CITY ERROR:', cityError.message);
+      return [];
+    }
+
+    const { data: listingsData, error: listingError } = await supabase
+      .from('rent_listings')
+      .select(`
+        id,
+        owner_name,
+        owner_phone,
+        owner_whatsapp,
+        vehicle_type,
+        vehicle_model,
+        seats,
+        purposes,
+        base_city_id,
+        service_city_ids,
+        price_text,
+        photos,
+        description,
+        status,
+        updated_at,
+        is_verified
+      `)
+      .eq('status', 'active')
+      .limit(500);
+
+    if (listingError) {
+      console.error('RENT SEO LISTING ERROR:', listingError.message);
+      return [];
+    }
+
+    const cities = Array.isArray(citiesData) ? citiesData : [];
+    const listings = Array.isArray(listingsData) ? listingsData : [];
+
+    console.log('RENT SEO cities:', cities.length);
+    console.log('RENT SEO active listings:', listings.length);
+
+    const cityById = new Map<string, any>(cities.map((city: any) => [city.id, city]));
+    const pageMap = new Map<string, SeoPage>();
+
+    for (const listing of listings as any[]) {
+      const vehicle = localVehicle(listing.vehicle_type);
+      const cityIds = localListingCityIds(listing);
+
+      for (const cityId of cityIds) {
+        const city = cityById.get(cityId);
+        if (!city) continue;
+
+        const name = localCityName(city);
+        const cSlug = localSlugify(name);
+        if (!cSlug) continue;
+
+        const slug = `${vehicle.slugPart}-in-${cSlug}`;
+        const existing = pageMap.get(slug);
+
+        if (existing) {
+          existing.listings.push(listing as RentListing);
+          continue;
+        }
+
+        pageMap.set(slug, {
+          slug,
+          city: city as RentCity,
+          vehicleType: localClean(listing.vehicle_type),
+          vehicleKey: vehicle.key,
+          vehicleLabel: vehicle.label,
+          vehicleTitle: vehicle.title,
+          emoji: vehicle.emoji,
+          listings: [listing as RentListing],
+        });
+      }
+    }
+
+    const pages = Array.from(pageMap.values());
+
+    console.log('RENT SEO pages created:', pages.map((page) => page.slug).join(', '));
+
+    return pages.map((page) => ({
+      params: {
+        slug: page.slug,
+      },
+      props: {
+        page,
+      },
+    }));
+  } catch (error) {
+    console.error('RENT SEO getStaticPaths crashed:', error);
+    return [];
+  }
+}
+
+const { page } = Astro.props as { page: SeoPage };
+
+const city = displayCityName(page.city);
+
+const cityId = page.city.id;
+
+const listings = page.listings
+  .filter((listing) => listingMatchesPage(listing, cityId, page.vehicleKey))
+  .slice(0, 50);
+
+const purposes = collectPurposes(listings, page.vehicleLabel);
+const primaryPurpose = titleCase(purposes[0] || 'Local Trip');
+const purposeList = purposes.map((purpose) => titleCase(purpose)).join(', ');
+
+const canonicalUrl = `${SITE_URL}/rent/${page.slug}/`;
+const title = `${page.vehicleTitle} in ${city} | Direct Owner Contacts | SoniaBuddy`;
+
+const description =
+  `Find ${page.vehicleTitle.toLowerCase()} in ${city} for ${purposeList}. Compare active owner listings, seats, vehicle details, price text, call number and WhatsApp contact on SoniaBuddy.`;
+const verifiedCount = listings.filter((listing) => listing.is_verified).length;
+
+const seatValues = listings
+  .map((listing) => listing.seats)
+  .filter((seat): seat is number => typeof seat === 'number' && seat > 0);
+
+const minSeats = seatValues.length ? Math.min(...seatValues) : null;
+const maxSeats = seatValues.length ? Math.max(...seatValues) : null;
+
+const seatText =
+  minSeats && maxSeats
+    ? minSeats === maxSeats
+      ? `${minSeats} seater options`
+      : `${minSeats} to ${maxSeats} seater options`
+    : 'different seating options';
+
+const ownerText =
+  listings.length === 1
+    ? '1 active local owner listing'
+    : `${listings.length} active local owner listings`;
+const serviceJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: `${page.vehicleTitle} in ${city}`,
+  description,
+  provider: {
+    '@type': 'Organization',
+    name: 'SoniaBuddy',
+    url: SITE_URL,
+  },
+  areaServed: {
+    '@type': 'City',
+    name: city,
+  },
+  serviceType: [
+    `${page.vehicleTitle} in ${city}`,
+    ...purposes.map((purpose) => purposeHeading(purpose, page.vehicleLabel, city)),
+  ].join(', '),
+  url: canonicalUrl,
+};
+
+const itemListJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `${page.vehicleTitle} listings in ${city}`,
+  itemListElement: listings.slice(0, 30).map((listing, index) => ({
+    '@type': 'ListItem',
+    position: index + 1,
+    item: {
+      '@type': 'Service',
+      name: titleForListing(listing),
+      description: listing.description || description,
+      serviceType: `${page.vehicleTitle} in ${city}`,
+      provider: {
+        '@type': 'Organization',
+        name: listing.owner_name || 'Local vehicle owner',
+      },
+      areaServed: {
+        '@type': 'City',
+        name: city,
+      },
+    },
+  })),
+};
+
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: SITE_URL,
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Rent Vehicle',
+      item: `${SITE_URL}/rent-vehicle`,
+    },
+    {
+      '@type': 'ListItem',
+      position: 3,
+      name: `${page.vehicleTitle} in ${city}`,
+      item: canonicalUrl,
+    },
+  ],
+};
+---
+
+<BaseLayout title={title} description={description}>
+  <Fragment slot="head">
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:type" content="website" />
+    <script type="application/ld+json" set:html={JSON.stringify(serviceJsonLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(itemListJsonLd)} />
+    <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
+  </Fragment>
+
+    <main class="rent-seo-page">
+    <section class="hero">
+      <div class="hero-badge">{page.emoji} {page.vehicleLabel} Rental</div>
+
+      <h1>{page.vehicleTitle} in {city}</h1>
+
+      <p>
+        Find {page.vehicleTitle.toLowerCase()} in {city} for {purposeList}.
+        SoniaBuddy helps users compare {ownerText}, {seatText}, price text,
+        owner name, call option and WhatsApp contact in one simple page.
+      </p>
+    </section>
+
+    <section class="content-card">
+      <h2>{page.vehicleTitle} use cases in {city}</h2>
+
+      <div class="chips">
+        {purposes.map((purpose) => (
+          <span>{titleCase(purpose)}</span>
+        ))}
+      </div>
+
+      <p>
+        People usually need {page.vehicleLabel.toLowerCase()} rental in {city} for {purposeList}.
+        These use cases include both active owner listing data and common rental needs such as cheap rent,
+        wedding travel, tour plans, local trips, family travel, outstation journeys, station pickup and airport pickup.
+        Before booking, compare seat capacity, vehicle condition, pickup location, trip duration and final rent.
+        Always confirm whether toll, parking, waiting time, night charge or extra kilometer charge is included in the quoted price.
+      </p>
+    </section>
+
+    <section class="seo-listing-card">
+      <div class="section-heading-row">
+        <h2>Available {page.vehicleLabel} Listings in {city}</h2>
+        <p>{listings.length} active listing{listings.length === 1 ? '' : 's'} found from local owners.</p>
+      </div>
+
+      <div class="seo-rent-grid">
+        {listings.map((listing) => {
+          const phone = onlyDigits(listing.owner_phone);
+          const wa = whatsappNumber(listing);
+          const img = firstPhoto(listing);
+          const listingPurposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
+
+          return (
+            <article class="seo-rent-card">
+              <div class="seo-rent-photo">
+                {img ? (
+                  <img src={img} alt={titleForListing(listing)} loading="lazy" decoding="async" />
+                ) : (
+                  <span>{page.emoji}</span>
+                )}
+              </div>
+
+              <div class="seo-rent-body">
+                <div class="seo-rent-headline">
+                  <h3>{titleForListing(listing)}</h3>
+                  {listing.is_verified && <span class="verified-pill">Verified</span>}
+                </div>
+
+                <p class="owner-line">Owner: {listing.owner_name || 'Local vehicle owner'}</p>
+
+                <div class="facts">
+                  {listing.price_text && <span>Price: {listing.price_text}</span>}
+                  {listing.seats && <span>Seats: {listing.seats}</span>}
+                  {listingPurposes.length > 0 && <span>Use: {listingPurposes.join(', ')}</span>}
+                </div>
+
+                {listing.description && <p class="desc-line">{listing.description}</p>}
+
+                <div class="seo-rent-actions">
+                  {phone ? (
+                    <a class="mini-btn call" href={`tel:${phone}`}>Call Now</a>
+                  ) : (
+                    <span class="mini-btn disabled">No Phone</span>
+                  )}
+
+                  {wa ? (
+                    <a class="mini-btn wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">
+                      WhatsApp
+                    </a>
+                  ) : (
+                    <span class="mini-btn disabled">No WhatsApp</span>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+
+    <section class="content-card">
+      <h2>About {page.vehicleTitle} in {city}</h2>
+
+      <p>
+        SoniaBuddy is a local vehicle rental discovery page for people who need {page.vehicleLabel.toLowerCase()} options in {city}.
+        This page is generated from active owner listings and helps users compare available vehicles, seating capacity,
+        owner name, price text, purpose tags, call option and WhatsApp contact before making a booking decision.
+        Current listings include {ownerText}, {seatText}, and {verifiedCount > 0 ? `${verifiedCount} verified listing${verifiedCount === 1 ? '' : 's'}` : 'owner-submitted listings'}.
+      </p>
+
+      <p>
+        SoniaBuddy does not set the final rent amount. Users should confirm the final price directly with the owner
+        because cost can change based on distance, pickup point, date, waiting time, night charge, toll, parking and route.
+      </p>
+
+      <p class="bn-line">
+        বাংলা: {city} এলাকায় {page.vehicleLabel} ভাড়া খুঁজতে এই পেজে সক্রিয় গাড়ির মালিকদের তথ্য, আসন সংখ্যা, ব্যবহার, ফোন এবং WhatsApp যোগাযোগ দেখা যায়।
+      </p>
+    </section>
+
+    <section class="content-card">
+      <h2>How to choose the right {page.vehicleLabel} in {city}</h2>
+
+      <p>
+        Start by checking the number of seats, vehicle model, owner name and price text shown in the listing.
+        For family travel, choose a vehicle with enough luggage space and comfortable seating.
+        For wedding or group travel, confirm reporting time, return time, decoration permission and waiting charges.
+        For outstation or longer trips, ask about per-kilometer charges, driver allowance, toll, parking and night halt charges.
+        Calling the owner directly is the fastest way to confirm availability and avoid misunderstanding before the trip.
+      </p>
+
+      <p class="bn-line">
+        বাংলা: বুকিং করার আগে গাড়ির আসন সংখ্যা, ভাড়া, পিকআপ পয়েন্ট, সময়, দূরত্ব এবং অতিরিক্ত চার্জ মালিকের সঙ্গে নিশ্চিত করুন।
+      </p>
+    </section>
+
+    <section class="faq-card">
+      <h2>FAQs about {page.vehicleLabel} Rental in {city}</h2>
+
+      <details open>
+        <summary>How can I find {page.vehicleTitle.toLowerCase()} in {city}?</summary>
+        <p>
+          You can check the active listings on this page and contact the vehicle owner directly by phone or WhatsApp.
+          Each listing may include vehicle model, seats, purpose, price text and owner details.
+        </p>
+      </details>
+
+      <details>
+        <summary>Is the rent price fixed on SoniaBuddy?</summary>
+        <p>
+          No. SoniaBuddy shows owner listings and contact details. The final rent should be confirmed with the owner because price can change by distance, date, pickup point, waiting time, route and vehicle type.
+        </p>
+      </details>
+
+      <details>
+        <summary>Can I book {page.vehicleLabel.toLowerCase()} for {primaryPurpose.toLowerCase()}?</summary>
+        <p>
+          Yes, if the listing includes {primaryPurpose.toLowerCase()} or a similar purpose, you can contact the owner and confirm availability.
+          Always mention your date, pickup location, destination and number of passengers.
+        </p>
+      </details>
+
+      <details>
+        <summary>What should I confirm before calling a {page.vehicleLabel.toLowerCase()} owner?</summary>
+        <p>
+          Confirm vehicle seats, total rent, pickup time, pickup place, destination, waiting charge, toll, parking and whether WhatsApp communication is available for sharing trip details.
+        </p>
+      </details>
+
+      <details>
+        <summary>Can vehicle owners add their listing on SoniaBuddy?</summary>
+        <p>
+          Yes. Vehicle owners can register their vehicle on SoniaBuddy. After the listing becomes active, it can appear on city-based rental pages like this one.
+        </p>
+      </details>
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  :global(html),
+  :global(body) {
+    background: #08051f !important;
+  }
+
+  
+
+  .rent-seo-page {
+    width: min(980px, calc(100% - 0.75rem));
+    margin: 0 auto;
+    padding: 0.6rem 0 1.6rem;
+    color: #ffffff;
+    background: #08051f;
+  }
+
+  .hero,
+  .content-card,
+  .faq-card,
+  .seo-listing-card,
+  .content-grid article {
+    background: linear-gradient(145deg, #211053, #10062d);
+    border: 1px solid rgba(255, 138, 0, 0.24);
+    border-radius: 0.85rem;
+    padding: 0.75rem;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
+    color: #ffffff;
+  }
+
+  .hero,
+  .content-card,
+  .faq-card,
+  .seo-listing-card,
+  .content-grid {
+    margin-top: 0.65rem;
+  }
+
+  .hero {
+    text-align: left;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 0.28rem 0.55rem;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 0.74rem;
+    margin-bottom: 0.4rem;
+    background: rgba(255, 138, 0, 0.18);
+    color: #ffb24d;
+  }
+
+  h1 {
+    font-size: clamp(1.42rem, 4vw, 2.15rem);
+    line-height: 1.08;
+    margin: 0 0 0.35rem;
+    color: #ffffff;
+  }
+
+  h2 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: #ffffff;
+  }
+
+  h3 {
+    margin: 0;
+    color: #ffffff;
+  }
+
+  p,
+  summary,
+  strong {
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  p,
+  summary {
+    line-height: 1.45;
+  }
+
+  .hero p,
+  .content-card p,
+  .faq-card p {
+    margin: 0.32rem 0 0;
+    font-size: 0.86rem;
+  }
+
+  .bn-line {
+    margin-top: 0.55rem !important;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78) !important;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.5rem 0;
+  }
+
+  .chips span {
+    padding: 0.28rem 0.52rem;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.74rem;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+
+  .section-heading-row {
+    margin-bottom: 0.55rem;
+  }
+
+  .section-heading-row p {
+    margin: 0;
+    font-size: 0.8rem;
+  }
+
+  .seo-rent-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .seo-rent-card {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 0.55rem;
+    padding: 0.55rem;
+    border-radius: 0.72rem;
+    background: rgba(255, 255, 255, 0.085);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .seo-rent-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.65rem;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 1.3rem;
+  }
+
+  .seo-rent-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .seo-rent-body {
+    min-width: 0;
+  }
+
+  .seo-rent-headline {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .seo-rent-headline h3 {
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+
+  .owner-line {
+    margin: 0.1rem 0 0 !important;
+    font-size: 0.74rem !important;
+    color: rgba(255, 255, 255, 0.74) !important;
+  }
+
+  .verified-pill {
+    display: inline-flex;
+    padding: 0.14rem 0.38rem;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 0.64rem;
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+  }
+
+  .facts span {
+    display: inline-flex;
+    padding: 0.18rem 0.38rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.72rem;
+    line-height: 1.25;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .desc-line {
+    margin: 0.35rem 0 0 !important;
+    font-size: 0.76rem !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .seo-rent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+  }
+
+  .mini-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.45rem;
+    text-decoration: none;
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .mini-btn.call {
+    background: #ff7a00;
+    color: #12051f;
+  }
+
+  .mini-btn.wa {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .mini-btn.disabled {
+    opacity: 0.6;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .content-grid article {
+    padding: 0.72rem;
+  }
+
+  .content-grid p {
+    margin: 0;
+    font-size: 0.84rem;
+  }
+
+  details {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0.58rem 0;
+  }
+
+  details:first-of-type {
+    border-top: 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 0.86rem;
+    color: #ffffff;
+  }
+
+  @media (min-width: 760px) {
+    .seo-rent-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .content-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .rent-seo-page {
+      width: min(100% - 0.5rem, 980px);
+      padding-top: 0.35rem;
+    }
+
+    .hero,
+    .content-card,
+    .faq-card,
+    .seo-listing-card,
+    .content-grid article {
+      border-radius: 0.72rem;
+      padding: 0.6rem;
+    }
+
+    .seo-rent-card {
+      grid-template-columns: 46px 1fr;
+      gap: 0.48rem;
+      padding: 0.5rem;
+    }
+
+    .seo-rent-photo {
+      width: 46px;
+      height: 46px;
+    }
+
+    .mini-btn {
+      min-height: 25px;
+      padding: 0.28rem 0.44rem;
+    }
+  }
+</style>

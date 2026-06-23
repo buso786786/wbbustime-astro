@@ -1,0 +1,51 @@
+/* Rent SEO shared visibility theme */
+.rent-seo-page {
+  color: #ffffff;
+}
+
+.rent-seo-page .hero,
+.rent-seo-page .content-card,
+.rent-seo-page .faq-card,
+.rent-seo-page .nearby-card,
+.rent-seo-page .content-grid article {
+  background: linear-gradient(145deg, #24185a, #13073a) !important;
+  border: 1px solid rgba(255, 138, 0, 0.22) !important;
+}
+
+.rent-seo-page h1,
+.rent-seo-page h2,
+.rent-seo-page summary {
+  color: #ffffff !important;
+  text-shadow: none !important;
+}
+
+.rent-seo-page p,
+.rent-seo-page li {
+  color: rgba(255, 255, 255, 0.86) !important;
+  text-shadow: none !important;
+}
+
+.rent-seo-page .hero p {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.rent-seo-page .chips span {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+}
+
+.rent-seo-page .btn-outline {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.rent-seo-page .hero-badge {
+  background: rgba(255, 138, 0, 0.18) !important;
+  color: #ffb24d !important;
+}
+
+.rent-seo-page .nearby-links a {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
