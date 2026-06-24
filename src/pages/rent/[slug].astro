@@ -43,12 +43,29 @@ type VehicleInfo = {
 type SeoPage = {
   slug: string;
   city: RentCity;
+  pageType: 'vehicle' | 'use-case';
   vehicleType: string;
   vehicleKey: string;
   vehicleLabel: string;
   vehicleTitle: string;
   emoji: string;
+  useCaseKey?: string;
+  useCaseLabel?: string;
+  useCaseTitle?: string;
+  relatedVehicleLabels?: string[];
   listings: RentListing[];
+};
+
+type UseCaseInfo = {
+  key: string;
+  label: string;
+  title: string;
+  slugPart: string;
+  emoji: string;
+  relatedVehicleKeys: string[];
+  relatedVehicleLabels: string[];
+  purposeWords: string[];
+  titleSuffix: string;
 };
 
 function cleanText(value: unknown) {
@@ -140,6 +157,155 @@ function vehicleInfo(value: unknown): VehicleInfo {
   };
 }
 
+
+const USE_CASE_PAGES: UseCaseInfo[] = [
+  {
+    key: 'wedding',
+    label: 'Wedding',
+    title: 'Wedding Car and Bus Rental',
+    slugPart: 'wedding-car-bus-rental',
+    emoji: '💒',
+    relatedVehicleKeys: ['car', 'bus', 'pickup-van', 'auto', 'toto'],
+    relatedVehicleLabels: ['Car', 'Bus', 'Pickup Van', 'Auto', 'Toto'],
+    purposeWords: ['wedding', 'marriage', 'bride', 'groom', 'event'],
+    titleSuffix: 'Bride/Groom Car, Guest Bus, Full Day Package',
+  },
+  {
+    key: 'tour',
+    label: 'Tour',
+    title: 'Tour Car and Bus Rental',
+    slugPart: 'tour-car-bus-rental',
+    emoji: '🧳',
+    relatedVehicleKeys: ['car', 'bus', 'auto', 'toto'],
+    relatedVehicleLabels: ['Car', 'Bus', 'Auto', 'Toto'],
+    purposeWords: ['tour', 'picnic', 'outstation', 'family trip', 'group travel'],
+    titleSuffix: 'Tour Car, Tour Bus, Full Day and Outstation',
+  },
+  {
+    key: 'local',
+    label: 'Local',
+    title: 'Local Car, Toto and Auto Rental',
+    slugPart: 'local-car-toto-auto-rental',
+    emoji: '📍',
+    relatedVehicleKeys: ['car', 'toto', 'auto', 'pickup-van'],
+    relatedVehicleLabels: ['Car', 'Toto', 'Auto', 'Pickup Van'],
+    purposeWords: ['local', 'local trip', 'station pickup', 'market', 'short distance', 'daily local'],
+    titleSuffix: 'Local Trip, Station Pickup, Market Travel',
+  },
+  {
+    key: 'emergency',
+    label: 'Emergency',
+    title: 'Emergency Ambulance Rental',
+    slugPart: 'emergency-ambulance-rental',
+    emoji: '🚑',
+    relatedVehicleKeys: ['ambulance', 'car'],
+    relatedVehicleLabels: ['Ambulance', 'Car'],
+    purposeWords: ['emergency', 'ambulance', 'hospital', 'patient', 'clinic', 'nursing home'],
+    titleSuffix: 'Ambulance, Hospital Transfer, Patient Transport',
+  },
+  {
+    key: 'goods',
+    label: 'Goods/Parcel',
+    title: 'Goods Pickup Van Rental',
+    slugPart: 'goods-pickup-van-rental',
+    emoji: '📦',
+    relatedVehicleKeys: ['pickup-van', 'auto', 'toto'],
+    relatedVehicleLabels: ['Pickup Van', 'Auto', 'Toto'],
+    purposeWords: ['goods', 'parcel', 'delivery', 'shifting', 'transport', 'business'],
+    titleSuffix: 'Pickup Van, Parcel, Local Goods Transport',
+  },
+  {
+    key: 'school-office',
+    label: 'School/Office',
+    title: 'School Office Car and Bus Rental',
+    slugPart: 'school-office-car-bus-rental',
+    emoji: '🏫',
+    relatedVehicleKeys: ['car', 'bus', 'auto', 'toto'],
+    relatedVehicleLabels: ['Car', 'Bus', 'Auto', 'Toto'],
+    purposeWords: ['school', 'office', 'staff', 'student', 'daily', 'monthly'],
+    titleSuffix: 'School, Office, Staff and Daily Travel',
+  },
+];
+
+function useCaseInfo(key: string | undefined | null) {
+  return USE_CASE_PAGES.find((item) => item.key === key) || USE_CASE_PAGES[0];
+}
+
+function normalizePurpose(value: unknown) {
+  return cleanText(value).toLowerCase().replace(/[-_/]+/g, ' ');
+}
+
+function listingPurposeText(listing: RentListing) {
+  const parts = Array.isArray(listing.purposes) ? listing.purposes : [];
+  return parts.map(normalizePurpose).join(' ');
+}
+
+function listingMatchesUseCasePage(listing: RentListing, useCaseKey: string) {
+  const useCase = useCaseInfo(useCaseKey);
+  const vehicle = vehicleInfo(listing.vehicle_type);
+  const purposeText = listingPurposeText(listing);
+  const hasPurposeMatch = useCase.purposeWords.some((word) => purposeText.includes(normalizePurpose(word)));
+  const vehicleRelated = useCase.relatedVehicleKeys.includes(vehicle.key);
+
+  if (hasPurposeMatch) return vehicleRelated || useCase.key === 'emergency' || useCase.key === 'goods';
+  return vehicleRelated;
+}
+
+function collectUseCasePurposes(useCaseKey: string | undefined | null) {
+  const useCase = useCaseInfo(useCaseKey);
+
+  const map: Record<string, string[]> = {
+    wedding: ['Wedding', 'Bride/Groom Travel', 'Guest Pickup', 'Full Day Package', 'Family Travel', 'Decoration/Goods Support'],
+    tour: ['Tour', 'Outstation', 'Picnic', 'Group Travel', 'Full Day Rental', 'Per KM Price'],
+    local: ['Local Trip', 'Station Pickup', 'Market Trip', 'Short Distance', 'Daily Local Travel', 'Fixed Price'],
+    emergency: ['Emergency', 'Ambulance', 'Hospital Transfer', 'Patient Transport', 'Clinic Transfer', '24/7 Availability'],
+    goods: ['Goods Transport', 'Parcel Delivery', 'Pickup Van', 'House Shifting', 'Local Delivery', 'Small Business Delivery'],
+    'school-office': ['School/Office', 'Staff Transport', 'Student Travel', 'Daily Pickup', 'Monthly Rental', 'Route Based Price'],
+  };
+
+  return map[useCase.key] || map.wedding;
+}
+
+function useCaseContent(city: string, page: SeoPage, ownerText: string, seatText: string) {
+  const useCase = useCaseInfo(page.useCaseKey);
+  const vehicleText = (page.relatedVehicleLabels || useCase.relatedVehicleLabels).join(', ');
+
+  const content: Record<string, string[]> = {
+    wedding: [
+      `Find wedding car and bus rental in ${city} for bride and groom travel, guest pickup, family movement, decoration support and full day wedding booking. SoniaBuddy shows local owner listings for ${vehicleText}, so users can compare photos, seats, model, price text and direct call or WhatsApp contact in one page.`,
+      `For wedding rent, different vehicles solve different needs. Cars are useful for bride/groom and family travel, buses are useful for guest pickup and group movement, while pickup vans may help with decoration, sound or wedding goods transport. Some owners may offer fixed price packages, full day rates or per kilometre pricing depending on date, distance, route and waiting time.`,
+      `Before booking, confirm final rent, pickup point, reporting time, return time, decoration permission, night charge, toll, parking and driver allowance directly with the owner. This page has ${ownerText} and ${seatText}, but SoniaBuddy is only a listing platform; final price, availability and service quality are managed by individual owners.`,
+    ],
+    tour: [
+      `Find tour car and bus rental in ${city} for family trips, picnic, group travel, outstation journeys and full day sightseeing. SoniaBuddy lists local owners with ${vehicleText}, helping users compare seating capacity, vehicle condition, photos, price text and direct owner contact before planning a trip.`,
+      `Tour rental needs can be different from local travel. A small family may need a car with driver, while a picnic or group journey may need a bus. Owners may provide fixed tour packages, full day rates, per kilometre pricing or outstation plans based on destination, distance, date, waiting time and night halt requirements.`,
+      `Users should confirm route, pickup time, number of passengers, luggage space, driver allowance, toll, parking and extra kilometre charges before booking. SoniaBuddy does not set final rent; it only helps users discover active local listings and contact vehicle owners directly by phone or WhatsApp.`,
+    ],
+    local: [
+      `Find local car, toto and auto rental in ${city} for station pickup, market trip, family movement, short distance travel and nearby city visits. SoniaBuddy helps users compare ${vehicleText} listings from local owners with available photos, seats, price text, purpose tags and direct contact options.`,
+      `Local rental is useful when users need quick pickup, flexible timing or short-route travel with a known local owner. Cars may be used for family or nearby travel, toto and auto options are useful for short distance and city movement, while pickup vans may help with small goods or local delivery needs.`,
+      `Before confirming a local trip, call or WhatsApp the owner and ask about fixed price, waiting time, pickup location, return timing and extra charges. SoniaBuddy is only a listing platform, so final availability, rent and service details must be confirmed directly with the vehicle owner.`,
+    ],
+    emergency: [
+      `Find emergency ambulance rental in ${city} for hospital transfer, patient transport, clinic movement, nursing home travel and urgent medical trips. SoniaBuddy lists local ambulance and related emergency transport contacts so users can quickly compare owner details, phone number, WhatsApp availability and service area.`,
+      `Emergency travel needs fast confirmation. Ambulance listings may support hospital pickup, patient shifting or medical transfer, while some car owners may help with urgent non-critical hospital travel if clearly listed. Users should always confirm vehicle availability, pickup point, destination hospital, timing and any medical support requirement before starting.`,
+      `SoniaBuddy does not operate ambulance services directly and does not guarantee emergency response time. It only shows active owner listings. For serious medical emergencies, users should also contact official emergency numbers and nearby hospitals while confirming the listed owner by phone.`,
+    ],
+    goods: [
+      `Find goods pickup van rental in ${city} for parcel delivery, local goods movement, small business transport, house shifting support and market supply trips. SoniaBuddy shows local ${vehicleText} listings with owner contact, price text, photos and service area so users can compare before hiring.`,
+      `Goods transport pricing can depend on distance, item size, loading time, labour requirement, route, waiting time and return trip. Pickup vans are useful for larger goods, while auto or toto listings may help for small parcels or local delivery if the owner provides that service.`,
+      `Before booking, confirm vehicle size, load capacity, pickup point, delivery location, loading/unloading responsibility, waiting charge and final rent directly with the owner. SoniaBuddy is only a listing platform and does not handle goods safety, payment or transport responsibility.`,
+    ],
+    'school-office': [
+      `Find school and office car or bus rental in ${city} for student pickup, staff transport, daily route travel, monthly rental and scheduled local movement. SoniaBuddy helps users compare ${vehicleText} listings with seats, owner name, price text, photos and direct contact options.`,
+      `School-office transport is different from one-time booking because timing, route, safety, passenger count and monthly price matter. Cars may work for small groups, while buses are suitable for students or staff groups. Auto and toto listings may also be useful for short local route travel if available.`,
+      `Before confirming, discuss route, pickup time, drop time, monthly or daily price, holidays, driver details, seating capacity and emergency contact with the owner. SoniaBuddy only lists vehicle owners; final agreement, safety checks and payment terms must be managed directly between user and owner.`,
+    ],
+  };
+
+  return content[useCase.key] || content.wedding;
+}
+
 function listingCityIds(listing: RentListing) {
   const ids = new Set<string>();
 
@@ -154,9 +320,15 @@ function listingCityIds(listing: RentListing) {
   return Array.from(ids);
 }
 
-function listingMatchesPage(listing: RentListing, cityId: string, vehicleKey: string) {
+function listingMatchesPage(listing: RentListing, cityId: string, page: SeoPage) {
+  if (!listingCityIds(listing).includes(cityId)) return false;
+
+  if (page.pageType === 'use-case' && page.useCaseKey) {
+    return listingMatchesUseCasePage(listing, page.useCaseKey);
+  }
+
   const vehicle = vehicleInfo(listing.vehicle_type);
-  return vehicle.key === vehicleKey && listingCityIds(listing).includes(cityId);
+  return vehicle.key === page.vehicleKey;
 }
 
 function collectPurposes(listings: RentListing[], vehicleLabel: string) {
@@ -243,7 +415,11 @@ function titleForListing(listing: RentListing) {
   const model = cleanText(listing.vehicle_model);
   const seats = listing.seats ? `${listing.seats} seater` : '';
 
-  return [model || `${vehicle.label} rental`, seats].filter(Boolean).join(' · ');
+  return [vehicle.label, model, seats].filter(Boolean).join(' · ');
+}
+
+function modelText(listing: RentListing) {
+  return cleanText(listing.vehicle_model);
 }
 
 function onlyDigits(value: unknown) {
@@ -374,6 +550,88 @@ export async function getStaticPaths() {
     const cityById = new Map<string, any>(cities.map((city: any) => [city.id, city]));
     const pageMap = new Map<string, SeoPage>();
 
+    const localUseCasePages = [
+      {
+        key: 'wedding',
+        label: 'Wedding',
+        title: 'Wedding Car and Bus Rental',
+        slugPart: 'wedding-car-bus-rental',
+        emoji: '💒',
+        relatedVehicleKeys: ['car', 'bus', 'pickup-van', 'auto', 'toto'],
+        relatedVehicleLabels: ['Car', 'Bus', 'Pickup Van', 'Auto', 'Toto'],
+        purposeWords: ['wedding', 'marriage', 'bride', 'groom', 'event'],
+      },
+      {
+        key: 'tour',
+        label: 'Tour',
+        title: 'Tour Car and Bus Rental',
+        slugPart: 'tour-car-bus-rental',
+        emoji: '🧳',
+        relatedVehicleKeys: ['car', 'bus', 'auto', 'toto'],
+        relatedVehicleLabels: ['Car', 'Bus', 'Auto', 'Toto'],
+        purposeWords: ['tour', 'picnic', 'outstation', 'family trip', 'group travel'],
+      },
+      {
+        key: 'local',
+        label: 'Local',
+        title: 'Local Car, Toto and Auto Rental',
+        slugPart: 'local-car-toto-auto-rental',
+        emoji: '📍',
+        relatedVehicleKeys: ['car', 'toto', 'auto', 'pickup-van'],
+        relatedVehicleLabels: ['Car', 'Toto', 'Auto', 'Pickup Van'],
+        purposeWords: ['local', 'local trip', 'station pickup', 'market', 'short distance', 'daily local'],
+      },
+      {
+        key: 'emergency',
+        label: 'Emergency',
+        title: 'Emergency Ambulance Rental',
+        slugPart: 'emergency-ambulance-rental',
+        emoji: '🚑',
+        relatedVehicleKeys: ['ambulance', 'car'],
+        relatedVehicleLabels: ['Ambulance', 'Car'],
+        purposeWords: ['emergency', 'ambulance', 'hospital', 'patient', 'clinic', 'nursing home'],
+      },
+      {
+        key: 'goods',
+        label: 'Goods/Parcel',
+        title: 'Goods Pickup Van Rental',
+        slugPart: 'goods-pickup-van-rental',
+        emoji: '📦',
+        relatedVehicleKeys: ['pickup-van', 'auto', 'toto'],
+        relatedVehicleLabels: ['Pickup Van', 'Auto', 'Toto'],
+        purposeWords: ['goods', 'parcel', 'delivery', 'shifting', 'transport', 'business'],
+      },
+      {
+        key: 'school-office',
+        label: 'School/Office',
+        title: 'School Office Car and Bus Rental',
+        slugPart: 'school-office-car-bus-rental',
+        emoji: '🏫',
+        relatedVehicleKeys: ['car', 'bus', 'auto', 'toto'],
+        relatedVehicleLabels: ['Car', 'Bus', 'Auto', 'Toto'],
+        purposeWords: ['school', 'office', 'staff', 'student', 'daily', 'monthly'],
+      },
+    ];
+
+    function localNormalizePurpose(value: unknown) {
+      return localClean(value).toLowerCase().replace(/[-_/]+/g, ' ');
+    }
+
+    function localListingPurposeText(listing: any) {
+      const parts = Array.isArray(listing?.purposes) ? listing.purposes : [];
+      return parts.map(localNormalizePurpose).join(' ');
+    }
+
+    function localListingMatchesUseCasePage(listing: any, useCase: any) {
+      const vehicle = localVehicle(listing.vehicle_type);
+      const purposeText = localListingPurposeText(listing);
+      const hasPurposeMatch = useCase.purposeWords.some((word: string) => purposeText.includes(localNormalizePurpose(word)));
+      const vehicleRelated = useCase.relatedVehicleKeys.includes(vehicle.key);
+
+      if (hasPurposeMatch) return vehicleRelated || useCase.key === 'emergency' || useCase.key === 'goods';
+      return vehicleRelated;
+    }
+
     for (const listing of listings as any[]) {
       const vehicle = localVehicle(listing.vehicle_type);
       const cityIds = localListingCityIds(listing);
@@ -397,12 +655,51 @@ export async function getStaticPaths() {
         pageMap.set(slug, {
           slug,
           city: city as RentCity,
+          pageType: 'vehicle',
           vehicleType: localClean(listing.vehicle_type),
           vehicleKey: vehicle.key,
           vehicleLabel: vehicle.label,
           vehicleTitle: vehicle.title,
           emoji: vehicle.emoji,
           listings: [listing as RentListing],
+        });
+      }
+    }
+
+    for (const city of cities as any[]) {
+      const name = localCityName(city);
+      const cSlug = localSlugify(name);
+      if (!cSlug) continue;
+
+      const cityListings = (listings as any[]).filter((listing) =>
+        localListingCityIds(listing).includes(city.id)
+      );
+
+      if (!cityListings.length) continue;
+
+      for (const useCase of localUseCasePages) {
+        const matchedListings = cityListings.filter((listing) =>
+          localListingMatchesUseCasePage(listing, useCase)
+        );
+
+        if (!matchedListings.length) continue;
+
+        const slug = `${useCase.slugPart}-in-${cSlug}`;
+
+        pageMap.set(slug, {
+          slug,
+          city: city as RentCity,
+          pageType: 'use-case',
+          vehicleType: 'all',
+          vehicleKey: 'all',
+          vehicleLabel: useCase.label,
+          vehicleTitle: useCase.title,
+          emoji: useCase.emoji,
+          useCaseKey: useCase.key,
+          useCaseLabel: useCase.label,
+          useCaseTitle: useCase.title,
+          relatedVehicleLabels: useCase.relatedVehicleLabels,
+          listings: matchedListings as RentListing[],
         });
       }
     }
@@ -432,18 +729,31 @@ const city = displayCityName(page.city);
 const cityId = page.city.id;
 
 const listings = page.listings
-  .filter((listing) => listingMatchesPage(listing, cityId, page.vehicleKey))
+  .filter((listing) => listingMatchesPage(listing, cityId, page))
   .slice(0, 50);
 
-const purposes = collectPurposes(listings, page.vehicleLabel);
+const isUseCasePage = page.pageType === 'use-case';
+const useCase = useCaseInfo(page.useCaseKey);
+const pageTitleText = isUseCasePage ? `${useCase.title} in ${city}` : `${page.vehicleTitle} in ${city}`;
+const pageBadgeText = isUseCasePage
+  ? `${useCase.emoji} ${useCase.label} Rental`
+  : `${page.emoji} ${page.vehicleLabel} Rental`;
+const relatedVehicleText = isUseCasePage
+  ? (page.relatedVehicleLabels || useCase.relatedVehicleLabels).join(', ')
+  : page.vehicleLabel;
+
+const purposes = isUseCasePage ? collectUseCasePurposes(page.useCaseKey) : collectPurposes(listings, page.vehicleLabel);
 const primaryPurpose = titleCase(purposes[0] || 'Local Trip');
 const purposeList = purposes.map((purpose) => titleCase(purpose)).join(', ');
 
 const canonicalUrl = `${SITE_URL}/rent/${page.slug}/`;
-const title = `${page.vehicleTitle} in ${city} | Direct Owner Contacts | SoniaBuddy`;
+const title = isUseCasePage
+  ? `${useCase.title} in ${city} | ${useCase.titleSuffix} | SoniaBuddy`
+  : `${page.vehicleTitle} in ${city} | Direct Owner Contacts | SoniaBuddy`;
 
-const description =
-  `Find ${page.vehicleTitle.toLowerCase()} in ${city} for ${purposeList}. Compare active owner listings, seats, vehicle details, price text, call number and WhatsApp contact on SoniaBuddy.`;
+const description = isUseCasePage
+  ? `Find ${useCase.title.toLowerCase()} in ${city}. Compare ${relatedVehicleText.toLowerCase()} listings for ${purposeList}, owner contact, seats, price text, availability and WhatsApp on SoniaBuddy.`
+  : `Find ${page.vehicleTitle.toLowerCase()} in ${city} for ${purposeList}. Compare active owner listings, seats, vehicle details, price text, call number and WhatsApp contact on SoniaBuddy.`;
 const verifiedCount = listings.filter((listing) => listing.is_verified).length;
 
 const seatValues = listings
@@ -464,10 +774,33 @@ const ownerText =
   listings.length === 1
     ? '1 active local owner listing'
     : `${listings.length} active local owner listings`;
+
+const seoContentParagraphs = isUseCasePage ? useCaseContent(city, page, ownerText, seatText) : [];
+const listingSectionTitle = isUseCasePage
+  ? `Available ${relatedVehicleText} Listings for ${useCase.label} in ${city}`
+  : `Available ${page.vehicleLabel} Listings in ${city}`;
+
+const heroIntro = isUseCasePage
+  ? `Find ${useCase.title.toLowerCase()} in ${city} with ${relatedVehicleText.toLowerCase()} options. SoniaBuddy helps users compare ${ownerText}, ${seatText}, price text, owner name, call option and WhatsApp contact in one simple page.`
+  : `Find ${page.vehicleTitle.toLowerCase()} in ${city} for ${purposeList}. SoniaBuddy helps users compare ${ownerText}, ${seatText}, price text, owner name, call option and WhatsApp contact in one simple page.`;
+
+const firstContentHeading = isUseCasePage
+  ? `${useCase.label} rental options in ${city}`
+  : `${page.vehicleTitle} use cases in ${city}`;
+
+const aboutNeedText = isUseCasePage
+  ? `${useCase.label.toLowerCase()} rental with ${relatedVehicleText.toLowerCase()}`
+  : `${page.vehicleLabel.toLowerCase()} options`;
+
+const chooseLabel = isUseCasePage ? useCase.label : page.vehicleLabel;
+const faqTitleText = isUseCasePage ? useCase.title : `${page.vehicleLabel} Rental`;
+const faqFindText = isUseCasePage ? useCase.title.toLowerCase() : page.vehicleTitle.toLowerCase();
+const faqBookText = isUseCasePage ? `${useCase.label.toLowerCase()} rental` : page.vehicleLabel.toLowerCase();
+
 const serviceJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Service',
-  name: `${page.vehicleTitle} in ${city}`,
+  name: pageTitleText,
   description,
   provider: {
     '@type': 'Organization',
@@ -479,7 +812,7 @@ const serviceJsonLd = {
     name: city,
   },
   serviceType: [
-    `${page.vehicleTitle} in ${city}`,
+    pageTitleText,
     ...purposes.map((purpose) => purposeHeading(purpose, page.vehicleLabel, city)),
   ].join(', '),
   url: canonicalUrl,
@@ -488,7 +821,7 @@ const serviceJsonLd = {
 const itemListJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'ItemList',
-  name: `${page.vehicleTitle} listings in ${city}`,
+  name: isUseCasePage ? `${useCase.title} listings in ${city}` : `${page.vehicleTitle} listings in ${city}`,
   itemListElement: listings.slice(0, 30).map((listing, index) => ({
     '@type': 'ListItem',
     position: index + 1,
@@ -496,7 +829,7 @@ const itemListJsonLd = {
       '@type': 'Service',
       name: titleForListing(listing),
       description: listing.description || description,
-      serviceType: `${page.vehicleTitle} in ${city}`,
+      serviceType: pageTitleText,
       provider: {
         '@type': 'Organization',
         name: listing.owner_name || 'Local vehicle owner',
@@ -528,14 +861,14 @@ const breadcrumbJsonLd = {
     {
       '@type': 'ListItem',
       position: 3,
-      name: `${page.vehicleTitle} in ${city}`,
+      name: pageTitleText,
       item: canonicalUrl,
     },
   ],
 };
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} canonical={canonicalUrl}>
   <Fragment slot="head">
     <link rel="canonical" href={canonicalUrl} />
     <meta property="og:title" content={title} />
@@ -549,19 +882,15 @@ const breadcrumbJsonLd = {
 
     <main class="rent-seo-page">
     <section class="hero">
-      <div class="hero-badge">{page.emoji} {page.vehicleLabel} Rental</div>
+      <div class="hero-badge">{pageBadgeText}</div>
 
-      <h1>{page.vehicleTitle} in {city}</h1>
+      <h1>{pageTitleText}</h1>
 
-      <p>
-        Find {page.vehicleTitle.toLowerCase()} in {city} for {purposeList}.
-        SoniaBuddy helps users compare {ownerText}, {seatText}, price text,
-        owner name, call option and WhatsApp contact in one simple page.
-      </p>
+      <p>{heroIntro}</p>
     </section>
 
     <section class="content-card">
-      <h2>{page.vehicleTitle} use cases in {city}</h2>
+      <h2>{firstContentHeading}</h2>
 
       <div class="chips">
         {purposes.map((purpose) => (
@@ -569,18 +898,22 @@ const breadcrumbJsonLd = {
         ))}
       </div>
 
-      <p>
-        People usually need {page.vehicleLabel.toLowerCase()} rental in {city} for {purposeList}.
-        These use cases include both active owner listing data and common rental needs such as cheap rent,
-        wedding travel, tour plans, local trips, family travel, outstation journeys, station pickup and airport pickup.
-        Before booking, compare seat capacity, vehicle condition, pickup location, trip duration and final rent.
-        Always confirm whether toll, parking, waiting time, night charge or extra kilometer charge is included in the quoted price.
-      </p>
+      {isUseCasePage ? (
+        seoContentParagraphs.map((paragraph) => <p>{paragraph}</p>)
+      ) : (
+        <p>
+          People usually need {page.vehicleLabel.toLowerCase()} rental in {city} for {purposeList}.
+          These use cases include both active owner listing data and common rental needs such as cheap rent,
+          wedding travel, tour plans, local trips, family travel, outstation journeys, station pickup and airport pickup.
+          Before booking, compare seat capacity, vehicle condition, pickup location, trip duration and final rent.
+          Always confirm whether toll, parking, waiting time, night charge or extra kilometer charge is included in the quoted price.
+        </p>
+      )}
     </section>
 
     <section class="seo-listing-card">
       <div class="section-heading-row">
-        <h2>Available {page.vehicleLabel} Listings in {city}</h2>
+        <h2>{listingSectionTitle}</h2>
         <p>{listings.length} active listing{listings.length === 1 ? '' : 's'} found from local owners.</p>
       </div>
 
@@ -589,27 +922,32 @@ const breadcrumbJsonLd = {
           const phone = onlyDigits(listing.owner_phone);
           const wa = whatsappNumber(listing);
           const img = firstPhoto(listing);
+          const listingVehicle = vehicleInfo(listing.vehicle_type);
+          const listingModel = modelText(listing);
           const listingPurposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
 
           return (
             <article class="seo-rent-card">
               <div class="seo-rent-photo">
                 {img ? (
-                  <img src={img} alt={titleForListing(listing)} loading="lazy" decoding="async" />
+                  <img src={img} alt={`${listingVehicle.label} ${listingModel || 'rental'} in ${city}`} loading="lazy" decoding="async" />
                 ) : (
-                  <span>{page.emoji}</span>
+                  <span>{listingVehicle.emoji}</span>
                 )}
               </div>
 
               <div class="seo-rent-body">
                 <div class="seo-rent-headline">
                   <h3>{titleForListing(listing)}</h3>
+                  <span class="vehicle-type-pill">{listingVehicle.label}</span>
                   {listing.is_verified && <span class="verified-pill">Verified</span>}
                 </div>
 
                 <p class="owner-line">Owner: {listing.owner_name || 'Local vehicle owner'}</p>
 
                 <div class="facts">
+                  <span>Vehicle: {listingVehicle.label}</span>
+                  {listingModel && <span>Model: {listingModel}</span>}
                   {listing.price_text && <span>Price: {listing.price_text}</span>}
                   {listing.seats && <span>Seats: {listing.seats}</span>}
                   {listingPurposes.length > 0 && <span>Use: {listingPurposes.join(', ')}</span>}
@@ -640,10 +978,10 @@ const breadcrumbJsonLd = {
     </section>
 
     <section class="content-card">
-      <h2>About {page.vehicleTitle} in {city}</h2>
+      <h2>About {pageTitleText}</h2>
 
       <p>
-        SoniaBuddy is a local vehicle rental discovery page for people who need {page.vehicleLabel.toLowerCase()} options in {city}.
+        SoniaBuddy is a local vehicle rental discovery page for people who need {aboutNeedText} in {city}.
         This page is generated from active owner listings and helps users compare available vehicles, seating capacity,
         owner name, price text, purpose tags, call option and WhatsApp contact before making a booking decision.
         Current listings include {ownerText}, {seatText}, and {verifiedCount > 0 ? `${verifiedCount} verified listing${verifiedCount === 1 ? '' : 's'}` : 'owner-submitted listings'}.
@@ -660,7 +998,7 @@ const breadcrumbJsonLd = {
     </section>
 
     <section class="content-card">
-      <h2>How to choose the right {page.vehicleLabel} in {city}</h2>
+      <h2>How to choose the right {chooseLabel} rental in {city}</h2>
 
       <p>
         Start by checking the number of seats, vehicle model, owner name and price text shown in the listing.
@@ -676,10 +1014,10 @@ const breadcrumbJsonLd = {
     </section>
 
     <section class="faq-card">
-      <h2>FAQs about {page.vehicleLabel} Rental in {city}</h2>
+      <h2>FAQs about {faqTitleText} in {city}</h2>
 
       <details open>
-        <summary>How can I find {page.vehicleTitle.toLowerCase()} in {city}?</summary>
+        <summary>How can I find {faqFindText} in {city}?</summary>
         <p>
           You can check the active listings on this page and contact the vehicle owner directly by phone or WhatsApp.
           Each listing may include vehicle model, seats, purpose, price text and owner details.
@@ -694,7 +1032,7 @@ const breadcrumbJsonLd = {
       </details>
 
       <details>
-        <summary>Can I book {page.vehicleLabel.toLowerCase()} for {primaryPurpose.toLowerCase()}?</summary>
+        <summary>Can I book {faqBookText} for {primaryPurpose.toLowerCase()}?</summary>
         <p>
           Yes, if the listing includes {primaryPurpose.toLowerCase()} or a similar purpose, you can contact the owner and confirm availability.
           Always mention your date, pickup location, destination and number of passengers.
@@ -702,7 +1040,7 @@ const breadcrumbJsonLd = {
       </details>
 
       <details>
-        <summary>What should I confirm before calling a {page.vehicleLabel.toLowerCase()} owner?</summary>
+        <summary>What should I confirm before calling a {faqBookText} owner?</summary>
         <p>
           Confirm vehicle seats, total rent, pickup time, pickup place, destination, waiting charge, toll, parking and whether WhatsApp communication is available for sharing trip details.
         </p>
@@ -903,6 +1241,16 @@ const breadcrumbJsonLd = {
     font-size: 0.64rem;
     background: rgba(34, 197, 94, 0.18);
     color: #86efac;
+  }
+
+  .vehicle-type-pill {
+    display: inline-flex;
+    padding: 0.14rem 0.38rem;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 0.64rem;
+    background: rgba(255, 138, 0, 0.16);
+    color: #ffb24d;
   }
 
   .facts {
