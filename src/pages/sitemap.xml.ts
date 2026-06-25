@@ -1,54 +1,216 @@
-// Static demo URLs - will be replaced by Supabase fetched routes later
-const staticPages = [
-	{ url: '/', lastmod: new Date().toISOString() },
-	{ url: '/route-finder', lastmod: new Date().toISOString() },
-	{ url: '/all-routes', lastmod: new Date().toISOString() },
-	{ url: '/bus-search', lastmod: new Date().toISOString() },
-	{ url: '/rent-vehicle', lastmod: new Date().toISOString() },
-	{ url: '/about', lastmod: new Date().toISOString() },
-	{ url: '/faq', lastmod: new Date().toISOString() },
-	{ url: '/contact', lastmod: new Date().toISOString() },
-	{ url: '/privacy-policy', lastmod: new Date().toISOString() },
-	{ url: '/terms-and-conditions', lastmod: new Date().toISOString() }
-];
+const BASE_URL = 'https://soniabuddy.in';
 
-// Static route data array with 10 demo routes
-const routes = [
-	{ slug: "arambagh-to-bandar" },
-	{ slug: "kolkata-to-durgapur" },
-	{ slug: "kolkata-to-siliguri" },
-	{ slug: "kolkata-to-asansol" },
-	{ slug: "bankura-to-asansol" },
-	{ slug: "durgapur-to-asansol" },
-	{ slug: "tarakeswar-to-digha" },
-	{ slug: "howrah-to-tarakeswar" },
-	{ slug: "mecheda-to-digha" },
-	{ slug: "kolkata-to-contai" }
-];
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
 
-const routePages = routes.map(route => ({
-	url: `/bus-timetable/${route.slug}/`,
-	lastmod: new Date().toISOString()
-}));
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
 
-const baseUrl = 'https://soniabuddy.in';
+const today = new Date().toISOString();
 
-const allPages = [...staticPages, ...routePages];
+type BusRoute = {
+  source: string | null;
+  destination: string | null;
+};
 
-const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+type RentCity = {
+  id: string;
+  name_en?: string | null;
+  name?: string | null;
+};
+
+type RentListing = {
+  vehicle_type?: string | null;
+  base_city_id?: string | null;
+  service_city_ids?: string[] | null;
+};
+
+const clean = (value: string | null | undefined) => String(value || '').trim();
+
+const slugify = (value: string) =>
+  clean(value)
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+
+const xmlEscape = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+
+function addUrl(set: Set<string>, url: string) {
+  if (!url.startsWith('/')) return;
+  set.add(url.endsWith('/') ? url : `${url}/`);
+}
+
+async function supabaseFetch<T>(path: string, timeoutMs = 2500): Promise<T[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}${path}`;
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    });
+
+    clearTimeout(timer);
+
+    if (!res.ok) return [];
+    return (await res.json()) as T[];
+  } catch {
+    clearTimeout(timer);
+    return [];
+  }
+}
+
+async function addBusSeoUrls(urls: Set<string>) {
+  const routes = await supabaseFetch<BusRoute>(
+    '/rest/v1/bus_routes?select=source,destination&limit=2000'
+  );
+
+  for (const route of routes) {
+    const source = clean(route.source);
+    const destination = clean(route.destination);
+
+    if (!source || !destination) continue;
+
+    const sourceSlug = slugify(source);
+    const destinationSlug = slugify(destination);
+
+    if (!sourceSlug || !destinationSlug) continue;
+    if (sourceSlug === destinationSlug) continue;
+
+    addUrl(urls, `/bus-timetable/${sourceSlug}-to-${destinationSlug}/`);
+    addUrl(urls, `/bus-timetable/${destinationSlug}-to-${sourceSlug}/`);
+  }
+}
+
+function vehicleKey(type: string) {
+  const value = clean(type).toLowerCase();
+
+  if (value.includes('pickup')) return 'pickup-van';
+  if (value.includes('ambulance')) return 'ambulance';
+  if (value.includes('toto')) return 'toto';
+  if (value.includes('auto')) return 'auto';
+  if (value.includes('bus')) return 'bus';
+
+  return 'car';
+}
+
+async function addRentSeoUrls(urls: Set<string>) {
+  const cities = await supabaseFetch<RentCity>(
+    '/rest/v1/rent_cities?select=id,name_en,name,active&active=eq.true&limit=1000'
+  );
+
+  const listings = await supabaseFetch<RentListing>(
+    '/rest/v1/rent_listings?select=vehicle_type,base_city_id,service_city_ids,status&status=eq.active&limit=2000'
+  );
+
+  const cityById = new Map<string, string>();
+
+  for (const city of cities) {
+    const cityName = clean(city.name_en || city.name);
+    if (city.id && cityName) {
+      cityById.set(city.id, cityName);
+    }
+  }
+
+  const cityVehicleMap = new Map<string, Set<string>>();
+
+  for (const listing of listings) {
+    const vehicle = vehicleKey(listing.vehicle_type || 'car');
+
+    const cityIds = [
+      listing.base_city_id,
+      ...(Array.isArray(listing.service_city_ids) ? listing.service_city_ids : []),
+    ].filter(Boolean) as string[];
+
+    for (const cityId of cityIds) {
+      if (!cityById.has(cityId)) continue;
+
+      const vehicles = cityVehicleMap.get(cityId) || new Set<string>();
+      vehicles.add(vehicle);
+      cityVehicleMap.set(cityId, vehicles);
+    }
+  }
+
+  for (const [cityId, vehicles] of cityVehicleMap.entries()) {
+    const cityName = cityById.get(cityId);
+    if (!cityName) continue;
+
+    const citySlug = slugify(cityName);
+    if (!citySlug) continue;
+
+    for (const vehicle of vehicles) {
+      addUrl(urls, `/rent/${vehicle}-rental-in-${citySlug}/`);
+    }
+
+    if (vehicles.has('car') || vehicles.has('bus')) {
+      addUrl(urls, `/rent/wedding-car-bus-rental-in-${citySlug}/`);
+      addUrl(urls, `/rent/tour-car-bus-rental-in-${citySlug}/`);
+      addUrl(urls, `/rent/school-office-car-bus-rental-in-${citySlug}/`);
+    }
+
+    if (vehicles.has('car') || vehicles.has('toto') || vehicles.has('auto')) {
+      addUrl(urls, `/rent/local-car-toto-auto-rental-in-${citySlug}/`);
+    }
+
+    if (vehicles.has('ambulance')) {
+      addUrl(urls, `/rent/emergency-ambulance-rental-in-${citySlug}/`);
+    }
+
+    if (vehicles.has('pickup-van')) {
+      addUrl(urls, `/rent/goods-pickup-van-rental-in-${citySlug}/`);
+    }
+  }
+}
+
+export async function GET() {
+  const urls = new Set<string>();
+
+  // Useful public pages
+  addUrl(urls, '/');
+  addUrl(urls, '/all-routes/');
+  addUrl(urls, '/bus-search/');
+  addUrl(urls, '/route-finder/');
+  addUrl(urls, '/rent-vehicle/');
+
+  // Trust/legal public pages
+  addUrl(urls, '/about/');
+  addUrl(urls, '/contact/');
+  addUrl(urls, '/privacy-policy/');
+  addUrl(urls, '/terms-and-conditions/');
+
+  // Real SEO URLs from database only
+  await addBusSeoUrls(urls);
+  await addRentSeoUrls(urls);
+
+  const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${allPages.map(page => `  <url>
-    <loc>${baseUrl}${page.url}</loc>
-    <lastmod>${page.lastmod}</lastmod>
+${Array.from(urls)
+  .sort()
+  .map((url) => `  <url>
+    <loc>${xmlEscape(`${BASE_URL}${url}`)}</loc>
+    <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`).join('\n')}
-</urlset>`.trim();
+    <priority>${url === '/' ? '1.0' : '0.8'}</priority>
+  </url>`)
+  .join('\n')}
+</urlset>`;
 
-export function GET() {
-	return new Response(sitemap, {
-		headers: {
-			'Content-Type': 'application/xml; charset=utf-8',
-		},
-	});
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/xml; charset=utf-8',
+    },
+  });
 }

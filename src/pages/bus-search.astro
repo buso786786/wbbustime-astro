@@ -1,597 +1,737 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-const from = Astro.url.searchParams.get("from") || "";
-const to = Astro.url.searchParams.get("to") || "";
+const from = Astro.url.searchParams.get('from') || '';
+const to = Astro.url.searchParams.get('to') || '';
 
-// Static demo stops - will be replaced by Supabase later
-const demoStops = [
-	{ en: "Tarakeswar", bn: "তারকেশ্বর" },
-	{ en: "Haripal", bn: "হরিপাল" },
-	{ en: "Jangipara", bn: "জাঙ্গিপাড়া" },
-	{ en: "Arambagh", bn: "আরামবাগ" },
-	{ en: "Goghat", bn: "গোঘাট" },
-	{ en: "Digha", bn: "দীঘা" },
-	{ en: "Kolkata", bn: "কলকাতা" },
-	{ en: "Durgapur", bn: "দুর্গাপুর" },
-	{ en: "Bankura", bn: "বাঁকুড়া" }
-];
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
 
-// Static demo route data - database-ready structure
-const routeData = {
-	slug: "tarakeswar-to-digha",
-	source_name_en: "Tarakeswar",
-	source_name_bn: "তারকেশ্বর",
-	destination_name_en: "Digha",
-	destination_name_bn: "দীঘা",
-	seo_title_en: "Tarakeswar to Digha Bus Timetable",
-	seo_description_en: "Complete bus timetable from Tarakeswar to Digha. View all stops, departure times, arrival times, fare, and duration.",
-	travel_guide_en: "The route from Tarakeswar to Digha covers 185 km and takes approximately 4 hours 15 minutes. Buses run daily with multiple departures throughout the day.",
-	travel_guide_bn: "তারকেশ্বর থেকে দিঘা পর্যন্ত রুটটি ১৮৫ কিলোমিটার এবং প্রায় ৪ ঘণ্টা ১৫ মিনিট সময় নেয়। দিনে একাধিকবার বাস চলাচল করে।",
-	fare_min: 150,
-	fare_max: 180,
-	distance_text: "185 km",
-	duration_text: "4h 15m",
-	stops: [
-		{ name_en: "Tarakeswar", name_bn: "তারকেশ্বর", up_time: "05:00 AM", down_time: "11:15 AM" },
-		{ name_en: "Haripal", name_bn: "হরিপাল", up_time: "05:25 AM", down_time: "10:50 AM" },
-		{ name_en: "Jangipara", name_bn: "জাঙ্গিপাড়া", up_time: "--:--", down_time: "--:--" },
-		{ name_en: "Arambagh", name_bn: "আরামবাগ", up_time: "06:10 AM", down_time: "10:05 AM" },
-		{ name_en: "Goghat", name_bn: "গোঘাট", up_time: "06:35 AM", down_time: "09:40 AM" },
-		{ name_en: "Digha", name_bn: "দীঘা", up_time: "10:15 AM", down_time: "04:30 PM" }
-	],
-	buses: [
-		{
-			id: 1,
-			name: "Tarakeswar Express",
-			reg_number: "WB 12 4567",
-			departure: "05:00 AM",
-			arrival: "10:15 AM",
-			fare: "₹150",
-			duration: "5h 15m",
-			total_stops: 6,
-			slug: "tarakeswar-express",
-			stop_times: [
-				{ up_time: "05:00 AM", down_time: "11:15 AM" },
-				{ up_time: "05:25 AM", down_time: "10:50 AM" },
-				{ up_time: "--:--", down_time: "--:--" },
-				{ up_time: "06:10 AM", down_time: "10:05 AM" },
-				{ up_time: "06:35 AM", down_time: "09:40 AM" },
-				{ up_time: "10:15 AM", down_time: "04:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 2,
-			name: "Maa Tara Travels",
-			reg_number: "WB 27 0999",
-			departure: "06:30 AM",
-			arrival: "11:45 AM",
-			fare: "₹170",
-			duration: "5h 15m",
-			total_stops: 6,
-			slug: "maa-tara-travels",
-			stop_times: [
-				{ up_time: "06:30 AM", down_time: "12:00 PM" },
-				{ up_time: "06:55 AM", down_time: "11:35 AM" },
-				{ up_time: "07:15 AM", down_time: "11:10 AM" },
-				{ up_time: "07:45 AM", down_time: "10:40 AM" },
-				{ up_time: "08:10 AM", down_time: "10:15 AM" },
-				{ up_time: "11:45 AM", down_time: "05:00 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 3,
-			name: "Digha Local",
-			reg_number: "WB 41 2233",
-			departure: "08:00 AM",
-			arrival: "01:30 PM",
-			fare: "₹140",
-			duration: "5h 30m",
-			total_stops: 6,
-			slug: "digha-local",
-			stop_times: [
-				{ up_time: "08:00 AM", down_time: "01:15 PM" },
-				{ up_time: "08:30 AM", down_time: "12:50 PM" },
-				{ up_time: "--:--", down_time: "--:--" },
-				{ up_time: "09:15 AM", down_time: "12:10 PM" },
-				{ up_time: "09:45 AM", down_time: "11:40 AM" },
-				{ up_time: "01:30 PM", down_time: "06:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 4,
-			name: "Morning Star Bus",
-			reg_number: "WB 39 7788",
-			departure: "10:15 AM",
-			arrival: "03:45 PM",
-			fare: "₹180",
-			duration: "5h 30m",
-			total_stops: 6,
-			slug: "morning-star-bus",
-			stop_times: [
-				{ up_time: "10:15 AM", down_time: "03:00 PM" },
-				{ up_time: "10:40 AM", down_time: "02:35 PM" },
-				{ up_time: "11:05 AM", down_time: "02:10 PM" },
-				{ up_time: "11:30 AM", down_time: "01:40 PM" },
-				{ up_time: "12:00 PM", down_time: "01:10 PM" },
-				{ up_time: "03:45 PM", down_time: "08:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		}
-	],
-	faq_items: [
-		{
-			question_en: "What is the fare from Tarakeswar to Digha?",
-			question_bn: "তারকেশ্বর থেকে দিঘা এর ভাড়া কত?",
-			answer_en: "The fare ranges from ₹150 to ₹180 depending on the bus type and service.",
-			answer_bn: "বাসের ধরন ও সার্ভিস অনুযায়ী ভাড়া ₹150 থেকে ₹180 পর্যন্ত হতে পারে।"
-		}
-	],
-	related_routes: [
-		{ from_en: "Kolkata", from_bn: "কলকাতা", to_en: "Digha", to_bn: "দীঘা" }
-	]
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
+
+type BusRouteRow = {
+  source?: string | null;
+  destination?: string | null;
+  route_data?: Array<{ stoppage_name?: string | null }> | null;
 };
 
-// Middle stop search logic shell - disabled for demo
-// const normalizeStop = (value: string) =>
-// 	value
-// 		.toLowerCase()
-// 		.trim()
-// 		.replace(/\s+/g, " ");
-//
-// const stopOrder = routeData.stops.map((s) => normalizeStop(s.name_en));
-//
-// const fromIndex = stopOrder.indexOf(normalizeStop(from));
-// const toIndex = stopOrder.indexOf(normalizeStop(to));
-//
-// const isValidSearch = fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex;
+async function loadStopSuggestions() {
+  const fallback = [
+    'Arambagh', 'আরামবাগ',
+    'Tarakeswar', 'তারকেশ্বর',
+    'Digha', 'দীঘা',
+    'Ghatal', 'ঘাটাল',
+    'Kolkata', 'কলকাতা',
+    'Howrah', 'হাওড়া',
+  ];
+
+  try {
+    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/bus_routes?select=source,destination,route_data&limit=2000`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    });
+
+    if (!res.ok) return fallback;
+
+    const rows = (await res.json()) as BusRouteRow[];
+    const set = new Set<string>();
+
+    for (const row of rows) {
+      if (row.source) set.add(row.source.trim());
+      if (row.destination) set.add(row.destination.trim());
+
+      for (const stop of row.route_data || []) {
+        if (stop.stoppage_name) set.add(stop.stoppage_name.trim());
+      }
+    }
+
+    return Array.from(set)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, 600);
+  } catch {
+    return fallback;
+  }
+}
+
+const stopSuggestions = await loadStopSuggestions();
 ---
 
-<BaseLayout title="Bus Search" description="Search bus timetables in West Bengal. Find departure and arrival times for local bus routes across the state.">
-	<div class="debug-label">PAGE: BUS SEARCH</div>
-	<section class="hero">
-		<div class="container">
-			<h1>Bus Search Results</h1>
-			<p>
-				<span class="lang-en">Find bus schedules and timings across West Bengal</span>
-				<span class="lang-bn">পশ্চিমবঙ্গ জুড়ে বাসের সময়সূচী খুঁজুন</span>
-			</p>
-		</div>
-	</section>
+<BaseLayout
+  title="Bus Search"
+  description="Search West Bengal bus timetable, direct buses, indirect bus routes, middle stop connections and route finder results."
+>
+  <section class="bus-search-page">
+    <div class="container">
+      <div class="bus-search-hero">
+        <p class="eyebrow">🚌 Bus Route Finder</p>
+        <h1
+  data-en="Search Bus Timetable in West Bengal"
+  data-bn="পশ্চিমবঙ্গে বাস টাইমটেবিল খুঁজুন"
+>
+  Search Bus Timetable in West Bengal
+</h1>
+       <p
+  data-en="Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections."
+  data-bn="আগে সরাসরি বাস খুঁজুন। সরাসরি বাস না পেলে SoniaBuddy মাঝের স্টপ দিয়ে সংযোগ রুট দেখাবে।"
+>
+  Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections.
+</p>
+        <p class="bn-line">বাংলা বা English stop name লিখে bus route খুঁজুন।</p>
+      </div>
 
-	<section>
-		<div class="container">
-			<div class="search-card">
-				<h3>
-					<span class="lang-en">Search Bus</span>
-					<span class="lang-bn">বাস খুঁজুন</span>
-				</h3>
-				<form id="bus-search-form" action="/bus-search" method="get">
-					<div class="form-row">
-						<div class="form-group">
-							<label for="bus-from">
-								<span class="lang-en">From</span>
-								<span class="lang-bn">কোথা থেকে</span>
-							</label>
-							<input type="text" id="bus-from" name="from" list="stop-suggestions" placeholder="Enter departure city" value={from || ''} required />
-							<datalist id="stop-suggestions">
-								{demoStops.map(stop => (
-									<option value={stop.en}>{stop.en} / {stop.bn}</option>
-								))}
-							</datalist>
-						</div>
-						<div class="form-group">
-							<label for="bus-to">
-								<span class="lang-en">To</span>
-								<span class="lang-bn">কোথায় যাবেন</span>
-							</label>
-							<input type="text" id="bus-to" name="to" list="stop-suggestions" placeholder="Enter destination city" value={to || ''} required />
-						</div>
-					</div>
-					<button type="submit" class="btn btn-full">
-						<span class="lang-en">Search Bus</span>
-						<span class="lang-bn">বাস খুঁজুন</span>
-					</button>
-				</form>
-			</div>
+      <div class="search-card">
+        <form id="bus-search-form">
+          <div class="search-grid">
+            <label>
+              <span data-en="From" data-bn="কোথা থেকে">From</span>
+              <input
+                id="bus-from"
+                name="from"
+                type="text"
+                list="stop-suggestions"
+                placeholder="Arambagh / আরামবাগ"
+                data-placeholder-en="Arambagh"
+               data-placeholder-bn="আরামবাগ"
+                value={from}
+                autocomplete="off"
+                required
+              />
+            </label>
 
-			<div id="bus-results-section" class="hidden">
-				<div class="section-title mt-3">
-					<p class="search-info">
-						<span class="lang-en">Showing buses for <span id="search-from"></span> to <span id="search-to"></span></span>
-						<span class="lang-bn"><span id="search-from-bn"></span> থেকে <span id="search-to-bn"></span> এর জন্য বাস দেখানো হচ্ছে</span>
-					</p>
-					<h2>
-						<span class="lang-en">Available Buses</span>
-						<span class="lang-bn">উপলব্ধ বাস</span>
-					</h2>
-				</div>
-				<div class="bus-results" id="dynamic-bus-results">
-					<!-- Dynamic results from route-finder will be inserted here -->
-				</div>
-				<div class="bus-results" id="demo-bus-results">
-					<p class="demo-note" style="display: none; color: #64748b; font-size: 0.875rem; margin-bottom: 1rem;">
-						Demo result shown because live route data is unavailable.
-					</p>
-					{routeData.buses.map((bus: any, index: number) => (
-						<div class="bus-result-card">
-							<div class="bus-photo">
-								<span class="bus-photo-emoji">🚌</span>
-							</div>
-							<div class="bus-info">
-								<div class="bus-header">
-									<h4>{bus.name}</h4>
-									<span class="direction-badge" id={`bus-direction-${index}`}>Up</span>
-								</div>
-								<p class="bus-reg">{bus.reg_number}</p>
-								<p class="bus-route-full">
-									<span class="lang-en">Full Route:</span>
-									<span class="lang-bn">সম্পূর্ণ রুট:</span>
-									{routeData.source_name_en} → {routeData.destination_name_en}
-								</p>
-								<p class="bus-route-segment">
-									<span class="lang-en">Your Search:</span>
-									<span class="lang-bn">আপনার অনুসন্ধান:</span>
-									<span id="search-segment-from"></span> → <span id="search-segment-to"></span>
-								</p>
-								<div class="bus-timing-row">
-									<div class="timing-item">
-										<span class="timing-label">Departure</span>
-										<span class="timing-value" id={`bus-departure-${index}`}>{bus.departure}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Arrival</span>
-										<span class="timing-value" id={`bus-arrival-${index}`}>{bus.arrival}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Fare</span>
-										<span class="timing-value">{bus.fare}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Duration</span>
-										<span class="timing-value">{bus.duration}</span>
-									</div>
-								</div>
-								<a href={`/bus-timetable/${routeData.slug}/?bus=${bus.slug}&from=${from}&to=${to}`} class="btn btn-full">
-									<span class="lang-en">View Timetable</span>
-									<span class="lang-bn">টাইমটেবিল দেখুন</span>
-								</a>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
+            <label>
+              <span data-en="To" data-bn="কোথায়">To</span>
+              <input
+                id="bus-to"
+                name="to"
+                type="text"
+                list="stop-suggestions"
+                placeholder="Digha / দীঘা"
+                data-placeholder-en="Digha"
+                data-placeholder-bn="দীঘা"
+                value={to}
+                autocomplete="off"
+                required
+              />
+            </label>
 
-			<div id="indirect-routes-section" class="hidden">
-				<div class="section-title mt-3">
-					<h2>
-						<span class="lang-en">Suggested Indirect Routes</span>
-						<span class="lang-bn">পরোক্ষ রুটের পরামর্শ</span>
-					</h2>
-				</div>
-				<div class="bus-results" id="indirect-routes-results">
-					<!-- Indirect routes will be inserted here -->
-				</div>
-			</div>
+            <button type="submit" id="search-btn" data-en="Search" data-bn="খুঁজুন">Search</button>
+          </div>
 
-			<div id="no-bus-section" class="hidden">
-				<div class="section-title mt-3">
-					<p class="search-info">
-						<span class="lang-en">Showing buses for <span id="search-from-no"></span> to <span id="search-to-no"></span></span>
-						<span class="lang-bn"><span id="search-from-no-bn"></span> থেকে <span id="search-to-no-bn"></span> এর জন্য বাস দেখানো হচ্ছে</span>
-					</p>
-					<h2>
-						<span class="lang-en">Available Buses</span>
-						<span class="lang-bn">উপলব্ধ বাস</span>
-					</h2>
-				</div>
-				<div class="card">
-					<p>
-						<span class="lang-en">No direct bus found. Try reverse direction or another stop.</span>
-						<span class="lang-bn">কোনো সরাসরি বাস পাওয়া যায়নি। বিপরীত দিক বা অন্য স্টপ চেষ্টা করুন।</span>
-					</p>
-				</div>
-			</div>
+          <datalist id="stop-suggestions">
+            {stopSuggestions.map((stop) => <option value={stop} />)}
+          </datalist>
+        </form>
+      </div>
 
-			<div id="popular-routes-section">
-				<div class="section-title mt-3">
-					<h2>
-						<span class="lang-en">Popular Bus Routes</span>
-						<span class="lang-bn">জনপ্রিয় বাস রুট</span>
-					</h2>
-				</div>
-				<div class="grid grid-3">
-					<a href="/bus-search?from=Kolkata&to=Siliguri" class="popular-item">
-						<h4>
-							<span class="lang-en">Kolkata to Siliguri</span>
-							<span class="lang-bn">কলকাতা থেকে শিলিগুড়ি</span>
-						</h4>
-						<p>
-							<span class="lang-en">Daily bus service available</span>
-							<span class="lang-bn">প্রতিদিন বাস সার্ভিস আছে</span>
-						</p>
-					</a>
-					<a href="/bus-search?from=Kolkata&to=Durgapur" class="popular-item">
-						<h4>
-							<span class="lang-en">Kolkata to Durgapur</span>
-							<span class="lang-bn">কলকাতা থেকে দুর্গাপুর</span>
-						</h4>
-						<p>
-							<span class="lang-en">Frequent bus service</span>
-							<span class="lang-bn">ঘন ঘন বাস সার্ভিস</span>
-						</p>
-					</a>
-					<a href="/bus-search?from=Siliguri&to=Darjeeling" class="popular-item">
-						<h4>
-							<span class="lang-en">Siliguri to Darjeeling</span>
-							<span class="lang-bn">শিলিগুড়ি থেকে দার্জিলিং</span>
-						</h4>
-						<p>
-							<span class="lang-en">Hill route bus service</span>
-							<span class="lang-bn">পাহাড়ি রুট বাস সার্ভিস</span>
-						</p>
-					</a>
-					<a href="/bus-search?from=Kolkata&to=Asansol" class="popular-item">
-						<h4>
-							<span class="lang-en">Kolkata to Asansol</span>
-							<span class="lang-bn">কলকাতা থেকে আসানসোল</span>
-						</h4>
-						<p>
-							<span class="lang-en">Regular bus service</span>
-							<span class="lang-bn">নিয়মিত বাস সার্ভিস</span>
-						</p>
-					</a>
-					<a href="/bus-search?from=Durgapur&to=Asansol" class="popular-item">
-						<h4>
-							<span class="lang-en">Durgapur to Asansol</span>
-							<span class="lang-bn">দুর্গাপুর থেকে আসানসোল</span>
-						</h4>
-						<p>
-							<span class="lang-en">Short distance service</span>
-							<span class="lang-bn">ছোট দূরত্বের সার্ভিস</span>
-						</p>
-					</a>
-					<a href="/bus-search?from=Kolkata&to=Burdwan" class="popular-item">
-						<h4>
-							<span class="lang-en">Kolkata to Burdwan</span>
-							<span class="lang-bn">কলকাতা থেকে বর্ধমান</span>
-						</h4>
-						<p>
-							<span class="lang-en">Frequent connections</span>
-							<span class="lang-bn">ঘন ঘন সংযোগ</span>
-						</p>
-					</a>
-				</div>
-			</div>
-		</div>
-	</section>
+      <div id="status-box" class="status-box hidden"></div>
+
+      <section id="direct-section" class="result-section hidden">
+        <div class="section-head">
+          <h2 data-en="Direct buses found" data-bn="সরাসরি বাস পাওয়া গেছে">Direct buses found</h2>
+          <p id="direct-subtitle"></p>
+        </div>
+        <div id="direct-results" class="result-list"></div>
+      </section>
+
+      <section id="indirect-section" class="result-section hidden">
+        <div class="section-head">
+          <h2 data-en="Suggested indirect routes" data-bn="প্রস্তাবিত সংযোগ রুট">Suggested indirect routes</h2>
+          <p
+  data-en="Use these routes when direct bus is not available or when middle-stop travel is better."
+  data-bn="সরাসরি বাস না থাকলে বা মাঝের স্টপ দিয়ে যাত্রা ভালো হলে এই রুটগুলো ব্যবহার করুন।"
+>
+  Use these routes when direct bus is not available or when middle-stop travel is better.
+</p>
+        </div>
+        <div id="indirect-results" class="result-list"></div>
+      </section>
+
+      <section id="rent-section" class="rent-help hidden">
+        <h2 data-en="No bus route found" data-bn="কোনো বাস রুট পাওয়া যায়নি">No bus route found</h2>
+        <p>
+          We could not find direct or indirect bus routes for this search. You can try another spelling, reverse direction,
+          or find a car with driver.
+        </p>
+        <a
+  href="/rent-vehicle?tab=find"
+  class="rent-btn"
+  data-en="Find Rent Car / Cab"
+  data-bn="ভাড়া গাড়ি / ক্যাব খুঁজুন"
+>
+  Find Rent Car / Cab
+</a>
+      </section>
+
+      <section id="popular-section" class="popular-routes">
+        <h2 data-en="Popular searches" data-bn="জনপ্রিয় সার্চ">Popular searches</h2>
+        <div class="popular-grid">
+          <a href="/bus-search?from=Arambagh&to=Tarakeswar">Arambagh to Tarakeswar</a>
+          <a href="/bus-search?from=Arambagh&to=Digha">Arambagh to Digha</a>
+          <a href="/bus-search?from=Ghatal&to=Digha">Ghatal to Digha</a>
+          <a href="/bus-search?from=Digha&to=Arambagh">Digha to Arambagh</a>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <script>
+    import { findJourney } from '../lib/routeFinder';
+
+    const form = document.getElementById('bus-search-form');
+    const fromInput = document.getElementById('bus-from');
+    const toInput = document.getElementById('bus-to');
+    const searchBtn = document.getElementById('search-btn');
+
+    const statusBox = document.getElementById('status-box');
+    const directSection = document.getElementById('direct-section');
+    const indirectSection = document.getElementById('indirect-section');
+    const rentSection = document.getElementById('rent-section');
+    const popularSection = document.getElementById('popular-section');
+
+    const directResults = document.getElementById('direct-results');
+    const indirectResults = document.getElementById('indirect-results');
+    const directSubtitle = document.getElementById('direct-subtitle');
+
+    const escapeHtml = (value) =>
+      String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+    const slugify = (value) =>
+      String(value || '')
+        .normalize('NFKD')
+        .toLowerCase()
+        .trim()
+        .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+        .replace(/^-+|-+$/g, '');
+
+   const timetableUrl = (item, toArg, busIdArg) => {
+  const isBusObject = item && typeof item === 'object';
+
+  const displayFrom = isBusObject ? toArg : item;
+  const displayTo = isBusObject ? busIdArg : toArg;
+
+  const routeFrom = isBusObject
+    ? item.route_source || item.routeSource || item.main_source || item.mainSource || item.source || item.from || displayFrom
+    : item;
+
+  const routeTo = isBusObject
+    ? item.route_destination || item.routeDestination || item.main_destination || item.mainDestination || item.destination || item.to || displayTo
+    : toArg;
+
+  const busId = isBusObject ? item.bus_id : busIdArg;
+
+  const slug = `${slugify(routeFrom)}-to-${slugify(routeTo)}`;
+  let base = '/bus-timetable/result/';
+
+  if (slug.length > 4) {
+    base = `/bus-timetable/${slug}/`;
+  }
+
+  const params = new URLSearchParams();
+  if (busId) params.set('bus_id', busId);
+  params.set('from', displayFrom || routeFrom || '');
+  params.set('to', displayTo || routeTo || '');
+
+  return `${base}?${params.toString()}#selected-bus`;
+};
+
+    const setHidden = (el, hidden) => {
+      if (!el) return;
+      el.classList.toggle('hidden', hidden);
+    };
+
+    const setStatus = (message, type = 'info') => {
+      if (!statusBox) return;
+      statusBox.textContent = message;
+      statusBox.className = `status-box ${type}`;
+      setHidden(statusBox, false);
+    };
+
+    const resetResults = () => {
+      setHidden(statusBox, true);
+      setHidden(directSection, true);
+      setHidden(indirectSection, true);
+      setHidden(rentSection, true);
+      if (directResults) directResults.innerHTML = '';
+      if (indirectResults) indirectResults.innerHTML = '';
+    };
+
+    const busCard = (bus, searchFrom, searchTo) => {
+      const from = bus.from || searchFrom;
+      const to = bus.to || searchTo;
+      const url = timetableUrl(bus, from, to);
+
+      return `
+        <article class="bus-card">
+          <div class="bus-photo">
+            ${
+              bus.image_url
+                ? `<img src="${escapeHtml(bus.image_url)}" alt="${escapeHtml(bus.bus_name || 'Bus')}" loading="lazy" />`
+                : `<span>🚌</span>`
+            }
+          </div>
+
+          <div class="bus-info">
+            <div class="bus-title-row">
+              <h3>${escapeHtml(bus.bus_name || 'Bus')}</h3>
+              <span>${escapeHtml(bus.bus_type || 'Bus')}</span>
+            </div>
+
+            <p class="route-line">${escapeHtml(from)} → ${escapeHtml(to)}</p>
+
+            <div class="time-grid">
+              <div>
+                <small>Departure</small>
+                <strong>${escapeHtml(bus.departure || 'Time not available')}</strong>
+              </div>
+              <div>
+                <small>Arrival</small>
+                <strong>${escapeHtml(bus.arrival || 'Time not available')}</strong>
+              </div>
+              <div>
+                <small>Fare</small>
+                <strong>${escapeHtml(bus.fare || '--')}</strong>
+              </div>
+              <div>
+                <small>Match</small>
+                <strong>${escapeHtml(bus.matchReason || 'direct')}</strong>
+              </div>
+            </div>
+
+            <a class="view-btn" href="${url}">View Timetable</a>
+          </div>
+        </article>
+      `;
+    };
+
+    const indirectCard = (option, searchFrom, searchTo) => {
+      const step1 = option.step1 || {};
+      const step2 = option.step2 || {};
+      const mid = option.midpoint || option.midpointA || step1.to || step2.from || 'Middle stop';
+
+      return `
+        <article class="indirect-card">
+          <div class="indirect-head">
+            <h3>Via ${escapeHtml(mid)}</h3>
+            ${option.waitMin ? `<span>Wait ${escapeHtml(option.waitMin)} min</span>` : ''}
+          </div>
+
+          <div class="step-box">
+            <b>Step 1</b>
+            <p>${escapeHtml(step1.bus_name || 'Bus 1')}</p>
+            <small>${escapeHtml(step1.from || searchFrom)} → ${escapeHtml(step1.to || mid)}</small>
+            <small>${escapeHtml(step1.departure || 'Time not available')} → ${escapeHtml(step1.arrival || 'Time not available')}</small>
+            ${
+             step1.bus_id
+            ? `<a href="${timetableUrl(step1.from || searchFrom, step1.to || mid, step1.bus_id)}">Step 1 Timetable</a>`
+                : ''
+            }
+          </div>
+
+          <div class="step-box">
+            <b>Step 2</b>
+            <p>${escapeHtml(step2.bus_name || 'Bus 2')}</p>
+            <small>${escapeHtml(step2.from || mid)} → ${escapeHtml(step2.to || searchTo)}</small>
+            <small>${escapeHtml(step2.departure || 'Time not available')} → ${escapeHtml(step2.arrival || 'Time not available')}</small>
+            ${
+          step2.bus_id
+                ? `<a href="${timetableUrl(step2.from || mid, step2.to || searchTo, step2.bus_id)}">Step 2 Timetable</a>`
+                : ''
+            }
+          </div>
+        </article>
+      `;
+    };
+
+    async function runSearch(from, to) {
+      const source = String(from || '').trim();
+      const destination = String(to || '').trim();
+      if (!source || !destination) return;
+
+      resetResults();
+      setHidden(popularSection, true);
+      setStatus('Searching bus routes...', 'loading');
+
+      if (searchBtn) searchBtn.disabled = true;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('from', source);
+      url.searchParams.set('to', destination);
+      window.history.replaceState({}, '', url);
+
+      try {
+        const plan = await findJourney(source, destination);
+
+        const direct = plan.direct || [];
+        const indirect = plan.kind === 'indirect' ? plan.indirect || [] : [];
+        const alternativeIndirect = plan.alternativeIndirect || [];
+        const allIndirect = [...indirect, ...alternativeIndirect].slice(0, 4);
+
+        setHidden(statusBox, true);
+
+        if (direct.length && directResults) {
+          setHidden(directSection, false);
+          if (directSubtitle) directSubtitle.textContent = `${plan.source} to ${plan.destination}`;
+          directResults.innerHTML = direct.map((bus) => busCard(bus, source, destination)).join('');
+        }
+
+        if (allIndirect.length && indirectResults) {
+          setHidden(indirectSection, false);
+          indirectResults.innerHTML = allIndirect.map((option) => indirectCard(option, source, destination)).join('');
+        }
+
+        if (!direct.length && !allIndirect.length) {
+          setHidden(rentSection, false);
+        }
+      } catch (error) {
+        console.error(error);
+        setStatus('Search failed. Please try again.', 'error');
+      } finally {
+        if (searchBtn) searchBtn.disabled = false;
+      }
+    }
+
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      runSearch(fromInput?.value, toInput?.value);
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const initialFrom = params.get('from');
+    const initialTo = params.get('to');
+
+    if (initialFrom && fromInput) fromInput.value = initialFrom;
+    if (initialTo && toInput) toInput.value = initialTo;
+
+    if (initialFrom && initialTo) {
+      runSearch(initialFrom, initialTo);
+    }
+  </script>
+
+  <style>
+    .bus-search-page {
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+      min-height: 100vh;
+      padding: 1rem 0 2.5rem;
+    }
+
+    .bus-search-hero {
+      background: white;
+      border: 1px solid #dbeafe;
+      border-radius: 1.25rem;
+      padding: 1.35rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #2563eb;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .bus-search-hero h1 {
+      margin: 0 0 0.5rem;
+      color: #0f172a;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      line-height: 1.1;
+    }
+
+    .bus-search-hero p {
+      margin: 0.35rem 0 0;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .bn-line {
+      color: #0369a1 !important;
+      font-weight: 650;
+    }
+
+    .search-card,
+    .result-section,
+    .rent-help,
+    .popular-routes {
+      background: white;
+      border: 1px solid #dbeafe;
+      border-radius: 1rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-top: 1rem;
+    }
+
+    .search-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    .search-grid label {
+      display: grid;
+      gap: 0.35rem;
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .search-grid input {
+      width: 100%;
+      border: 1px solid #bfdbfe;
+      border-radius: 0.75rem;
+      padding: 0.8rem 0.9rem;
+      font: inherit;
+      color: #0f172a;
+      background: #f8fbff;
+    }
+
+    .search-grid input:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+      background: white;
+    }
+
+    #search-btn,
+    .view-btn,
+    .rent-btn,
+    .step-box a {
+      border: none;
+      border-radius: 0.75rem;
+      background: linear-gradient(135deg, #ff6b00, #ff8a00);
+      color: white;
+      font-weight: 800;
+      text-decoration: none;
+      padding: 0.82rem 1.15rem;
+      cursor: pointer;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 44px;
+    }
+
+    #search-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .status-box {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 1rem;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      font-weight: 700;
+    }
+
+    .status-box.error {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: #be123c;
+    }
+
+    .section-head h2,
+    .popular-routes h2,
+    .rent-help h2 {
+      margin: 0 0 0.35rem;
+      color: #0f172a;
+      font-size: 1.25rem;
+    }
+
+    .section-head p,
+    .rent-help p {
+      margin: 0 0 1rem;
+      color: #64748b;
+    }
+
+    .result-list {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .bus-card,
+    .indirect-card {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 0.85rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 1rem;
+      padding: 0.85rem;
+      background: #ffffff;
+    }
+
+    .bus-photo {
+      width: 88px;
+      height: 88px;
+      border-radius: 0.9rem;
+      background: #e0f2fe;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      font-size: 2rem;
+    }
+
+    .bus-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .bus-title-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .bus-title-row h3 {
+      margin: 0;
+      color: #0f172a;
+      font-size: 1rem;
+    }
+
+    .bus-title-row span,
+    .indirect-head span {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      border-radius: 999px;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .route-line {
+      margin: 0.35rem 0 0.65rem;
+      color: #475569;
+      font-weight: 650;
+    }
+
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .time-grid div {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.7rem;
+      padding: 0.5rem;
+    }
+
+    .time-grid small,
+    .step-box small {
+      display: block;
+      color: #64748b;
+      font-size: 0.72rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .time-grid strong {
+      color: #0f172a;
+      font-size: 0.85rem;
+    }
+
+    .indirect-card {
+      grid-template-columns: 1fr;
+    }
+
+    .indirect-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .indirect-head h3 {
+      margin: 0;
+      color: #0f172a;
+    }
+
+    .step-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.85rem;
+      padding: 0.75rem;
+      background: #f8fbff;
+      display: grid;
+      gap: 0.25rem;
+      margin-top: 0.6rem;
+    }
+
+    .step-box p {
+      margin: 0;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .step-box a {
+      margin-top: 0.4rem;
+      width: fit-content;
+      padding: 0.55rem 0.8rem;
+      min-height: auto;
+      font-size: 0.8rem;
+    }
+
+    .popular-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+
+    .popular-grid a {
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      padding: 0.55rem 0.8rem;
+      color: #0f172a;
+      background: #eff6ff;
+      text-decoration: none;
+      font-weight: 750;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 760px) {
+      .search-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #search-btn {
+        width: 100%;
+      }
+
+      .bus-card {
+        grid-template-columns: 76px 1fr;
+      }
+
+      .bus-photo {
+        width: 76px;
+        height: 76px;
+      }
+
+      .time-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
 </BaseLayout>
-
-<script>
-	import { findRoutes } from '../lib/routeFinder';
-
-	const busFromInput = document.getElementById('bus-from') as HTMLInputElement;
-	const busToInput = document.getElementById('bus-to') as HTMLInputElement;
-	const busSearchForm = document.getElementById('bus-search-form');
-	const busResultsSection = document.getElementById('bus-results-section');
-	const noBusSection = document.getElementById('no-bus-section');
-	const popularRoutesSection = document.getElementById('popular-routes-section');
-	const dynamicBusResults = document.getElementById('dynamic-bus-results');
-	const demoBusResults = document.getElementById('demo-bus-results');
-	const demoNote = document.querySelector('.demo-note');
-	const indirectRoutesSection = document.getElementById('indirect-routes-section');
-	const indirectRoutesResults = document.getElementById('indirect-routes-results');
-
-	// Function to perform search
-	async function performSearch(from: string, to: string) {
-		if (!from || !to) return;
-
-		// Update URL
-		const url = new URL(window.location.href);
-		url.searchParams.set('from', from);
-		url.searchParams.set('to', to);
-		window.history.replaceState({}, '', url.toString());
-
-		// Hide popular routes
-		if (popularRoutesSection) {
-			popularRoutesSection.classList.add('hidden');
-		}
-
-		// Show results section
-		if (busResultsSection) {
-			busResultsSection.classList.remove('hidden');
-		}
-		if (noBusSection) {
-			noBusSection.classList.add('hidden');
-		}
-
-		// Update search display
-		const searchFrom = document.getElementById('search-from');
-		const searchTo = document.getElementById('search-to');
-		const searchFromBn = document.getElementById('search-from-bn');
-		const searchToBn = document.getElementById('search-to-bn');
-		const searchSegmentFrom = document.getElementById('search-segment-from');
-		const searchSegmentTo = document.getElementById('search-segment-to');
-
-		if (searchFrom) searchFrom.textContent = from;
-		if (searchTo) searchTo.textContent = to;
-		if (searchFromBn) searchFromBn.textContent = from;
-		if (searchToBn) searchToBn.textContent = to;
-		if (searchSegmentFrom) searchSegmentFrom.textContent = from;
-		if (searchSegmentTo) searchSegmentTo.textContent = to;
-
-		// Hide demo results initially
-		if (demoBusResults) demoBusResults.style.display = 'none';
-		if (demoNote) demoNote.style.display = 'none';
-		if (indirectRoutesSection) indirectRoutesSection.classList.add('hidden');
-
-		// Show loading
-		if (dynamicBusResults) {
-			dynamicBusResults.innerHTML = '<p style="text-align: center; padding: 2rem; color: #64748b;">Loading...</p>';
-		}
-
-		try {
-			const result = await findRoutes(from, to);
-
-			// Handle different response kinds
-			if (result.kind === 'direct' && result.data?.options?.length > 0) {
-				// Show direct bus cards
-				if (dynamicBusResults) {
-					dynamicBusResults.innerHTML = `
-						<h3 style="margin-bottom: 1rem;">Direct buses found</h3>
-						${result.data.options.map((bus: any) => `
-						<div class="bus-result-card">
-							<div class="bus-photo">
-								${bus.image_url ? `<img src="${bus.image_url}" alt="${bus.bus_name}" />` : '<span class="bus-photo-emoji">🚌</span>'}
-							</div>
-							<div class="bus-info">
-								<div class="bus-header">
-									<h4>${bus.bus_name || 'Bus'}</h4>
-									<span class="direction-badge">${bus.bus_type || 'Bus'}</span>
-								</div>
-								<p class="bus-reg">${bus.reg_number || ''}</p>
-								<p class="bus-route-full">
-									Full Route: ${bus.full_route || bus.from + ' → ' + bus.to}
-								</p>
-								<p class="bus-route-segment">
-									Your Search: ${bus.from || from} → ${bus.to || to}
-								</p>
-								<div class="bus-timing-row">
-									<div class="timing-item">
-										<span class="timing-label">Departure</span>
-										<span class="timing-value">${bus.departure || 'Time not available'}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Arrival</span>
-										<span class="timing-value">${bus.arrival || 'Time not available'}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Fare</span>
-										<span class="timing-value">${bus.fare || '--'}</span>
-									</div>
-									<div class="timing-item">
-										<span class="timing-label">Duration</span>
-										<span class="timing-value">${bus.duration || '--'}</span>
-									</div>
-								</div>
-								${bus.bus_id ? `<a href="/bus-timetable/result/?bus_id=${encodeURIComponent(bus.bus_id)}&bus_name=${encodeURIComponent(bus.bus_name || 'Bus')}&from=${encodeURIComponent(bus.from || from)}&to=${encodeURIComponent(bus.to || to)}" class="btn btn-full">
-									View Timetable
-								</a>` : ''}
-							</div>
-						</div>
-					`).join('')}
-					`;
-				}
-			} else if (result.kind === 'indirect' && result.data && result.data.options) {
-				// Show no direct bus found block with rent car button
-				if (dynamicBusResults) {
-					dynamicBusResults.innerHTML = `
-						<div class="card" style="text-align: center; padding: 2rem; margin-bottom: 2rem;">
-							<h3 style="color: #f97316; margin-bottom: 0.5rem;">No direct bus found</h3>
-							<p style="color: #64748b; margin-bottom: 1.5rem;">Direct bus is not available for this route right now. You can try alternative indirect bus routes below.</p>
-							<a href="/rent-vehicle" class="btn" style="background: #f97316; color: white; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 0.375rem; display: inline-block; margin-bottom: 0.5rem;">
-								Find Rent Car / Cab
-							</a>
-							<p style="font-size: 0.875rem; color: #64748b;">Need faster travel? Book a car with driver.</p>
-						</div>
-						<h3 style="margin-bottom: 1rem;">Alternative indirect bus routes</h3>
-					`;
-				}
-
-				// Show max 2 indirect cards
-				const indirectOptions = result.data.options.slice(0, 2);
-				if (indirectRoutesSection) {
-					indirectRoutesSection.classList.remove('hidden');
-				}
-				if (indirectRoutesResults) {
-					indirectRoutesResults.innerHTML = indirectOptions.map((option: any) => `
-						<div class="bus-result-card">
-							<div class="bus-info">
-								<h4>Via ${option.midpoint || 'Midpoint'}</h4>
-								<p class="bus-route-segment">
-									Step 1: ${option.step1?.bus_name || 'Bus 1'} (${option.step1?.from || from} → ${option.step1?.to || option.midpoint})
-								</p>
-								<p class="bus-route-segment">
-									${option.step1?.departure || 'Time not available'} → ${option.step1?.arrival || 'Time not available'}
-								</p>
-								<p class="bus-route-segment">
-									Step 2: ${option.step2?.bus_name || 'Bus 2'} (${option.step2?.from || option.midpoint} → ${option.step2?.to || to})
-								</p>
-								<p class="bus-route-segment">
-									${option.step2?.departure || 'Time not available'} → ${option.step2?.arrival || 'Time not available'}
-								</p>
-								${option.waitMin ? `<p class="bus-reg">Wait: ${option.waitMin} min</p>` : ''}
-								<div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-									${option.step1?.bus_id ? `<a href="/bus-timetable/result/?bus_id=${encodeURIComponent(option.step1.bus_id)}&bus_name=${encodeURIComponent(option.step1.bus_name || 'Bus 1')}&from=${encodeURIComponent(option.step1.from || from)}&to=${encodeURIComponent(option.step1.to || option.midpoint)}" class="btn" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
-										Step 1 Timetable
-									</a>` : ''}
-									${option.step2?.bus_id ? `<a href="/bus-timetable/result/?bus_id=${encodeURIComponent(option.step2.bus_id)}&bus_name=${encodeURIComponent(option.step2.bus_name || 'Bus 2')}&from=${encodeURIComponent(option.step2.from || option.midpoint)}&to=${encodeURIComponent(option.step2.to || to)}" class="btn" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
-										Step 2 Timetable
-									</a>` : ''}
-								</div>
-							</div>
-						</div>
-					`).join('');
-				}
-			} else if (result.kind === 'none') {
-				// Show no bus route found with rent car button
-				if (dynamicBusResults) {
-					dynamicBusResults.innerHTML = `
-						<div class="card" style="text-align: center; padding: 2rem;">
-							<h3 style="color: #f97316; margin-bottom: 0.5rem;">No bus route found</h3>
-							<p style="color: #64748b; margin-bottom: 1.5rem;">We could not find a bus route for this search right now.</p>
-							<a href="/rent-vehicle" class="btn" style="background: #f97316; color: white; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 0.375rem; display: inline-block; margin-bottom: 0.5rem;">
-								Find Rent Car / Cab
-							</a>
-							<p style="font-size: 0.875rem; color: #64748b;">Need faster travel? Book a car with driver.</p>
-						</div>
-					`;
-				}
-			} else {
-				// Show demo results as fallback
-				if (demoBusResults) demoBusResults.style.display = 'flex';
-				if (demoNote) demoNote.style.display = 'block';
-			}
-		} catch (error) {
-			console.error('Error calling route-finder:', error);
-			// Show demo results as fallback
-			if (demoBusResults) demoBusResults.style.display = 'flex';
-			if (demoNote) demoNote.style.display = 'block';
-		}
-	}
-
-	// Form submit handler
-	if (busSearchForm) {
-		busSearchForm.addEventListener('submit', (e) => {
-			e.preventDefault();
-			if (busFromInput && busToInput) {
-				const from = busFromInput.value.trim();
-				const to = busToInput.value.trim();
-				if (from && to) {
-					performSearch(from, to);
-				}
-			}
-		});
-	}
-
-	// Read query params on page load and auto-search if they exist
-	const params = new URLSearchParams(window.location.search);
-	const fromParam = params.get('from');
-	const toParam = params.get('to');
-
-	if (busFromInput && fromParam) {
-		busFromInput.value = fromParam;
-	}
-	if (busToInput && toParam) {
-		busToInput.value = toParam;
-	}
-
-	if (fromParam && toParam) {
-	window.setTimeout(() => {
-		performSearch(fromParam, toParam);
-	}, 100);
-}
-</script>

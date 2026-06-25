@@ -1,146 +1,164 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { buildBusSeoRoutes } from '../lib/busSeoLinks';
 
-// Static route data array with 10 demo routes
-const routes = [
-	{
-		slug: "arambagh-to-bandar",
-		from_en: "Arambagh",
-		from_bn: "আরামবাগ",
-		to_en: "Bandar",
-		to_bn: "বাঁদর",
-		distance: "45 km",
-		duration: "1h 30m",
-		fare_min: 50,
-		fare_max: 70
-	},
-	{
-		slug: "kolkata-to-durgapur",
-		from_en: "Kolkata",
-		from_bn: "কলকাতা",
-		to_en: "Durgapur",
-		to_bn: "দুর্গাপুর",
-		distance: "160 km",
-		duration: "3h 30m",
-		fare_min: 120,
-		fare_max: 180
-	},
-	{
-		slug: "kolkata-to-siliguri",
-		from_en: "Kolkata",
-		from_bn: "কলকাতা",
-		to_en: "Siliguri",
-		to_bn: "শিলিগুড়ি",
-		distance: "560 km",
-		duration: "10h 30m",
-		fare_min: 450,
-		fare_max: 650
-	},
-	{
-		slug: "kolkata-to-asansol",
-		from_en: "Kolkata",
-		from_bn: "কলকাতা",
-		to_en: "Asansol",
-		to_bn: "আসানসোল",
-		distance: "200 km",
-		duration: "4h 00m",
-		fare_min: 150,
-		fare_max: 220
-	},
-	{
-		slug: "bankura-to-asansol",
-		from_en: "Bankura",
-		from_bn: "বাঁকুড়া",
-		to_en: "Asansol",
-		to_bn: "আসানসোল",
-		distance: "60 km",
-		duration: "1h 45m",
-		fare_min: 60,
-		fare_max: 90
-	},
-	{
-		slug: "durgapur-to-asansol",
-		from_en: "Durgapur",
-		from_bn: "দুর্গাপুর",
-		to_en: "Asansol",
-		to_bn: "আসানসোল",
-		distance: "40 km",
-		duration: "1h 15m",
-		fare_min: 40,
-		fare_max: 60
-	},
-	{
-		slug: "tarakeswar-to-digha",
-		from_en: "Tarakeswar",
-		from_bn: "তারকেশ্বর",
-		to_en: "Digha",
-		to_bn: "দীঘা",
-		distance: "185 km",
-		duration: "4h 15m",
-		fare_min: 150,
-		fare_max: 180
-	},
-	{
-		slug: "howrah-to-tarakeswar",
-		from_en: "Howrah",
-		from_bn: "হাওড়া",
-		to_en: "Tarakeswar",
-		to_bn: "তারকেশ্বর",
-		distance: "70 km",
-		duration: "2h 00m",
-		fare_min: 70,
-		fare_max: 100
-	},
-	{
-		slug: "mecheda-to-digha",
-		from_en: "Mecheda",
-		from_bn: "মেছেদা",
-		to_en: "Digha",
-		to_bn: "দীঘা",
-		distance: "120 km",
-		duration: "2h 45m",
-		fare_min: 100,
-		fare_max: 140
-	},
-	{
-		slug: "kolkata-to-contai",
-		from_en: "Kolkata",
-		from_bn: "কলকাতা",
-		to_en: "Contai",
-		to_bn: "কাঁথি",
-		distance: "140 km",
-		duration: "3h 15m",
-		fare_min: 110,
-		fare_max: 160
-	}
-];
+const seoRoutes = await buildBusSeoRoutes();
+
+const routeGroups = seoRoutes.reduce((groups, route) => {
+  const first = route.source.charAt(0).toUpperCase();
+  if (!groups[first]) groups[first] = [];
+  groups[first].push(route);
+  return groups;
+}, {} as Record<string, typeof seoRoutes>);
+
+const letters = Object.keys(routeGroups).sort();
 ---
 
 <BaseLayout
-	title="All Bus Routes - West Bengal Bus Timetable"
-	description="Complete list of all bus routes in West Bengal. View timetables, fares, and schedules for all major routes."
+  title="All Bus Routes"
+  description="Browse all real West Bengal bus timetable SEO route links generated from database route data."
 >
-	<div class="debug-label">PAGE: ALL ROUTES</div>
-	<section class="hero">
-		<div class="container">
-			<h1>All Bus Routes</h1>
-			<p>Complete list of all bus routes in West Bengal with timetables, fares, and schedules.</p>
-		</div>
-	</section>
+  <main class="all-routes-page">
+    <div class="container">
+      <section class="hero-card">
+        <p class="eyebrow">🚌 Bus Route Directory</p>
+        <h1>All Bus Timetable Routes</h1>
+        <p>
+          Browse crawlable bus timetable pages generated from real bus source and destination data.
+          New DB route add karne ke baad next build me link auto add hoga.
+        </p>
+      </section>
 
-	<section>
-		<div class="container">
-			<div class="section-title">
-				<h2>Available Routes</h2>
-			</div>
-			<div class="grid grid-3">
-				{routes.map(route => (
-					<a href={`/bus-timetable/${route.slug}/`} class="popular-item">
-						<h4>{route.from_en} to {route.to_en}</h4>
-						<p>{route.distance} • {route.duration} • ₹{route.fare_min} - ₹{route.fare_max}</p>
-					</a>
-				))}
-			</div>
-		</div>
-	</section>
+      <section class="summary-card">
+        <strong>{seoRoutes.length}</strong>
+        <span>real bus SEO links found</span>
+      </section>
+
+      {seoRoutes.length > 0 ? (
+        <section class="route-directory">
+          {letters.map((letter) => (
+            <div class="letter-block">
+              <h2>{letter}</h2>
+
+              <div class="route-grid">
+                {routeGroups[letter].map((route) => (
+                  <a href={route.href} class="route-card">
+                    <strong>{route.source} to {route.destination}</strong>
+                    <span>
+                      {route.routeCount} route data
+                      {route.busNames.length ? ` · ${route.busNames.slice(0, 2).join(', ')}` : ''}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : (
+        <section class="empty-card">
+          <h2>No real bus route links found</h2>
+          <p>Public build could not read bus route data from Supabase.</p>
+        </section>
+      )}
+    </div>
+  </main>
+
+  <style>
+    .all-routes-page {
+      min-height: 100vh;
+      padding: 1rem 0 2.5rem;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+    }
+
+    .hero-card,
+    .summary-card,
+    .letter-block,
+    .empty-card {
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 1.25rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #2563eb;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-card h1 {
+      margin: 0 0 0.5rem;
+      color: #0f172a;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+      line-height: 1.1;
+    }
+
+    .hero-card p,
+    .empty-card p {
+      margin: 0.35rem 0 0;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .summary-card {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    .summary-card strong {
+      color: #ff6b00;
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+
+    .summary-card span {
+      color: #334155;
+      font-weight: 800;
+    }
+
+    .letter-block h2 {
+      margin: 0 0 0.75rem;
+      color: #0f172a;
+      font-size: 1.25rem;
+    }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 0.65rem;
+    }
+
+    .route-card {
+      display: block;
+      background: #f8fbff;
+      border: 1px solid #bfdbfe;
+      border-radius: 0.95rem;
+      padding: 0.8rem;
+      color: #0f172a;
+      text-decoration: none;
+    }
+
+    .route-card:hover {
+      background: #eff6ff;
+    }
+
+    .route-card strong {
+      display: block;
+      font-size: 0.98rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .route-card span {
+      display: block;
+      color: #64748b;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+  </style>
 </BaseLayout>

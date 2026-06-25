@@ -104,37 +104,86 @@ const fullTitle = `${title} | ${siteName}`;
     </footer>
 
     <script>
-      (function() {
-        const langButtons = document.querySelectorAll('.lang-toggle button');
-        const body = document.body;
+  (function() {
+    const langButtons = document.querySelectorAll('.lang-toggle button');
+    const body = document.body;
+    const html = document.documentElement;
 
-        body.setAttribute('data-lang', 'en');
+    const readLang = () => {
+      try {
+        return (
+          localStorage.getItem('soniabuddy_lang') ||
+          localStorage.getItem('soniabuddy_rent_lang_v1') ||
+          'en'
+        );
+      } catch {
+        return 'en';
+      }
+    };
 
-        langButtons.forEach((button) => {
-          button.addEventListener('click', function(event) {
-            const target = event.currentTarget;
-            const lang = target.getAttribute('data-lang') || 'en';
+    const applyLang = (lang) => {
+      const safeLang = lang === 'bn' ? 'bn' : 'en';
 
-            body.setAttribute('data-lang', lang);
+      body.setAttribute('data-lang', safeLang);
+      html.setAttribute('lang', safeLang === 'bn' ? 'bn' : 'en');
 
-            try {
-              localStorage.setItem('soniabuddy_rent_lang_v1', lang);
-              localStorage.setItem('soniabuddy_lang', lang);
-            } catch {
-              // ignore
-            }
+      document.querySelectorAll('[data-en][data-bn]').forEach((el) => {
+        const text = el.getAttribute(safeLang === 'bn' ? 'data-bn' : 'data-en');
+        if (text !== null) el.textContent = text;
+      });
 
-            langButtons.forEach((btn) => btn.classList.remove('active'));
-            target.classList.add('active');
+      document.querySelectorAll('[data-placeholder-en][data-placeholder-bn]').forEach((el) => {
+        const text = el.getAttribute(
+          safeLang === 'bn' ? 'data-placeholder-bn' : 'data-placeholder-en'
+        );
+        if (text !== null) el.setAttribute('placeholder', text);
+      });
 
-            window.dispatchEvent(new StorageEvent('storage', {
+      langButtons.forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-lang') === safeLang);
+      });
+    };
+
+    const saveLang = (lang) => {
+      try {
+        localStorage.setItem('soniabuddy_lang', lang);
+        localStorage.setItem('soniabuddy_rent_lang_v1', lang);
+      } catch {
+        // ignore
+      }
+    };
+
+    const currentLang = readLang();
+    applyLang(currentLang);
+
+    langButtons.forEach((button) => {
+      button.addEventListener('click', function(event) {
+        const target = event.currentTarget;
+        const lang = target.getAttribute('data-lang') || 'en';
+
+        saveLang(lang);
+        applyLang(lang);
+
+        window.dispatchEvent(
+          new CustomEvent('soniabuddy:lang-change', {
+            detail: { lang },
+          })
+        );
+
+        try {
+          window.dispatchEvent(
+            new StorageEvent('storage', {
               key: 'soniabuddy_rent_lang_v1',
-              newValue: lang
-            }));
-          });
-        });
-      })();
-    </script>
+              newValue: lang,
+            })
+          );
+        } catch {
+          // ignore
+        }
+      });
+    });
+  })();
+</script>
   </body>
 </html>
 

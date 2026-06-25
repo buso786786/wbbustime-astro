@@ -1,0 +1,201 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { buildRentCityGroups, getUseCaseLinks, getVehicleLinks } from '../lib/rentSeoLinks';
+
+const cityGroups = await buildRentCityGroups();
+---
+
+<BaseLayout
+  title="Rent Vehicle by City"
+  description="Browse real city-wise car, bus, toto, pickup van and ambulance rental SEO pages in West Bengal on SoniaBuddy."
+>
+  <main class="rent-cities-page">
+    <div class="container">
+      <section class="hero-card">
+        <p class="eyebrow">🚗 Rent City Directory</p>
+        <h1>Rent Vehicle by City in West Bengal</h1>
+        <p>
+          These links are generated from active rent cities and active rent listings only. No fake city link is shown.
+        </p>
+      </section>
+
+      {cityGroups.length > 0 ? (
+        <section class="city-grid">
+          {cityGroups.map((group) => {
+            const vehicleLinks = getVehicleLinks(group);
+            const useLinks = getUseCaseLinks(group);
+
+            return (
+              <article class="city-card">
+                <div class="city-head">
+                  <div>
+                    <h2>{group.city} Rent Vehicle</h2>
+                    {group.cityBn && <p>{group.cityBn}</p>}
+                    {group.district && <small>{group.district}</small>}
+                  </div>
+                  <a href={vehicleLinks[0]?.url || '/rent-vehicle/'} class="main-city-link">Open</a>
+                </div>
+
+                <div class="link-block">
+                  <h3>Vehicle Type</h3>
+                  <div class="link-list">
+                    {vehicleLinks.map((item) => (
+                      <a href={item.url}>{item.label}</a>
+                    ))}
+                  </div>
+                </div>
+
+                {useLinks.length > 0 && (
+                  <div class="link-block">
+                    <h3>Use Case</h3>
+                    <div class="link-list use-links">
+                      {useLinks.map((item) => (
+                        <a href={item.url}>{item.label}</a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ) : (
+        <section class="empty-card">
+          <h2>No active rent city links found</h2>
+          <p>
+            Add active rent city and active listing in database. After next build, links will appear here automatically.
+          </p>
+          <a href="/rent-vehicle/">Open Rent Vehicle</a>
+        </section>
+      )}
+    </div>
+  </main>
+
+  <style>
+    .rent-cities-page {
+      min-height: 100vh;
+      padding: 1rem 0 2.5rem;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+    }
+
+    .hero-card,
+    .city-card,
+    .empty-card {
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 1.25rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #2563eb;
+      font-size: 0.8rem;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-card h1 {
+      margin: 0 0 0.5rem;
+      color: #0f172a;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+      line-height: 1.1;
+    }
+
+    .hero-card p,
+    .empty-card p {
+      margin: 0.35rem 0 0;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .city-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.9rem;
+    }
+
+    .city-card {
+      margin-bottom: 0;
+    }
+
+    .city-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin-bottom: 0.8rem;
+    }
+
+    .city-head h2 {
+      margin: 0;
+      color: #0f172a;
+      font-size: 1.08rem;
+    }
+
+    .city-head p {
+      margin: 0.2rem 0 0;
+      color: #0369a1;
+      font-weight: 800;
+    }
+
+    .city-head small {
+      display: block;
+      margin-top: 0.2rem;
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .main-city-link {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #ff7a00;
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 900;
+      padding: 0.42rem 0.7rem;
+    }
+
+    .link-block + .link-block {
+      margin-top: 0.85rem;
+    }
+
+    .link-block h3 {
+      margin: 0 0 0.5rem;
+      color: #334155;
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .link-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .link-list a,
+    .empty-card a {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #075985;
+      text-decoration: none;
+      font-weight: 850;
+      font-size: 0.82rem;
+      padding: 0.45rem 0.65rem;
+    }
+
+    .use-links a {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #ea580c;
+    }
+  </style>
+</BaseLayout>

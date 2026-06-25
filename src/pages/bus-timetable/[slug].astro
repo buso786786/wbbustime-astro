@@ -1,603 +1,991 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
-export async function getStaticPaths() {
-	return [
-		{ params: { slug: 'tarakeswar-to-digha' } },
-		{ params: { slug: 'result' } }
-	];
-}
+const SITE_URL = 'https://soniabuddy.in';
 
-const { slug } = Astro.params;
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
 
-// Check if this is the result page
-const isResultPage = slug === 'result';
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
 
-// Read query params for result page
-const url = new URL(Astro.request.url);
-const busId = url.searchParams.get('bus_id') || '';
-const busName = url.searchParams.get('bus_name') || '';
-const from = url.searchParams.get('from') || '';
-const to = url.searchParams.get('to') || '';
-
-// Static demo route data - database-ready structure
-const routeData = {
-	slug: "tarakeswar-to-digha",
-	source_name_en: "Tarakeswar",
-	source_name_bn: "তারকেশ্বর",
-	destination_name_en: "Digha",
-	destination_name_bn: "দীঘা",
-	seo_title_en: "Tarakeswar to Digha Bus Timetable",
-	seo_description_en: "Complete bus timetable from Tarakeswar to Digha. View all stops, departure times, arrival times, fare, and duration.",
-	travel_guide_en: "The route from Tarakeswar to Digha covers 185 km and takes approximately 4 hours 15 minutes. Buses run daily with multiple departures throughout the day.",
-	travel_guide_bn: "তারকেশ্বর থেকে দিঘা পর্যন্ত রুটটি ১৮৫ কিলোমিটার এবং প্রায় ৪ ঘণ্টা ১৫ মিনিট সময় নেয়। দিনে একাধিকবার বাস চলাচল করে।",
-	fare_min: 150,
-	fare_max: 180,
-	distance_text: "185 km",
-	duration_text: "4h 15m",
-	stops: [
-		{ name_en: "Tarakeswar", name_bn: "তারকেশ্বর", up_time: "05:00 AM", down_time: "11:15 AM" },
-		{ name_en: "Haripal", name_bn: "হরিপাল", up_time: "05:25 AM", down_time: "10:50 AM" },
-		{ name_en: "Jangipara", name_bn: "জাঙ্গিপাড়া", up_time: "--:--", down_time: "--:--" },
-		{ name_en: "Arambagh", name_bn: "আরামবাগ", up_time: "06:10 AM", down_time: "10:05 AM" },
-		{ name_en: "Goghat", name_bn: "গোঘাট", up_time: "06:35 AM", down_time: "09:40 AM" },
-		{ name_en: "Digha", name_bn: "দীঘা", up_time: "10:15 AM", down_time: "04:30 PM" }
-	],
-	buses: [
-		{
-			id: 1,
-			name: "Tarakeswar Express",
-			reg_number: "WB 12 4567",
-			departure: "05:00 AM",
-			arrival: "10:15 AM",
-			fare: "₹150",
-			duration: "5h 15m",
-			slug: "tarakeswar-express",
-			stop_times: [
-				{ up_time: "05:00 AM", down_time: "11:15 AM" },
-				{ up_time: "05:25 AM", down_time: "10:50 AM" },
-				{ up_time: "--:--", down_time: "--:--" },
-				{ up_time: "06:10 AM", down_time: "10:05 AM" },
-				{ up_time: "06:35 AM", down_time: "09:40 AM" },
-				{ up_time: "10:15 AM", down_time: "04:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 2,
-			name: "Maa Tara Travels",
-			reg_number: "WB 27 0999",
-			departure: "06:30 AM",
-			arrival: "11:45 AM",
-			fare: "₹170",
-			duration: "5h 15m",
-			slug: "maa-tara-travels",
-			stop_times: [
-				{ up_time: "06:30 AM", down_time: "12:00 PM" },
-				{ up_time: "06:55 AM", down_time: "11:35 AM" },
-				{ up_time: "07:15 AM", down_time: "11:10 AM" },
-				{ up_time: "07:45 AM", down_time: "10:40 AM" },
-				{ up_time: "08:10 AM", down_time: "10:15 AM" },
-				{ up_time: "11:45 AM", down_time: "05:00 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 3,
-			name: "Digha Local",
-			reg_number: "WB 41 2233",
-			departure: "08:00 AM",
-			arrival: "01:30 PM",
-			fare: "₹140",
-			duration: "5h 30m",
-			slug: "digha-local",
-			stop_times: [
-				{ up_time: "08:00 AM", down_time: "01:15 PM" },
-				{ up_time: "08:30 AM", down_time: "12:50 PM" },
-				{ up_time: "--:--", down_time: "--:--" },
-				{ up_time: "09:15 AM", down_time: "12:10 PM" },
-				{ up_time: "09:45 AM", down_time: "11:40 AM" },
-				{ up_time: "01:30 PM", down_time: "06:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		},
-		{
-			id: 4,
-			name: "Morning Star Bus",
-			reg_number: "WB 39 7788",
-			departure: "10:15 AM",
-			arrival: "03:45 PM",
-			fare: "₹180",
-			duration: "5h 30m",
-			slug: "morning-star-bus",
-			stop_times: [
-				{ up_time: "10:15 AM", down_time: "03:00 PM" },
-				{ up_time: "10:40 AM", down_time: "02:35 PM" },
-				{ up_time: "11:05 AM", down_time: "02:10 PM" },
-				{ up_time: "11:30 AM", down_time: "01:40 PM" },
-				{ up_time: "12:00 PM", down_time: "01:10 PM" },
-				{ up_time: "03:45 PM", down_time: "08:30 PM" }
-			],
-			photo: "/bus-placeholder.jpg"
-		}
-	],
-	faq_items: [
-		{
-			question_en: "What is the fare from Tarakeswar to Digha?",
-			question_bn: "তারকেশ্বর থেকে দিঘা এর ভাড়া কত?",
-			answer_en: "The fare ranges from ₹150 to ₹180 depending on the bus type and service.",
-			answer_bn: "বাসের ধরন ও সার্ভিস অনুযায়ী ভাড়া ₹150 থেকে ₹180 পর্যন্ত হতে পারে।"
-		}
-	],
-	related_routes: [
-		{ from_en: "Kolkata", from_bn: "কলকাতা", to_en: "Digha", to_bn: "দীঘা" }
-	]
+type StopTime = {
+  stoppage_name?: string | null;
+  up_time?: string | null;
+  down_time?: string | null;
 };
 
-const routeTitle = isResultPage ? 'Bus Timetable' : routeData.seo_title_en;
-const routeDescription = isResultPage ? 'View bus timetable details.' : routeData.seo_description_en;
+type BusRoute = {
+  id: string;
+  bus_name: string | null;
+  source: string | null;
+  destination: string | null;
+  bus_type: string | null;
+  image_url: string | null;
+  route_data: StopTime[] | null;
+};
+
+type StopRow = {
+  name: string;
+  up_time: string;
+  down_time: string;
+};
+
+type BusCard = {
+  id: string;
+  bus_name: string;
+  bus_type: string;
+  image_url: string | null;
+  source: string;
+  destination: string;
+  departure: string;
+  arrival: string;
+  direction: 'up' | 'down';
+  stops: StopRow[];
+};
+
+const clean = (value: string | null | undefined) => String(value || '').trim();
+
+const slugify = (value: string) =>
+  clean(value)
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+
+const normalKey = (value: string) =>
+  clean(value)
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const sameStop = (a: string, b: string) => {
+  const x = normalKey(a);
+  const y = normalKey(b);
+  return x && y && (x === y || x.includes(y) || y.includes(x));
+};
+
+function fullStops(route: BusRoute): StopRow[] {
+  const rows: StopRow[] = [];
+
+  if (route.source) {
+    rows.push({ name: route.source, up_time: '', down_time: '' });
+  }
+
+  for (const stop of route.route_data || []) {
+    const name = clean(stop.stoppage_name);
+    if (!name) continue;
+
+    const last = rows[rows.length - 1];
+
+    if (last && sameStop(last.name, name)) {
+      if (!last.up_time && stop.up_time) last.up_time = clean(stop.up_time);
+      if (!last.down_time && stop.down_time) last.down_time = clean(stop.down_time);
+      continue;
+    }
+
+    rows.push({
+      name,
+      up_time: clean(stop.up_time),
+      down_time: clean(stop.down_time),
+    });
+  }
+
+  if (route.destination) {
+    const last = rows[rows.length - 1];
+    if (!last || !sameStop(last.name, route.destination)) {
+      rows.push({ name: route.destination, up_time: '', down_time: '' });
+    }
+  }
+
+  return rows;
+}
+
+function findStopIndex(stops: StopRow[], stopName: string) {
+  return stops.findIndex((stop) => sameStop(stop.name, stopName));
+}
+
+function routeContains(route: BusRoute, fromName: string, toName: string) {
+  const stops = fullStops(route);
+  const fromIndex = findStopIndex(stops, fromName);
+  const toIndex = findStopIndex(stops, toName);
+  return fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex;
+}
+
+function makeBusCard(route: BusRoute, fromName: string, toName: string): BusCard | null {
+  const stops = fullStops(route);
+  const fromIndex = findStopIndex(stops, fromName);
+  const toIndex = findStopIndex(stops, toName);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return null;
+
+  const isDown = fromIndex > toIndex;
+  const departureStop = stops[fromIndex];
+  const arrivalStop = stops[toIndex];
+
+  return {
+    id: route.id,
+    bus_name: clean(route.bus_name) || 'Bus',
+    bus_type: clean(route.bus_type) || 'Bus',
+    image_url: route.image_url,
+    source: departureStop.name,
+    destination: arrivalStop.name,
+    departure: isDown ? departureStop.down_time || 'Time not available' : departureStop.up_time || 'Time not available',
+    arrival: isDown ? arrivalStop.down_time || 'Time not available' : arrivalStop.up_time || 'Time not available',
+    direction: isDown ? 'down' : 'up',
+    stops,
+  };
+}
+
+export async function getStaticPaths() {
+  const url =
+    'https://ytxtyphbguszjndtpakm.supabase.co/rest/v1/bus_routes?select=id,bus_name,source,destination,bus_type,image_url,route_data&limit=3000';
+
+  const anonKey =
+    'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
+  const clean = (value: string | null | undefined) => String(value || '').trim();
+
+  const slugify = (value: string) =>
+    clean(value)
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const sameStop = (a: string | null | undefined, b: string | null | undefined) => {
+    const x = clean(a)
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const y = clean(b)
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
+  };
+  let routes: BusRoute[] = [];
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+    });
+
+    if (res.ok) {
+      routes = (await res.json()) as BusRoute[];
+    }
+  } catch {
+    routes = [];
+  }
+
+  const pairMap = new Map<string, { source: string; destination: string; routes: BusRoute[] }>();
+
+  const addMainPair = (sourceRaw: string | null, destinationRaw: string | null) => {
+    const source = clean(sourceRaw);
+    const destination = clean(destinationRaw);
+
+    if (!source || !destination) return;
+    if (sameStop(source, destination)) return;
+
+    const slug = `${slugify(source)}-to-${slugify(destination)}`;
+    if (!slug || slug.includes('--')) return;
+
+    const matchedRoutes = routes.filter((route) => {
+      const routeSource = clean(route.source);
+      const routeDestination = clean(route.destination);
+
+      return (
+        (sameStop(routeSource, source) && sameStop(routeDestination, destination)) ||
+        (sameStop(routeSource, destination) && sameStop(routeDestination, source))
+      );
+    });
+
+    if (matchedRoutes.length === 0) return;
+
+    if (!pairMap.has(slug)) {
+      pairMap.set(slug, {
+        source,
+        destination,
+        routes: matchedRoutes,
+      });
+    }
+  };
+
+  for (const route of routes) {
+    addMainPair(route.source, route.destination);
+    addMainPair(route.destination, route.source);
+  }
+
+  return Array.from(pairMap.entries()).map(([slug, value]) => ({
+    params: { slug },
+    props: value,
+  }));
+}
+const { slug } = Astro.params;
+
+const { source, destination, routes } = Astro.props as {
+  source: string;
+  destination: string;
+  routes: BusRoute[];
+};
+const busCards = routes
+  .map((route) => makeBusCard(route, source, destination))
+  .filter(Boolean) as BusCard[];
+
+const selectedBusId = Astro.url.searchParams.get('bus_id') || '';
+
+const firstBus = selectedBusId
+  ? busCards.find((bus) => bus.id === selectedBusId) || busCards[0]
+  : busCards[0];
+
+const uniqueStops = Array.from(
+  new Set(
+    busCards
+      .flatMap((bus) => bus.stops.map((stop) => clean(stop.name)))
+      .filter(Boolean)
+  )
+);
+
+const importantStops = uniqueStops.slice(0, 10);
+const busNames = busCards.map((bus) => bus.bus_name).filter(Boolean).slice(0, 6);
+
+const upTimes = busCards
+  .map((bus) => bus.departure)
+  .filter((time) => time && time !== 'Time not available')
+  .slice(0, 5);
+
+const downTimes = busCards
+  .map((bus) => bus.arrival)
+  .filter((time) => time && time !== 'Time not available')
+  .slice(0, 5);
+
+const stopText = importantStops.length ? importantStops.join(', ') : `${source}, ${destination}`;
+const busText = busNames.length ? busNames.join(', ') : 'available route buses';
+const upTimeText = upTimes.length ? upTimes.join(', ') : 'available route timing';
+const downTimeText = downTimes.length ? downTimes.join(', ') : 'available return-side timing';
+
+const pageTitle = `${source} to ${destination} Bus Timetable`;
+const pageDescription = `Check ${source} to ${destination} bus timetable with bus names, stop-wise up time, down time and route details on SoniaBuddy.`;
 const canonical = `/bus-timetable/${slug}/`;
+const canonicalUrl = `${SITE_URL}${canonical}`;
+
+const breadcrumbJson = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: SITE_URL,
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Bus Search',
+      item: `${SITE_URL}/bus-search/`,
+    },
+    {
+      '@type': 'ListItem',
+      position: 3,
+      name: pageTitle,
+      item: canonicalUrl,
+    },
+  ],
+};
+
+const faqJson = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: `How can I check ${source} to ${destination} bus timetable?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: `You can check ${source} to ${destination} bus timetable on this page. The page shows available buses, stop-wise up time, down time and route details where data is available.`,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: `Are up time and down time available for ${source} to ${destination}?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: `Yes, up time and down time are shown where timing data is available in the route database. Timing can change due to traffic, road conditions or operator updates.`,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: `Can I search reverse route from ${destination} to ${source}?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: `Yes, you can search the reverse route from ${destination} to ${source} using SoniaBuddy bus search or route finder.`,
+      },
+    },
+  ],
+};
 ---
 
 <BaseLayout
-	title={routeTitle}
-	description={routeDescription}
-	canonical={canonical}
+  title={pageTitle}
+  description={pageDescription}
+  canonical={canonical}
 >
-	<div class="debug-label">PAGE: TIMETABLE</div>
-	{isResultPage ? (
-		<section class="hero">
-			<div class="container">
-				<h1>Bus Timetable</h1>
-			</div>
-		</section>
-	) : (
-		<section class="hero">
-			<div class="container">
-				<h1>Tarakeswar to Digha Bus Timetable</h1>
-			</div>
-		</section>
-	)}
+  <section class="timetable-page">
+    <div class="container">
+      <div class="hero-card">
+        <p class="eyebrow" data-en="🚌 Bus Timetable" data-bn="🚌 বাস টাইমটেবিল">🚌 Bus Timetable</p>
+<h1>{pageTitle}</h1>
+<p
+  data-en="Check available buses, bus names, route stops, up time and down time for this route."
+  data-bn="এই রুটের উপলব্ধ বাস, বাসের নাম, স্টপ লিস্ট, আপ টাইম ও ডাউন টাইম দেখুন।"
+>
+  Check available buses, bus names, route stops, up time and down time for this route.
+</p>
+<p class="bn-line">এই রুটের bus timing, stop list এবং up/down time দেখুন।</p>
+      </div>
 
-	{isResultPage ? (
-		<section>
-			<div class="container">
-				<div class="card" style="text-align: center; padding: 2rem;">
-					<h3 style="margin-bottom: 1rem;">Selected Bus</h3>
+      <div class="summary-grid">
+        <div>
+          <span data-en="From" data-bn="কোথা থেকে">From</span>
+          <strong>{source}</strong>
+        </div>
+        <div>
+          <span data-en="To" data-bn="কোথায়">To</span>
+          <strong>{destination}</strong>
+        </div>
+        <div>
+          <span data-en="Buses" data-bn="বাস">Buses</span>
+          <strong>{busCards.length}</strong>
+        </div>
+        <div>
+          <span data-en="Stops" data-bn="স্টপ">Stops</span>
+          <strong>{uniqueStops.length}</strong>
+        </div>
+      </div>
 
-<p id="result-bus-name" style="font-size: 1.25rem; font-weight: 500; margin-bottom: 0.5rem;">
-	Selected bus
+      {firstBus ? (
+        <section class="selected-card" id="selected-bus">
+          <div class="bus-photo">
+            {firstBus.image_url ? (
+              <img src={firstBus.image_url} alt={firstBus.bus_name} loading="lazy" />
+            ) : (
+              <span>🚌</span>
+            )}
+          </div>
+
+          <div class="bus-info">
+            <p class="selected-label" data-en="Selected Bus" data-bn="নির্বাচিত বাস">Selected Bus</p>
+            <h2>{firstBus.bus_name}</h2>
+            <p class="route-line">{firstBus.source} → {firstBus.destination}</p>
+
+            <div class="time-grid">
+              <div>
+                <small data-en="Departure" data-bn="ছাড়ার সময়">Departure</small>
+                <strong>{firstBus.departure}</strong>
+              </div>
+              <div>
+                <small data-en="Arrival" data-bn="পৌঁছানোর সময়">Arrival</small>
+                <strong>{firstBus.arrival}</strong>
+              </div>
+              <div>
+                <small data-en="Type" data-bn="ধরন">Type</small>
+                <strong>{firstBus.bus_type}</strong>
+              </div>
+              <div>
+                <small data-en="Direction" data-bn="দিক">Direction</small>
+                <strong>{firstBus.direction === 'down' ? 'Down' : 'Up'}</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section class="empty-card">
+  <h2 data-en="No bus timetable found" data-bn="কোনো বাস টাইমটেবিল পাওয়া যায়নি">
+    No bus timetable found
+  </h2>
+
+  <p
+    data-en="Try another spelling, reverse direction, or search nearby stops."
+    data-bn="অন্য বানান, উল্টো দিক, বা কাছাকাছি স্টপ দিয়ে সার্চ করুন।"
+  >
+    Try another spelling, reverse direction, or search nearby stops.
+  </p>
+
+  <div class="empty-actions">
+    <a
+      href="/bus-search"
+      class="empty-btn secondary"
+      data-en="Back to Bus Search"
+      data-bn="বাস সার্চে ফিরে যান"
+    >
+      Back to Bus Search
+    </a>
+
+    <a
+      href="/rent-vehicle?tab=find"
+      class="empty-btn primary"
+      data-en="Find Rent Car / Cab"
+      data-bn="ভাড়া গাড়ি / ক্যাব খুঁজুন"
+    >
+      Find Rent Car / Cab
+    </a>
+  </div>
+</section>
+      )}
+
+      {busCards.length > 1 && (
+        <section class="section-card">
+          <h2>
+  <span data-en="All Buses on" data-bn="সব বাস">All Buses on</span>
+  {source} to {destination}
+  <span data-en="Route" data-bn="রুটে">Route</span>
+</h2>
+          <div class="bus-list">
+            {busCards.map((bus) => (
+              <a
+                href={`${canonical}?bus_id=${bus.id}&from=${encodeURIComponent(source)}&to=${encodeURIComponent(destination)}#selected-bus`}
+                class={`mini-bus-card ${bus.id === selectedBusId ? 'active' : ''}`}
+              >
+                <span>{bus.bus_name}</span>
+                <small>{bus.departure} → {bus.arrival}</small>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {firstBus && (
+        <section class="section-card timetable-section">
+          <h2>
+  {firstBus.bus_name}
+  <span data-en="Stop-wise Timetable" data-bn="স্টপ অনুযায়ী টাইমটেবিল">Stop-wise Timetable</span>
+</h2>
+<p
+  class="table-note"
+  data-en="Mobile view shows each stop as a clean card: stop name, up time and down time."
+  data-bn="মোবাইলে প্রতিটি স্টপ কার্ড আকারে দেখাবে: স্টপ নাম, আপ টাইম ও ডাউন টাইম।"
+>
+  Mobile view shows each stop as a clean card: stop name, up time and down time.
 </p>
 
-<p id="result-route" style="color: #64748b; margin-bottom: 0.5rem;"></p>
+          <div class="desktop-table">
+            <table>
+              <thead>
+                <tr>
+                  <th data-en="Stop" data-bn="স্টপ">Stop</th>
+<th data-en="Up Time" data-bn="আপ টাইম">Up Time</th>
+<th data-en="Down Time" data-bn="ডাউন টাইম">Down Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {firstBus.stops.map((stop) => (
+                  <tr class={sameStop(stop.name, source) || sameStop(stop.name, destination) ? 'highlight-row' : ''}>
+                    <td>{stop.name}</td>
+                    <td>{stop.up_time || '--'}</td>
+                    <td>{stop.down_time || '--'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-<p id="result-bus-id" style="color: #64748b; margin-bottom: 1.5rem; font-size: 0.875rem;"></p>
+          <div class="mobile-stop-list">
+            {firstBus.stops.map((stop, index) => (
+              <article class={`stop-card ${sameStop(stop.name, source) || sameStop(stop.name, destination) ? 'active-stop' : ''}`}>
+                <div class="stop-top">
+                  <span>{index + 1}</span>
+                  <strong>{stop.name}</strong>
+                </div>
+                <div class="stop-times">
+                  <div>
+                   <small data-en="Up Time" data-bn="আপ টাইম">Up Time</small>
+                    <b>{stop.up_time || '--'}</b>
+                  </div>
+                  <div>
+                    <small data-en="Down Time" data-bn="ডাউন টাইম">Down Time</small>
+                    <b>{stop.down_time || '--'}</b>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
-<p style="color: #64748b;">Detailed stop timetable will be connected here.</p>
-				</div>
-			</div>
-		</section>
-	) : (
-		<section>
-			<div class="container">
-				<div class="route-summary">
-					<div class="summary-item">
-						<span class="summary-label">
-							<span class="lang-en">Source</span>
-							<span class="lang-bn">উৎস</span>
-						</span>
-						<span class="summary-value">
-							<span class="lang-en">{routeData.source_name_en}</span>
-							<span class="lang-bn">{routeData.source_name_bn}</span>
-						</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">
-							<span class="lang-en">Destination</span>
-							<span class="lang-bn">গন্তব্য</span>
-						</span>
-						<span class="summary-value">
-							<span class="lang-en">{routeData.destination_name_en}</span>
-							<span class="lang-bn">{routeData.destination_name_bn}</span>
-						</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">
-							<span class="lang-en">Distance</span>
-							<span class="lang-bn">দূরত্ব</span>
-						</span>
-						<span class="summary-value">{routeData.distance_text}</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">
-							<span class="lang-en">Duration</span>
-							<span class="lang-bn">সময়কাল</span>
-						</span>
-						<span class="summary-value">{routeData.duration_text}</span>
-					</div>
-					<div class="summary-item">
-						<span class="summary-label">
-							<span class="lang-en">Fare</span>
-							<span class="lang-bn">ভাড়া</span>
-						</span>
-						<span class="summary-value">₹{routeData.fare_min} - ₹{routeData.fare_max}</span>
-					</div>
-				</div>
-			</div>
-		</section>
-	)}
+      <section class="section-card seo-summary">
+        <h2>{source} to {destination} Bus Route Summary</h2>
 
-	{!isResultPage && (
-		<>
-		<section>
-			<div class="container">
-				<div class="bus-summary-header">
-					<p class="selected-bus-text">Selected Bus: <span id="selected-bus-name">{routeData.buses[0].name}</span></p>
-					<p class="search-segment-text" id="search-segment-container" class="hidden">
-						Search Segment: <span id="search-segment-from"></span> → <span id="search-segment-to"></span> |
-						Direction: <span id="search-direction"></span>
-					</p>
-				</div>
-				<div class="bus-card">
-					<div class="bus-photo">
-						<span class="bus-photo-emoji">🚌</span>
-					</div>
-					<div class="bus-info">
-						<h3 id="bus-name">{routeData.buses[0].name}</h3>
-						<p class="bus-reg" id="bus-reg">{routeData.buses[0].reg_number}</p>
-						<p class="bus-route">
-							{routeData.source_name_en} → {routeData.destination_name_en}
-						</p>
-						<div class="bus-timing-row">
-							<div class="timing-item">
-								<span class="timing-label">Departure</span>
-								<span class="timing-value" id="bus-departure">{routeData.buses[0].departure}</span>
-							</div>
-							<div class="timing-item">
-								<span class="timing-label">Arrival</span>
-								<span class="timing-value" id="bus-arrival">{routeData.buses[0].arrival}</span>
-							</div>
-							<div class="timing-item">
-								<span class="timing-label">Fare</span>
-								<span class="timing-value" id="bus-fare">{routeData.buses[0].fare}</span>
-							</div>
-							<div class="timing-item">
-								<span class="timing-label">Duration</span>
-								<span class="timing-value" id="bus-duration">{routeData.buses[0].duration}</span>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
+        <p>
+          The {source} to {destination} bus timetable page on SoniaBuddy is created from available route data,
+          bus details and stop-wise timing information. This route currently shows {busCards.length} listed
+          {busCards.length === 1 ? 'bus option' : 'bus options'} for passengers travelling from {source} to {destination}.
+          Available buses on this route include {busText}. The page shows important stop information, up timing and down timing
+          wherever that data is available.
+        </p>
 
-		<section>
-			<div class="container">
-				<a href="/bus-search" class="back-link">← Back to Bus Search</a>
-			</div>
-		</section>
+        <p>
+          Important stops found for this route include {stopText}. Passengers can use this page to compare bus names,
+          check departure timing, arrival timing, direction and stop-wise timetable before planning the journey.
+          For the selected bus, SoniaBuddy highlights the source stop, destination stop and available up/down timing in a mobile-friendly layout.
+        </p>
 
-		<section>
-			<div class="container">
-				<div class="section-title">
-					<h2>Select Bus</h2>
-				</div>
-				<div class="bus-selection">
-					{routeData.buses.map((bus: any) => (
-						<a href={`/bus-timetable/${slug}/?bus=${bus.slug}`} class="bus-select-btn" data-bus-slug={bus.slug}>
-							{bus.name}
-						</a>
-					))}
-				</div>
-			</div>
-		</section>
+        <p>
+          Available departure timing examples for this route include {upTimeText}. Arrival or return-side timing information includes
+          {downTimeText}. Bus timing may change because of traffic, weather, road conditions, local route updates or operator changes.
+          Please reach the bus stop early and confirm important travel details locally before starting the journey.
+        </p>
+      </section>
 
-		<section>
-			<div class="container">
-				<div class="section-title">
-					<h2>Full Stops Timetable</h2>
-				</div>
-				<div class="timetable-table">
-					<table>
-						<thead>
-							<tr>
-								<th>Stop No</th>
-								<th>Stop Name</th>
-								<th>Up Time</th>
-								<th>Down Time</th>
-							</tr>
-						</thead>
-						<tbody>
-							{routeData.stops.map((stop, index) => (
-								<tr id={`stop-row-${index}`}>
-									<td>{index + 1}</td>
-									<td>{stop.name_en}</td>
-									<td id={`stop-up-${index}`}>{stop.up_time}</td>
-									<td id={`stop-down-${index}`}>{stop.down_time}</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			</div>
-		</section>
+      <section class="section-card faq-card">
+        <h2>{source} to {destination} Bus FAQ</h2>
 
-		<section>
-			<div class="container">
-				<div class="section-title">
-					<h2>Travel Guide</h2>
-				</div>
-				<div class="card">
-					<p>{routeData.travel_guide_en}</p>
-				</div>
-			</div>
-		</section>
+        <details open>
+          <summary>How can I check {source} to {destination} bus timetable?</summary>
+          <p>
+            You can check the {source} to {destination} bus timetable on this page. It shows available bus names,
+            departure time, arrival time and stop-wise up/down time where data is available.
+          </p>
+        </details>
 
-		<section>
-			<div class="container">
-				<div class="section-title">
-					<h2>Fare Information</h2>
-				</div>
-				<div class="card">
-					<p>Fare Range: ₹{routeData.fare_min} - ₹{routeData.fare_max}</p>
-				</div>
-			</div>
-		</section>
+        <details>
+          <summary>Are up time and down time available on this route?</summary>
+          <p>
+            Yes, up time and down time are shown in the stop-wise timetable when the timing exists in the database.
+            If a time is missing, the page shows “--” or “Time not available” instead of fake timing.
+          </p>
+        </details>
 
-		<section>
-			<div class="container">
-				<div class="section-title">
-					<h2>FAQ</h2>
-				</div>
-				<div class="faq-list">
-					{routeData.faq_items.map(faq => (
-						<div class="faq-item">
-							<h3>{faq.question_en}</h3>
-							<p>{faq.answer_en}</p>
-						</div>
-					))}
-				</div>
-			</div>
-		</section>
+        <details>
+          <summary>Can I search {destination} to {source} reverse route?</summary>
+          <p>
+            Yes. You can search the reverse route from {destination} to {source} using SoniaBuddy bus search.
+            Reverse timing is shown where down-time data is available.
+          </p>
+        </details>
 
-		<script type="application/ld+json" set:html={JSON.stringify({
-			"@context": "https://schema.org",
-			"@type": "BreadcrumbList",
-			"itemListElement": [
-				{
-					"@type": "ListItem",
-					"position": 1,
-					"name": "Home",
-					"item": "https://soniabuddy.com"
-				},
-				{
-					"@type": "ListItem",
-					"position": 2,
-					"name": "Bus Search",
-					"item": "https://soniabuddy.com/bus-search"
-				},
-				{
-					"@type": "ListItem",
-					"position": 3,
-					"name": routeTitle,
-					"item": `https://soniabuddy.com${canonical}`
-				}
-			]
-		})}>
-		</script>
+        <details>
+          <summary>Why can bus timing change?</summary>
+          <p>
+            Bus timing can change due to traffic, weather, route updates, road condition or operator changes.
+            Please confirm locally before travelling.
+          </p>
+        </details>
+      </section>
 
-		<script type="application/ld+json" set:html={JSON.stringify({
-			"@context": "https://schema.org",
-			"@type": "FAQPage",
-			"mainEntity": routeData.faq_items.map(faq => ({
-				"@type": "Question",
-				"name": faq.question_en,
-				"acceptedAnswer": {
-					"@type": "Answer",
-					"text": faq.answer_en
-				}
-			}))
-		})}>
-		</script>
+      <div class="back-row">
+        <a
+  href={`/bus-search?from=${encodeURIComponent(source)}&to=${encodeURIComponent(destination)}`}
+  data-en="← Back to Bus Search"
+  data-bn="← বাস সার্চে ফিরে যান"
+>
+  ← Back to Bus Search
+</a>
+<a href="/all-routes/" data-en="See All Routes →" data-bn="সব রুট দেখুন →">See All Routes →</a>
+      </div>
+    </div>
+  </section>
 
-		<script>
-		(function() {
-		const buses = [
-			{
-				slug: "tarakeswar-express",
-				name: "Tarakeswar Express",
-				reg_number: "WB 12 4567",
-				departure: "05:00 AM",
-				arrival: "10:15 AM",
-				fare: "₹150",
-				duration: "5h 15m",
-				stop_times: [
-					{ up_time: "05:00 AM", down_time: "11:15 AM" },
-					{ up_time: "05:25 AM", down_time: "10:50 AM" },
-					{ up_time: "--:--", down_time: "--:--" },
-					{ up_time: "06:10 AM", down_time: "10:05 AM" },
-					{ up_time: "06:35 AM", down_time: "09:40 AM" },
-					{ up_time: "10:15 AM", down_time: "04:30 PM" }
-				]
-			},
-			{
-				slug: "maa-tara-travels",
-				name: "Maa Tara Travels",
-				reg_number: "WB 27 0999",
-				departure: "06:30 AM",
-				arrival: "11:45 AM",
-				fare: "₹170",
-				duration: "5h 15m",
-				stop_times: [
-					{ up_time: "06:30 AM", down_time: "12:00 PM" },
-					{ up_time: "06:55 AM", down_time: "11:35 AM" },
-					{ up_time: "07:15 AM", down_time: "11:10 AM" },
-					{ up_time: "07:45 AM", down_time: "10:40 AM" },
-					{ up_time: "08:10 AM", down_time: "10:15 AM" },
-					{ up_time: "11:45 AM", down_time: "05:00 PM" }
-				]
-			},
-			{
-				slug: "digha-local",
-				name: "Digha Local",
-				reg_number: "WB 41 2233",
-				departure: "08:00 AM",
-				arrival: "01:30 PM",
-				fare: "₹140",
-				duration: "5h 30m",
-				stop_times: [
-					{ up_time: "08:00 AM", down_time: "01:15 PM" },
-					{ up_time: "08:30 AM", down_time: "12:50 PM" },
-					{ up_time: "--:--", down_time: "--:--" },
-					{ up_time: "09:15 AM", down_time: "12:10 PM" },
-					{ up_time: "09:45 AM", down_time: "11:40 AM" },
-					{ up_time: "01:30 PM", down_time: "06:30 PM" }
-				]
-			},
-			{
-				slug: "morning-star-bus",
-				name: "Morning Star Bus",
-				reg_number: "WB 39 7788",
-				departure: "10:15 AM",
-				arrival: "03:45 PM",
-				fare: "₹180",
-				duration: "5h 30m",
-				stop_times: [
-					{ up_time: "10:15 AM", down_time: "03:00 PM" },
-					{ up_time: "10:40 AM", down_time: "02:35 PM" },
-					{ up_time: "11:05 AM", down_time: "02:10 PM" },
-					{ up_time: "11:30 AM", down_time: "01:40 PM" },
-					{ up_time: "12:00 PM", down_time: "01:10 PM" },
-					{ up_time: "03:45 PM", down_time: "08:30 PM" }
-				]
-			}
-		];
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJson)} />
+  <script type="application/ld+json" set:html={JSON.stringify(faqJson)} />
 
-		const params = new URLSearchParams(window.location.search);
-		const busSlug = params.get("bus");
-		const from = params.get("from");
-		const to = params.get("to");
+  <style>
+    .timetable-page {
+      min-height: 100vh;
+      padding: 1rem 0 2.5rem;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+    }
 
-		const selectedBus = busSlug ? buses.find(b => b.slug === busSlug) : buses[0];
+    .hero-card,
+    .selected-card,
+    .section-card,
+    .empty-card {
+      background: white;
+      border: 1px solid #dbeafe;
+      border-radius: 1.25rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-bottom: 1rem;
+    }
 
-		if (selectedBus) {
-			const busName = document.getElementById('bus-name');
-			const busReg = document.getElementById('bus-reg');
-			const busDeparture = document.getElementById('bus-departure');
-			const busArrival = document.getElementById('bus-arrival');
-			const busFare = document.getElementById('bus-fare');
-			const busDuration = document.getElementById('bus-duration');
-			const selectedBusName = document.getElementById('selected-bus-name');
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #2563eb;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
 
-			if (busName) busName.textContent = selectedBus.name;
-			if (busReg) busReg.textContent = selectedBus.reg_number;
-			if (busFare) busFare.textContent = selectedBus.fare;
-			if (busDuration) busDuration.textContent = selectedBus.duration;
-			if (selectedBusName) selectedBusName.textContent = selectedBus.name;
+    .hero-card h1 {
+      margin: 0 0 0.5rem;
+      color: #0f172a;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+      line-height: 1.1;
+    }
 
-			// Update stop table
-			if (selectedBus.stop_times) {
-				selectedBus.stop_times.forEach((stopTime, index) => {
-					const stopUp = document.getElementById(`stop-up-${index}`);
-					const stopDown = document.getElementById(`stop-down-${index}`);
-					if (stopUp) stopUp.textContent = stopTime.up_time;
-					if (stopDown) stopDown.textContent = stopTime.down_time;
-				});
-			}
+    .hero-card p,
+    .section-card p,
+    .empty-card p {
+      color: #475569;
+      line-height: 1.55;
+      margin: 0.35rem 0 0;
+    }
 
-			// Handle from/to query params for segment search
-			if (from && to) {
-				const normalizeStop = (value: string) =>
-					value.toLowerCase().trim().replace(/\s+/g, " ");
+    .bn-line {
+      color: #0369a1 !important;
+      font-weight: 650;
+    }
 
-				const stopOrder = [
-					"tarakeswar",
-					"haripal",
-					"jangipara",
-					"arambagh",
-					"goghat",
-					"digha"
-				];
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.7rem;
+      margin-bottom: 1rem;
+    }
 
-				const fromIndex = stopOrder.indexOf(normalizeStop(from));
-				const toIndex = stopOrder.indexOf(normalizeStop(to));
+    .summary-grid div {
+      background: white;
+      border: 1px solid #dbeafe;
+      border-radius: 1rem;
+      padding: 0.8rem;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    }
 
-				if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
-					const isReverse = fromIndex > toIndex;
-					const direction = isReverse ? "Down" : "Up";
+    .summary-grid span,
+    .time-grid small {
+      display: block;
+      color: #64748b;
+      font-size: 0.75rem;
+      margin-bottom: 0.15rem;
+    }
 
-					// Show search segment container
-					const searchSegmentContainer = document.getElementById('search-segment-container');
-					if (searchSegmentContainer) {
-						searchSegmentContainer.classList.remove('hidden');
-					}
+    .summary-grid strong,
+    .time-grid strong {
+      color: #0f172a;
+      font-size: 0.95rem;
+    }
 
-					// Update search segment text
-					const searchSegmentFrom = document.getElementById('search-segment-from');
-					const searchSegmentTo = document.getElementById('search-segment-to');
-					const searchDirection = document.getElementById('search-direction');
+    .selected-card {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 0.9rem;
+      align-items: start;
+    }
 
-					if (searchSegmentFrom) searchSegmentFrom.textContent = from;
-					if (searchSegmentTo) searchSegmentTo.textContent = to;
-					if (searchDirection) searchDirection.textContent = direction;
+    .bus-photo {
+      width: 96px;
+      height: 96px;
+      border-radius: 1rem;
+      background: #e0f2fe;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      font-size: 2.2rem;
+    }
 
-					// Update departure and arrival with segment times
-					if (busDeparture && selectedBus.stop_times[fromIndex]) {
-						busDeparture.textContent = isReverse ? selectedBus.stop_times[fromIndex].down_time : selectedBus.stop_times[fromIndex].up_time;
-					}
-					if (busArrival && selectedBus.stop_times[toIndex]) {
-						busArrival.textContent = isReverse ? selectedBus.stop_times[toIndex].down_time : selectedBus.stop_times[toIndex].up_time;
-					}
+    .bus-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
 
-					// Highlight from and to rows
-					const fromRow = document.getElementById(`stop-row-${fromIndex}`);
-					const toRow = document.getElementById(`stop-row-${toIndex}`);
-					if (fromRow) fromRow.classList.add('highlight-row');
-					if (toRow) toRow.classList.add('highlight-row');
-				}
-			}
+    .selected-label {
+      margin: 0 0 0.2rem !important;
+      color: #2563eb !important;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
 
-			// Update bus selector links to preserve from/to query
-			const busSelectBtns = document.querySelectorAll('.bus-select-btn');
-			busSelectBtns.forEach((btn) => {
-				const busSlug = btn.getAttribute('data-bus-slug');
-				if (busSlug) {
-					let href = `/bus-timetable/${slug}/?bus=${busSlug}`;
-					if (from && to) {
-						href += `&from=${from}&to=${to}`;
-					}
-					btn.setAttribute('href', href);
-				}
-			});
-		}
-	})();
-</script>
-		</>
-	)}
-	{isResultPage && (
-	<script>
-		const params = new URLSearchParams(window.location.search);
+    .bus-info h2,
+    .section-card h2,
+    .empty-card h2 {
+      margin: 0 0 0.45rem;
+      color: #0f172a;
+      font-size: 1.25rem;
+    }
 
-		const busId = params.get("bus_id") || "";
-		const busName = params.get("bus_name") || params.get("busName") || "";
-		const from = params.get("from") || "";
-		const to = params.get("to") || "";
+    .route-line {
+      margin: 0 0 0.7rem !important;
+      color: #475569 !important;
+      font-weight: 700;
+    }
 
-		const busNameEl = document.getElementById("result-bus-name");
-		const routeEl = document.getElementById("result-route");
-		const busIdEl = document.getElementById("result-bus-id");
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
 
-		if (busNameEl) {
-			busNameEl.textContent = busName || "Selected bus";
-		}
+    .time-grid div {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      padding: 0.55rem;
+    }
 
-		if (routeEl) {
-			routeEl.textContent = from && to ? `${from} → ${to}` : "";
-		}
+    .bus-list {
+      display: grid;
+      gap: 0.55rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
 
-		if (busIdEl) {
-			busIdEl.textContent = busId ? `Bus ID: ${busId}` : "";
-		}
-	</script>
-)}
+    .mini-bus-card {
+      display: grid;
+      gap: 0.2rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.85rem;
+      padding: 0.75rem;
+      color: #0f172a;
+      text-decoration: none;
+      background: #f8fbff;
+    }
+
+    .mini-bus-card.active,
+    .mini-bus-card:hover {
+      border-color: #38bdf8;
+      background: #e0f2fe;
+    }
+
+    .mini-bus-card span {
+      font-weight: 800;
+    }
+
+    .mini-bus-card small {
+      color: #64748b;
+    }
+
+    .table-note {
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem !important;
+    }
+
+    .desktop-table {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 0.9rem;
+      border: 1px solid #e2e8f0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0.7rem;
+      color: #0f172a;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    th:first-child,
+    td:first-child {
+      width: 52%;
+    }
+
+    th:nth-child(2),
+    td:nth-child(2),
+    th:nth-child(3),
+    td:nth-child(3) {
+      width: 24%;
+      white-space: normal;
+    }
+
+    th {
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 0.85rem;
+    }
+
+    .highlight-row td {
+      background: #fff7ed;
+      font-weight: 800;
+    }
+
+    .mobile-stop-list {
+      display: none;
+    }
+
+    .stop-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.85rem;
+      background: #f8fbff;
+      padding: 0.75rem;
+    }
+
+    .stop-card + .stop-card {
+      margin-top: 0.6rem;
+    }
+
+    .stop-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .stop-top span {
+      min-width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      display: inline-grid;
+      place-items: center;
+      font-size: 0.78rem;
+      font-weight: 900;
+    }
+
+    .stop-top strong {
+      color: #0f172a;
+      line-height: 1.25;
+    }
+
+    .stop-times {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .stop-times div {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.7rem;
+      background: white;
+      padding: 0.55rem;
+    }
+
+    .stop-times small {
+      display: block;
+      color: #64748b;
+      font-size: 0.72rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .stop-times b {
+      color: #0f172a;
+      font-size: 0.9rem;
+    }
+
+    .active-stop {
+      background: #fff7ed;
+      border-color: #fed7aa;
+    }
+
+    .seo-summary p {
+      margin-top: 0.7rem;
+      color: #334155;
+      line-height: 1.75;
+      font-size: 0.98rem;
+    }
+
+    .faq-card details {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.85rem;
+      padding: 0.8rem;
+      margin-top: 0.65rem;
+      background: #f8fbff;
+    }
+
+    .faq-card summary {
+      cursor: pointer;
+      font-weight: 850;
+      color: #0f172a;
+      line-height: 1.35;
+    }
+
+    .faq-card details[open] {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .back-row {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .back-row a,
+    .empty-card a {
+      color: #2563eb;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    @media (max-width: 760px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .selected-card {
+        grid-template-columns: 76px 1fr;
+      }
+
+      .bus-photo {
+        width: 76px;
+        height: 76px;
+      }
+
+      .time-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .desktop-table {
+        display: none;
+      }
+
+      .mobile-stop-list {
+        display: block;
+      }
+
+      .table-note {
+        display: none;
+      }
+    }
+    .empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.empty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.empty-btn.primary {
+  background: #f97316;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.24);
+}
+
+.empty-btn.secondary {
+  background: #e0f2fe;
+  color: #075985;
+}
+  </style>
 </BaseLayout>
