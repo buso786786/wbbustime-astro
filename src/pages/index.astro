@@ -12,8 +12,8 @@ const stopSuggestions = await buildBusStopSuggestions();
 ---
 
 <BaseLayout
-  title="Home"
-  description="Find Bus Timetable & Rent Vehicles in West Bengal. Search local bus timings and find cars, buses, toto, pickup vans and ambulances with driver."
+  title="SoniaBuddy - West Bengal Bus Timetable & Rent Vehicle"
+  description="Find West Bengal bus timetable, route finder, bus search and driver-included vehicle rental for car, bus, toto, pickup van and ambulance on SoniaBuddy."
 >
   <main class="home-page">
     <section class="home-hero">
@@ -213,27 +213,35 @@ const search = (query) => {
         return;
       }
 
-      box.innerHTML = results
-  .map(
-    (item) => `
-      <button type="button" class="suggest-item" data-value="${item.value}">
-        <span class="suggest-icon">⌖</span>
-        <span class="suggest-text">${item.label}</span>
-      </button>
-    `
-  )
-  .join('');
+      box.innerHTML = '';
 
-      box.hidden = false;
+results.forEach((item) => {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'suggest-item';
+  btn.dataset.value = item.value || '';
 
-      box.querySelectorAll('.suggest-item').forEach((btn) => {
-        btn.addEventListener('mousedown', (event) => {
-          event.preventDefault();
-          input.value = btn.getAttribute('data-value') || '';
-          hideAll();
-          if (input === fromInput) toInput?.focus();
-        });
-      });
+  const icon = document.createElement('span');
+  icon.className = 'suggest-icon';
+  icon.textContent = '⌖';
+
+  const text = document.createElement('span');
+  text.className = 'suggest-text';
+  text.textContent = item.label || item.value || '';
+
+  btn.append(icon, text);
+
+  btn.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+    input.value = btn.dataset.value || '';
+    hideAll();
+    if (input === fromInput) toInput?.focus();
+  });
+
+  box.appendChild(btn);
+});
+
+box.hidden = false;
     };
 
     fromInput?.addEventListener('input', () => showList(fromInput, fromList, toList));
@@ -260,7 +268,7 @@ const search = (query) => {
 
       if (!from || !to) return;
 
-      window.location.href = `/bus-search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      window.location.href = `/bus-search/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
     });
   </script>
 

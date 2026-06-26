@@ -95,16 +95,16 @@ async function addBusSeoUrls(urls: Set<string>) {
   }
 }
 
-function vehicleKey(type: string) {
+function vehicleSlugPart(type: string) {
   const value = clean(type).toLowerCase();
 
-  if (value.includes('pickup')) return 'pickup-van';
-  if (value.includes('ambulance')) return 'ambulance';
-  if (value.includes('toto')) return 'toto';
-  if (value.includes('auto')) return 'auto';
-  if (value.includes('bus')) return 'bus';
+  if (value.includes('pickup')) return 'pickup-van-rental';
+  if (value.includes('ambulance')) return 'ambulance-service';
+  if (value.includes('toto')) return 'toto-rental';
+  if (value.includes('auto')) return 'auto-rental';
+  if (value.includes('bus')) return 'bus-rental';
 
-  return 'car';
+  return 'car-rental';
 }
 
 async function addRentSeoUrls(urls: Set<string>) {
@@ -128,7 +128,7 @@ async function addRentSeoUrls(urls: Set<string>) {
   const cityVehicleMap = new Map<string, Set<string>>();
 
   for (const listing of listings) {
-    const vehicle = vehicleKey(listing.vehicle_type || 'car');
+    const vehicle = vehicleSlugPart(listing.vehicle_type || 'car');
 
     const cityIds = [
       listing.base_city_id,
@@ -152,7 +152,7 @@ async function addRentSeoUrls(urls: Set<string>) {
     if (!citySlug) continue;
 
     for (const vehicle of vehicles) {
-      addUrl(urls, `/rent/${vehicle}-rental-in-${citySlug}/`);
+      addUrl(urls, `/rent/${vehicle}-in-${citySlug}/`);
     }
 
     if (vehicles.has('car') || vehicles.has('bus')) {
@@ -179,17 +179,14 @@ export async function GET() {
   const urls = new Set<string>();
 
   // Useful public pages
-  addUrl(urls, '/');
-  addUrl(urls, '/all-routes/');
-  addUrl(urls, '/bus-search/');
-  addUrl(urls, '/route-finder/');
-  addUrl(urls, '/rent-vehicle/');
+addUrl(urls, '/');
+addUrl(urls, '/all-routes/');
+addUrl(urls, '/route-finder/');
 
-  // Trust/legal public pages
-  addUrl(urls, '/about/');
-  addUrl(urls, '/contact/');
-  addUrl(urls, '/privacy-policy/');
-  addUrl(urls, '/terms-and-conditions/');
+// Trust/legal public pages
+addUrl(urls, '/about/');
+addUrl(urls, '/privacy-policy/');
+addUrl(urls, '/terms-and-conditions/');
 
   // Real SEO URLs from database only
   await addBusSeoUrls(urls);

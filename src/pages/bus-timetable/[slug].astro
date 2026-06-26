@@ -146,32 +146,30 @@ export async function getStaticPaths() {
 
   const anonKey =
     'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
-  const clean = (value: string | null | undefined) => String(value || '').trim();
 
-  const slugify = (value: string) =>
-    clean(value)
+  const cleanPath = (value: string | null | undefined) => String(value || '').trim();
+
+  const slugifyPath = (value: string | null | undefined) =>
+    cleanPath(value)
       .normalize('NFKD')
       .toLowerCase()
       .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
       .replace(/^-+|-+$/g, '');
 
-  const sameStop = (a: string | null | undefined, b: string | null | undefined) => {
-    const x = clean(a)
+  const normalPath = (value: string | null | undefined) =>
+    cleanPath(value)
       .normalize('NFKD')
       .toLowerCase()
       .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 
-    const y = clean(b)
-      .normalize('NFKD')
-      .toLowerCase()
-      .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
+  const sameStopPath = (a: string | null | undefined, b: string | null | undefined) => {
+    const x = normalPath(a);
+    const y = normalPath(b);
     return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
   };
+
   let routes: BusRoute[] = [];
 
   try {
@@ -189,48 +187,54 @@ export async function getStaticPaths() {
     routes = [];
   }
 
-  const pairMap = new Map<string, { source: string; destination: string; routes: BusRoute[] }>();
+  const pairMap = new Map<
+    string,
+    { source: string; destination: string; routes: BusRoute[] }
+  >();
 
-  const addMainPair = (sourceRaw: string | null, destinationRaw: string | null) => {
-    const source = clean(sourceRaw);
-    const destination = clean(destinationRaw);
+  const addMainPair = (
+    sourceRaw: string | null | undefined,
+    destinationRaw: string | null | undefined,
+    route: BusRoute
+  ) => {
+    const source = cleanPath(sourceRaw);
+    const destination = cleanPath(destinationRaw);
 
     if (!source || !destination) return;
-    if (sameStop(source, destination)) return;
+    if (sameStopPath(source, destination)) return;
 
-    const slug = `${slugify(source)}-to-${slugify(destination)}`;
+    const slug = `${slugifyPath(source)}-to-${slugifyPath(destination)}`;
     if (!slug || slug.includes('--')) return;
 
-    const matchedRoutes = routes.filter((route) => {
-      const routeSource = clean(route.source);
-      const routeDestination = clean(route.destination);
-
-      return (
-        (sameStop(routeSource, source) && sameStop(routeDestination, destination)) ||
-        (sameStop(routeSource, destination) && sameStop(routeDestination, source))
-      );
-    });
-
-    if (matchedRoutes.length === 0) return;
-
-    if (!pairMap.has(slug)) {
-      pairMap.set(slug, {
+    const existing =
+      pairMap.get(slug) ||
+      {
         source,
         destination,
-        routes: matchedRoutes,
-      });
+        routes: [] as BusRoute[],
+      };
+
+    if (!existing.routes.some((item) => item.id === route.id)) {
+      existing.routes.push(route);
     }
+
+    pairMap.set(slug, existing);
   };
 
   for (const route of routes) {
-    addMainPair(route.source, route.destination);
-    addMainPair(route.destination, route.source);
+    // Main route page: Arambagh → Digha
+    addMainPair(route.source, route.destination, route);
+
+    // Reverse route page: Digha → Arambagh
+    addMainPair(route.destination, route.source, route);
   }
 
-  return Array.from(pairMap.entries()).map(([slug, value]) => ({
-    params: { slug },
-    props: value,
-  }));
+  return Array.from(pairMap.entries())
+    .filter(([, value]) => value.routes.length > 0)
+    .map(([slug, value]) => ({
+      params: { slug },
+      props: value,
+    }));
 }
 const { slug } = Astro.params;
 
@@ -248,7 +252,8 @@ const selectedBusId = Astro.url.searchParams.get('bus_id') || '';
 const firstBus = selectedBusId
   ? busCards.find((bus) => bus.id === selectedBusId) || busCards[0]
   : busCards[0];
-
+const selectedPhoto =
+  firstBus?.image_url || busCards.find((bus) => bus.image_url)?.image_url || '';
 const uniqueStops = Array.from(
   new Set(
     busCards
@@ -274,6 +279,169 @@ const stopText = importantStops.length ? importantStops.join(', ') : `${source},
 const busText = busNames.length ? busNames.join(', ') : 'available route buses';
 const upTimeText = upTimes.length ? upTimes.join(', ') : 'available route timing';
 const downTimeText = downTimes.length ? downTimes.join(', ') : 'available return-side timing';
+
+const queryFrom = clean(Astro.url.searchParams.get('from')) || source;
+const queryTo = clean(Astro.url.searchParams.get('to')) || destination;
+
+const STOP_BN_MAP: Record<string, string> = {
+  arambagh: 'আরামবাগ',
+  tarakeswar: 'তারকেশ্বর',
+  tarkeshwar: 'তারকেশ্বর',
+  digha: 'দিঘা',
+  ghatal: 'ঘাটাল',
+  kolkata: 'কলকাতা',
+  howrah: 'হাওড়া',
+  durgapur: 'দুর্গাপুর',
+  bankura: 'বাঁকুড়া',
+  bishnupur: 'বিষ্ণুপুর',
+  burdwan: 'বর্ধমান',
+  bardhaman: 'বর্ধমান',
+  medinipur: 'মেদিনীপুর',
+  midnapore: 'মেদিনীপুর',
+  garia: 'গড়িয়া',
+  esplanade: 'এসপ্ল্যানেড',
+  'dharamtala': 'ধর্মতলা',
+  dharmatala: 'ধর্মতলা',
+  shambazar: 'শ্যামবাজার',
+  shyambazar: 'শ্যামবাজার',
+  egra: 'এগরা',
+  contai: 'কাঁথি',
+  kanthi: 'কাঁথি',
+  haldia: 'হলদিয়া',
+  tamluk: 'তমলুক',
+  kharagpur: 'খড়গপুর',
+  krishnanagar: 'কৃষ্ণনগর',
+  ranaghat: 'রানাঘাট',
+  barasat: 'বারাসাত',
+  barrackpore: 'ব্যারাকপুর',
+  sealdah: 'শিয়ালদহ',
+  asansol: 'আসানসোল',
+  bolpur: 'বোলপুর',
+  tarapith: 'তারাপীঠ',
+  siuri: 'সিউড়ি',
+  berhampore: 'বহরমপুর',
+  malda: 'মালদা',
+  siliguri: 'শিলিগুড়ি',
+  jalpaiguri: 'জলপাইগুড়ি',
+  coochbehar: 'কোচবিহার',
+  'cooch behar': 'কোচবিহার',
+};
+
+const stopBn = (name: string) => STOP_BN_MAP[normalKey(name)] || name;
+
+const isSearchStop = (name: string) => sameStop(name, queryFrom) || sameStop(name, queryTo);
+
+const timeToMinutesSafe = (value: string) => {
+  const raw = clean(value).toLowerCase();
+  if (!raw || raw === '--' || raw.includes('not available')) return 99999;
+
+  const match = raw.match(/(\d{1,2})[:.](\d{2})\s*(am|pm)?/i);
+  if (!match) return 99999;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const meridiem = match[3];
+
+  if (meridiem === 'pm' && hour !== 12) hour += 12;
+  if (meridiem === 'am' && hour === 12) hour = 0;
+
+  return hour * 60 + minute;
+};
+
+const dayPartEn = (value: string) => {
+  const minutes = timeToMinutesSafe(value);
+  if (minutes === 99999) return '';
+  if (minutes < 360) return 'Night';
+  if (minutes < 720) return 'Morning';
+  if (minutes < 1020) return 'Day';
+  if (minutes < 1200) return 'Evening';
+  return 'Night';
+};
+
+const dayPartBn = (value: string) => {
+  const part = dayPartEn(value);
+  if (part === 'Morning') return 'সকাল';
+  if (part === 'Day') return 'দিন';
+  if (part === 'Evening') return 'সন্ধ্যা';
+  if (part === 'Night') return 'রাত';
+  return '';
+};
+
+const uniqueText = (items: string[]) =>
+  Array.from(new Set(items.map((item) => clean(item)).filter(Boolean)));
+
+const listText = (items: string[], fallback: string, limit = 8) => {
+  const values = uniqueText(items).slice(0, limit);
+
+  if (values.length === 0) return fallback;
+  if (values.length === 1) return values[0];
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+
+  return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`;
+};
+
+const timeText = (items: string[], fallback: string, limit = 5) => {
+  const values = uniqueText(items)
+    .filter((time) => time && time !== 'Time not available')
+    .slice(0, limit)
+    .map((time) => {
+      const part = dayPartEn(time);
+      return part ? `${time} (${part})` : time;
+    });
+
+  return values.length ? values.join(', ') : fallback;
+};
+
+const getSegmentStops = () => {
+  if (!firstBus?.stops?.length) return importantStops;
+
+  const fromIndex = findStopIndex(firstBus.stops, source);
+  const toIndex = findStopIndex(firstBus.stops, destination);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+    return importantStops;
+  }
+
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+
+  const segment = firstBus.stops
+    .slice(start, end + 1)
+    .map((stop) => clean(stop.name))
+    .filter(Boolean);
+
+  return fromIndex > toIndex ? segment.reverse() : segment;
+};
+
+const segmentStops = getSegmentStops();
+const busNameSummary = listText(busCards.map((bus) => bus.bus_name), 'available buses', 6);
+const busTypeSummary = listText(busCards.map((bus) => bus.bus_type), 'local bus services', 4);
+const segmentStopSummary = listText(segmentStops, `${source} and ${destination}`, 10);
+
+const departureSummary = timeText(
+  busCards.map((bus) => bus.departure),
+  'available departure timing'
+);
+
+const arrivalSummary = timeText(
+  busCards.map((bus) => bus.arrival),
+  'available arrival timing'
+);
+
+const directionLabel =
+  firstBus?.direction === 'down'
+    ? 'return/down-side'
+    : 'going/up-side';
+
+const reverseRouteText = `${destination} to ${source}`;
+
+const seoSummaryParagraphs = [
+  `${source} to ${destination} bus timetable on SoniaBuddy is built from available bus route records, listed bus names and stop-wise timing data. This page currently shows ${busCards.length} ${busCards.length === 1 ? 'bus option' : 'bus options'} for the ${directionLabel} journey. Available service information includes ${busNameSummary}, with bus type data such as ${busTypeSummary}. The page is focused on the selected travel direction, so the departure stop, arrival stop and timetable examples are shown for passengers travelling from ${source} towards ${destination}.`,
+
+  `For this route segment, the important stop order includes ${segmentStopSummary}. This makes the page different from the reverse route page, because ${source} to ${destination} uses the stop order and timing direction for this journey, while ${reverseRouteText} uses the opposite side timing where available. Passengers can use the stop-wise timetable to understand where the bus starts, which major stops are covered, and where the selected destination appears on the route.`,
+
+  `Timing examples available for this page include departure around ${departureSummary} and arrival or opposite-side timing around ${arrivalSummary}. These timings are based on the route data currently available in the database and may change due to traffic, road conditions, weather, local route updates or operator changes. Before starting the journey, passengers should confirm the latest bus timing from the counter, operator or local source and reach the stop early.`
+];
 
 const pageTitle = `${source} to ${destination} Bus Timetable`;
 const pageDescription = `Check ${source} to ${destination} bus timetable with bus names, stop-wise up time, down time and route details on SoniaBuddy.`;
@@ -346,24 +514,30 @@ const faqJson = {
     <div class="container">
       <div class="hero-card">
         <p class="eyebrow" data-en="🚌 Bus Timetable" data-bn="🚌 বাস টাইমটেবিল">🚌 Bus Timetable</p>
-<h1>{pageTitle}</h1>
+<h1><span data-en={`${source} to ${destination} Bus Timetable`} data-bn={`${stopBn(source)} থেকে ${stopBn(destination)} বাস টাইমটেবিল`}>{pageTitle}</span></h1>
 <p
   data-en="Check available buses, bus names, route stops, up time and down time for this route."
   data-bn="এই রুটের উপলব্ধ বাস, বাসের নাম, স্টপ লিস্ট, আপ টাইম ও ডাউন টাইম দেখুন।"
 >
   Check available buses, bus names, route stops, up time and down time for this route.
 </p>
-<p class="bn-line">এই রুটের bus timing, stop list এবং up/down time দেখুন।</p>
+<p class="bn-line">এই রুটের bus timing, stop list এবং ছাড়ার সময় দেখুন।</p>
       </div>
+
+      <a class="rent-emoji-strip" href="/rent-vehicle?tab=find" aria-label="Find rent vehicle">
+        <span data-en="🚗 Tour car · 💍 Wedding car · 🚌 Bus rent · 🚑 Emergency vehicle · 🛺 Toto near you" data-bn="🚗 ট্যুর গাড়ি · 💍 বিয়ের গাড়ি · 🚌 বাস ভাড়া · 🚑 জরুরি গাড়ি · 🛺 কাছাকাছি টোটো এখানে ক্লিক করুন">
+          🚗 Tour car · 💍 Wedding car · 🚌 Bus rent · 🚑 Emergency vehicle · 🛺 Toto near you
+        </span>
+      </a>
 
       <div class="summary-grid">
         <div>
           <span data-en="From" data-bn="কোথা থেকে">From</span>
-          <strong>{source}</strong>
+          <strong data-en={source} data-bn={stopBn(source)}>{source}</strong>
         </div>
         <div>
           <span data-en="To" data-bn="কোথায়">To</span>
-          <strong>{destination}</strong>
+          <strong data-en={destination} data-bn={stopBn(destination)}>{destination}</strong>
         </div>
         <div>
           <span data-en="Buses" data-bn="বাস">Buses</span>
@@ -378,17 +552,21 @@ const faqJson = {
       {firstBus ? (
         <section class="selected-card" id="selected-bus">
           <div class="bus-photo">
-            {firstBus.image_url ? (
-              <img src={firstBus.image_url} alt={firstBus.bus_name} loading="lazy" />
-            ) : (
-              <span>🚌</span>
-            )}
+            {selectedPhoto ? (
+  <img src={selectedPhoto} alt={firstBus.bus_name} loading="lazy" decoding="async" />
+) : (
+  <span>🚌</span>
+)}
           </div>
 
           <div class="bus-info">
             <p class="selected-label" data-en="Selected Bus" data-bn="নির্বাচিত বাস">Selected Bus</p>
             <h2>{firstBus.bus_name}</h2>
-            <p class="route-line">{firstBus.source} → {firstBus.destination}</p>
+            <p class="route-line">
+                <span data-en={firstBus.source} data-bn={stopBn(firstBus.source)}>{firstBus.source}</span>
+                <span>→</span>
+                <span data-en={firstBus.destination} data-bn={stopBn(firstBus.destination)}>{firstBus.destination}</span>
+              </p>
 
             <div class="time-grid">
               <div>
@@ -405,7 +583,7 @@ const faqJson = {
               </div>
               <div>
                 <small data-en="Direction" data-bn="দিক">Direction</small>
-                <strong>{firstBus.direction === 'down' ? 'Down' : 'Up'}</strong>
+                <strong data-en={firstBus.direction === "down" ? "Down" : "Up"} data-bn={firstBus.direction === "down" ? "ডাউন" : "আপ"}>{firstBus.direction === "down" ? "Down" : "Up"}</strong>
               </div>
             </div>
           </div>
@@ -449,7 +627,7 @@ const faqJson = {
         <section class="section-card">
           <h2>
   <span data-en="All Buses on" data-bn="সব বাস">All Buses on</span>
-  {source} to {destination}
+  <span data-en={`${source} to ${destination}`} data-bn={`${stopBn(source)} থেকে ${stopBn(destination)}`}>{source} to {destination}</span>
   <span data-en="Route" data-bn="রুটে">Route</span>
 </h2>
           <div class="bus-list">
@@ -485,16 +663,34 @@ const faqJson = {
               <thead>
                 <tr>
                   <th data-en="Stop" data-bn="স্টপ">Stop</th>
-<th data-en="Up Time" data-bn="আপ টাইম">Up Time</th>
-<th data-en="Down Time" data-bn="ডাউন টাইম">Down Time</th>
+<th data-en="Up Time" data-bn="যাওয়ার সময়">Up Time</th>
+<th data-en="Down Time" data-bn="আসার সময়">Down Time</th>
                 </tr>
               </thead>
               <tbody>
                 {firstBus.stops.map((stop) => (
-                  <tr class={sameStop(stop.name, source) || sameStop(stop.name, destination) ? 'highlight-row' : ''}>
-                    <td>{stop.name}</td>
-                    <td>{stop.up_time || '--'}</td>
-                    <td>{stop.down_time || '--'}</td>
+                  <tr class={isSearchStop(stop.name) ? 'highlight-row exact-search-row' : ''}>
+                    <td>
+                      <span class={isSearchStop(stop.name) ? 'exact-stop-name stop-name' : 'stop-name'} data-en={stop.name} data-bn={stopBn(stop.name)}>
+                        {stop.name}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="time-cell-value">{stop.up_time || '--'}</span>
+                      {dayPartEn(stop.up_time) && (
+                        <span class="time-day-pill" data-en={dayPartEn(stop.up_time)} data-bn={dayPartBn(stop.up_time)}>
+                          {dayPartEn(stop.up_time)}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span class="time-cell-value">{stop.down_time || '--'}</span>
+                      {dayPartEn(stop.down_time) && (
+                        <span class="time-day-pill" data-en={dayPartEn(stop.down_time)} data-bn={dayPartBn(stop.down_time)}>
+                          {dayPartEn(stop.down_time)}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -503,19 +699,31 @@ const faqJson = {
 
           <div class="mobile-stop-list">
             {firstBus.stops.map((stop, index) => (
-              <article class={`stop-card ${sameStop(stop.name, source) || sameStop(stop.name, destination) ? 'active-stop' : ''}`}>
+              <article class={`stop-card thin-stop-card ${isSearchStop(stop.name) ? 'active-stop exact-search-row' : ''}`}>
                 <div class="stop-top">
                   <span>{index + 1}</span>
-                  <strong>{stop.name}</strong>
+                  <strong class={isSearchStop(stop.name) ? 'exact-stop-name stop-name' : 'stop-name'} data-en={stop.name} data-bn={stopBn(stop.name)}>
+                    {stop.name}
+                  </strong>
                 </div>
                 <div class="stop-times">
                   <div>
-                   <small data-en="Up Time" data-bn="আপ টাইম">Up Time</small>
+                    <small data-en="Up Time" data-bn="যাওয়ার সময়">Up Time</small>
                     <b>{stop.up_time || '--'}</b>
+                    {dayPartEn(stop.up_time) && (
+                      <em class="time-day-pill" data-en={dayPartEn(stop.up_time)} data-bn={dayPartBn(stop.up_time)}>
+                        {dayPartEn(stop.up_time)}
+                      </em>
+                    )}
                   </div>
                   <div>
-                    <small data-en="Down Time" data-bn="ডাউন টাইম">Down Time</small>
+                    <small data-en="Down Time" data-bn="আসার সময়">Down Time</small>
                     <b>{stop.down_time || '--'}</b>
+                    {dayPartEn(stop.down_time) && (
+                      <em class="time-day-pill" data-en={dayPartEn(stop.down_time)} data-bn={dayPartBn(stop.down_time)}>
+                        {dayPartEn(stop.down_time)}
+                      </em>
+                    )}
                   </div>
                 </div>
               </article>
@@ -525,28 +733,12 @@ const faqJson = {
       )}
 
       <section class="section-card seo-summary">
-        <h2>{source} to {destination} Bus Route Summary</h2>
+  <h2>{source} to {destination} Bus Route Summary</h2>
 
-        <p>
-          The {source} to {destination} bus timetable page on SoniaBuddy is created from available route data,
-          bus details and stop-wise timing information. This route currently shows {busCards.length} listed
-          {busCards.length === 1 ? 'bus option' : 'bus options'} for passengers travelling from {source} to {destination}.
-          Available buses on this route include {busText}. The page shows important stop information, up timing and down timing
-          wherever that data is available.
-        </p>
-
-        <p>
-          Important stops found for this route include {stopText}. Passengers can use this page to compare bus names,
-          check departure timing, arrival timing, direction and stop-wise timetable before planning the journey.
-          For the selected bus, SoniaBuddy highlights the source stop, destination stop and available up/down timing in a mobile-friendly layout.
-        </p>
-
-        <p>
-          Available departure timing examples for this route include {upTimeText}. Arrival or return-side timing information includes
-          {downTimeText}. Bus timing may change because of traffic, weather, road conditions, local route updates or operator changes.
-          Please reach the bus stop early and confirm important travel details locally before starting the journey.
-        </p>
-      </section>
+  {seoSummaryParagraphs.map((paragraph) => (
+    <p>{paragraph}</p>
+  ))}
+</section>
 
       <section class="section-card faq-card">
         <h2>{source} to {destination} Bus FAQ</h2>
@@ -600,7 +792,7 @@ const faqJson = {
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbJson)} />
   <script type="application/ld+json" set:html={JSON.stringify(faqJson)} />
 
-  <style>
+  <style is:global>
     .timetable-page {
       min-height: 100vh;
       padding: 1rem 0 2.5rem;
@@ -685,21 +877,22 @@ const faqJson = {
     }
 
     .bus-photo {
-      width: 96px;
-      height: 96px;
-      border-radius: 1rem;
-      background: #e0f2fe;
-      overflow: hidden;
-      display: grid;
-      place-items: center;
-      font-size: 2.2rem;
-    }
+  width: 120px;
+  height: 120px;
+  border-radius: 1rem;
+  background: #20145a;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 2.2rem;
+  align-self: stretch;
+}
 
-    .bus-photo img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+.bus-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
     .selected-label {
       margin: 0 0 0.2rem !important;
@@ -930,35 +1123,32 @@ const faqJson = {
     }
 
     @media (max-width: 760px) {
-      .summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+  .selected-card {
+    grid-template-columns: 104px 1fr;
+    gap: 0.75rem;
+  }
 
-      .selected-card {
-        grid-template-columns: 76px 1fr;
-      }
+  .bus-photo {
+    width: 104px;
+    height: 118px;
+  }
 
-      .bus-photo {
-        width: 76px;
-        height: 76px;
-      }
+  .time-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-      .time-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+  .desktop-table {
+    display: none;
+  }
 
-      .desktop-table {
-        display: none;
-      }
+  .mobile-stop-list {
+    display: block;
+  }
 
-      .mobile-stop-list {
-        display: block;
-      }
-
-      .table-note {
-        display: none;
-      }
-    }
+  .table-note {
+    display: none;
+  }
+}
     .empty-actions {
   display: flex;
   flex-wrap: wrap;
@@ -987,5 +1177,249 @@ const faqJson = {
   background: #e0f2fe;
   color: #075985;
 }
+    .rent-emoji-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: -0.15rem 0 1rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid #fed7aa;
+      background: linear-gradient(135deg, #fff7ed, #ffedd5);
+      color: #7c2d12;
+      font-size: 0.88rem;
+      font-weight: 900;
+      text-decoration: none;
+      line-height: 1.35;
+      box-shadow: 0 6px 18px rgba(249, 115, 22, 0.08);
+    }
+
+    .selected-card,
+    .section-card,
+    .hero-card,
+    .empty-card {
+      border-radius: 1rem;
+      padding: 0.82rem;
+    }
+
+    .selected-card {
+      grid-template-columns: 74px 1fr;
+      gap: 0.75rem;
+    }
+
+    .bus-photo {
+      width: 74px;
+      height: 74px;
+      border-radius: 0.85rem;
+    }
+
+    .bus-info h2,
+    .section-card h2,
+    .empty-card h2 {
+      font-size: 1.05rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .route-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.32rem;
+      font-size: 0.88rem;
+      margin-bottom: 0.45rem !important;
+    }
+
+    .time-grid {
+      gap: 0.35rem;
+    }
+
+    .time-grid div {
+      border-radius: 0.65rem;
+      padding: 0.42rem;
+    }
+
+    .mini-bus-card {
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.72rem;
+    }
+
+    th,
+    td {
+      padding: 0.48rem 0.55rem;
+      font-size: 0.88rem;
+    }
+
+    .stop-name {
+      display: inline;
+      font-weight: 850;
+    }
+
+    .exact-stop-name {
+      color: #c2410c !important;
+      text-decoration: underline;
+      text-decoration-color: #ff7a00;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    .exact-search-row td {
+      background: #fff7ed !important;
+      box-shadow: inset 3px 0 0 #ff7a00;
+    }
+
+    .time-cell-value {
+      display: inline-block;
+      font-weight: 850;
+      margin-right: 0.25rem;
+    }
+
+    .time-day-pill {
+      display: inline-flex;
+      width: fit-content;
+      margin-top: 0.18rem;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      color: #15803d;
+      padding: 0.08rem 0.35rem;
+      font-size: 0.64rem;
+      font-style: normal;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .thin-stop-card {
+      padding: 0.52rem 0.58rem;
+      border-radius: 0.72rem;
+    }
+
+    .thin-stop-card + .thin-stop-card {
+      margin-top: 0.42rem;
+    }
+
+    .stop-top {
+      margin-bottom: 0.38rem;
+      gap: 0.45rem;
+    }
+
+    .stop-top span {
+      min-width: 22px;
+      height: 22px;
+      font-size: 0.68rem;
+    }
+
+    .stop-top strong {
+      font-size: 0.88rem;
+    }
+
+    .stop-times {
+      gap: 0.35rem;
+    }
+
+    .stop-times div {
+      padding: 0.4rem;
+      border-radius: 0.6rem;
+    }
+
+    .stop-times small {
+      font-size: 0.66rem;
+    }
+
+    .stop-times b {
+      display: block;
+      font-size: 0.82rem;
+      margin-bottom: 0.08rem;
+    }
+
+    .active-stop {
+      background: #fff7ed;
+      border-color: #fdba74;
+    }
+
+    @media (max-width: 760px) {
+      .rent-emoji-strip {
+        border-radius: 0.85rem;
+        font-size: 0.78rem;
+        text-align: center;
+      }
+
+      .summary-grid {
+        gap: 0.45rem;
+      }
+
+      .summary-grid div {
+        padding: 0.52rem;
+        border-radius: 0.75rem;
+      }
+
+      .selected-card {
+        grid-template-columns: 62px 1fr;
+        gap: 0.58rem;
+      }
+
+      .bus-photo {
+        width: 62px;
+        height: 62px;
+      }
+
+      .time-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .time-grid div {
+        padding: 0.38rem;
+      }
+
+      .mobile-stop-list {
+        display: block;
+      }
+    }
+
+
+
+/* ULTRA FINAL OVERRIDE - SEO TIMETABLE PHOTO */
+.selected-card {
+  display: grid !important;
+  grid-template-columns: 122px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0.72rem !important;
+}
+.bus-photo {
+  width: 122px !important;
+  height: 122px !important;
+  min-height: 122px !important;
+  max-height: 122px !important;
+  align-self: start !important;
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+  background: #20145a !important;
+}
+.bus-photo img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+.bus-info { min-width: 0 !important; }
+
+@media (max-width: 760px) {
+  .selected-card {
+    grid-template-columns: 108px minmax(0, 1fr) !important;
+    gap: 0.58rem !important;
+    padding: 0.72rem !important;
+    align-items: start !important;
+  }
+  .bus-photo {
+    width: 108px !important;
+    height: 108px !important;
+    min-height: 108px !important;
+    max-height: 108px !important;
+  }
+  .bus-info h2 { font-size: 1.02rem !important; line-height: 1.12 !important; }
+  .route-line { font-size: 0.82rem !important; }
+  .time-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 0.38rem !important; }
+  .time-grid div { padding: 0.42rem !important; }
+}
+
   </style>
 </BaseLayout>

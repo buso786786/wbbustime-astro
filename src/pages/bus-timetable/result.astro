@@ -1,0 +1,529 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
+
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
+---
+
+<BaseLayout
+  title="Bus Timetable Result - SoniaBuddy"
+  description="View selected bus timetable, stop list and up/down timing on SoniaBuddy."
+  robots="noindex,follow"
+>
+  <section class="result-page">
+    <div class="container">
+      <div class="result-hero">
+        <p class="eyebrow">🚌 Bus Timetable</p>
+        <h1 id="page-title">Loading bus timetable...</h1>
+        <p id="page-subtitle">Please wait while SoniaBuddy loads the selected bus route.</p>
+      </div>
+
+      <section id="selected-bus" class="selected-card">
+        <div class="photo-box">
+          <span>🚌</span>
+        </div>
+
+        <div class="bus-info">
+          <p class="selected-label">Selected Bus</p>
+          <h2>Loading...</h2>
+          <p class="route-line">--</p>
+
+          <div class="time-grid">
+            <div>
+              <small>Departure</small>
+              <strong>--</strong>
+            </div>
+            <div>
+              <small>Arrival</small>
+              <strong>--</strong>
+            </div>
+            <div>
+              <small>Type</small>
+              <strong>--</strong>
+            </div>
+            <div>
+              <small>Direction</small>
+              <strong>--</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <h2>Stop-wise Timetable</h2>
+        <p class="table-note">Searched stops are underlined.</p>
+
+        <div id="stop-list" class="stop-list">
+          <p>Loading stops...</p>
+        </div>
+      </section>
+
+      <div class="back-row">
+        <a id="back-search" href="/bus-search">← Back to Bus Search</a>
+      </div>
+    </div>
+  </section>
+
+  <script define:vars={{ SUPABASE_URL, SUPABASE_ANON_KEY }}>
+    const params = new URLSearchParams(window.location.search);
+    const busId = params.get('bus_id') || '';
+    const searchFrom = params.get('from') || '';
+    const searchTo = params.get('to') || '';
+
+    const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
+    const selectedBus = document.getElementById('selected-bus');
+    const stopList = document.getElementById('stop-list');
+    const backSearch = document.getElementById('back-search');
+
+    if (backSearch) {
+      backSearch.href = `/bus-search?from=${encodeURIComponent(searchFrom)}&to=${encodeURIComponent(searchTo)}`;
+    }
+
+    const clean = (value) => String(value || '').trim();
+
+    const normalizeStop = (value) =>
+      clean(value)
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[.,/\\&_+|:;'"!?\-]/g, ' ')
+        .replace(/\bbus\s*stand\b/g, ' ')
+        .replace(/\bbus\s*stop\b/g, ' ')
+        .replace(/\bbus\s*station\b/g, ' ')
+        .replace(/\bstand\b/g, ' ')
+        .replace(/বাস\s*স্ট্যান্ড/g, ' ')
+        .replace(/বাসস্ট্যান্ড/g, ' ')
+        .replace(/বাস\s*স্টপ/g, ' ')
+        .replace(/বাসস্টপ/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const sameStop = (a, b) => {
+      const x = normalizeStop(a);
+      const y = normalizeStop(b);
+      return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
+    };
+
+    const escapeHtml = (value) =>
+      String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+    const timeToMinutes = (value) => {
+      const raw = String(value || '').trim().toLowerCase();
+      const match = raw.match(/(\d{1,2})[:.](\d{2})\s*(am|pm)?/i);
+      if (!match) return 99999;
+
+      let hour = Number(match[1]);
+      const minute = Number(match[2]);
+      const meridiem = match[3];
+
+      if (meridiem === 'pm' && hour !== 12) hour += 12;
+      if (meridiem === 'am' && hour === 12) hour = 0;
+
+      return hour * 60 + minute;
+    };
+
+    const getDayPart = (value) => {
+      const minutes = timeToMinutes(value);
+
+      if (minutes === 99999) return '';
+      if (minutes < 360) return 'Night';
+      if (minutes < 720) return 'Morning';
+      if (minutes < 1020) return 'Day';
+      if (minutes < 1200) return 'Evening';
+      return 'Night';
+    };
+
+    const makeStopRows = (route) => {
+      const rows = [];
+
+      if (route.source) {
+        rows.push({ name: route.source, up_time: '', down_time: '' });
+      }
+
+      for (const stop of route.route_data || []) {
+        const name = clean(stop.stoppage_name);
+        if (!name) continue;
+
+        const last = rows[rows.length - 1];
+
+        if (last && sameStop(last.name, name)) {
+          if (!last.up_time && stop.up_time) last.up_time = clean(stop.up_time);
+          if (!last.down_time && stop.down_time) last.down_time = clean(stop.down_time);
+          continue;
+        }
+
+        rows.push({
+          name,
+          up_time: clean(stop.up_time),
+          down_time: clean(stop.down_time),
+        });
+      }
+
+      if (route.destination) {
+        const last = rows[rows.length - 1];
+        if (!last || !sameStop(last.name, route.destination)) {
+          rows.push({ name: route.destination, up_time: '', down_time: '' });
+        }
+      }
+
+      return rows;
+    };
+
+    const findStopIndex = (stops, stopName) => stops.findIndex((stop) => sameStop(stop.name, stopName));
+
+    const loadBus = async () => {
+      if (!busId) {
+        if (pageTitle) pageTitle.textContent = 'Bus not selected';
+        if (pageSubtitle) pageSubtitle.textContent = 'Please go back and choose a bus again.';
+        if (stopList) stopList.innerHTML = '<p>Missing bus ID.</p>';
+        return;
+      }
+
+      const url =
+        `${SUPABASE_URL}/rest/v1/bus_routes?select=id,bus_name,source,destination,bus_type,image_url,route_data&id=eq.${encodeURIComponent(busId)}&limit=1`;
+
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      });
+
+      const rows = res.ok ? await res.json() : [];
+      const route = rows[0];
+
+      if (!route) {
+        if (pageTitle) pageTitle.textContent = 'Bus timetable not found';
+        if (pageSubtitle) pageSubtitle.textContent = 'This bus may have been removed or updated.';
+        if (stopList) stopList.innerHTML = '<p>No route data found.</p>';
+        return;
+      }
+
+      const stops = makeStopRows(route);
+      const fromIndex = findStopIndex(stops, searchFrom);
+      const toIndex = findStopIndex(stops, searchTo);
+      const isDown = fromIndex > toIndex;
+
+      const fromStop = fromIndex >= 0 ? stops[fromIndex] : { name: searchFrom, up_time: '', down_time: '' };
+      const toStop = toIndex >= 0 ? stops[toIndex] : { name: searchTo, up_time: '', down_time: '' };
+
+      const departure = isDown ? fromStop.down_time || 'Time not available' : fromStop.up_time || 'Time not available';
+      const arrival = isDown ? toStop.down_time || 'Time not available' : toStop.up_time || 'Time not available';
+
+      if (pageTitle) pageTitle.textContent = `${searchFrom} to ${searchTo} Bus Timetable`;
+      if (pageSubtitle) pageSubtitle.textContent = `${route.bus_name || 'Bus'} · ${searchFrom} → ${searchTo}`;
+
+      if (selectedBus) {
+        selectedBus.innerHTML = `
+          <div class="photo-box">
+            ${
+              route.image_url
+                ? `<img src="${escapeHtml(route.image_url)}" alt="${escapeHtml(route.bus_name || 'Bus')}" loading="eager" onerror="this.remove()" />`
+                : `<span>🚌</span>`
+            }
+          </div>
+
+          <div class="bus-info">
+            <p class="selected-label">Selected Bus</p>
+            <h2>${escapeHtml(route.bus_name || 'Bus')}</h2>
+            <p class="route-line">
+              <span class="searched-stop">${escapeHtml(searchFrom)}</span>
+              →
+              <span class="searched-stop">${escapeHtml(searchTo)}</span>
+            </p>
+
+            <div class="time-grid">
+              <div>
+                <small>Departure</small>
+                <strong>${escapeHtml(departure)}</strong>
+              </div>
+              <div>
+                <small>Arrival</small>
+                <strong>${escapeHtml(arrival)}</strong>
+              </div>
+              <div>
+                <small>Type</small>
+                <strong>${escapeHtml(route.bus_type || 'Bus')}</strong>
+              </div>
+              <div>
+                <small>Direction</small>
+                <strong>${isDown ? 'Down' : 'Up'}</strong>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (stopList) {
+        stopList.innerHTML = stops
+          .map((stop, index) => {
+            const active = sameStop(stop.name, searchFrom) || sameStop(stop.name, searchTo);
+            const upPart = getDayPart(stop.up_time);
+            const downPart = getDayPart(stop.down_time);
+
+            return `
+              <article class="stop-card ${active ? 'active-stop' : ''}">
+                <div class="stop-top">
+                  <span>${index + 1}</span>
+                  <strong class="${active ? 'searched-stop' : ''}">${escapeHtml(stop.name)}</strong>
+                </div>
+
+                <div class="stop-times">
+                  <div>
+                    <small>যাওয়ার সময়</small>
+                    <b>${escapeHtml(stop.up_time || '--')}</b>
+                    ${upPart ? `<em>${upPart}</em>` : ''}
+                  </div>
+                  <div>
+                    <small>আসার সময়</small>
+                    <b>${escapeHtml(stop.down_time || '--')}</b>
+                    ${downPart ? `<em>${downPart}</em>` : ''}
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join('');
+      }
+    };
+
+    loadBus().catch((error) => {
+      console.error(error);
+      if (pageTitle) pageTitle.textContent = 'Failed to load timetable';
+      if (stopList) stopList.innerHTML = '<p>Please try again.</p>';
+    });
+  </script>
+
+  <style is:global>
+    .result-page {
+      min-height: 100vh;
+      padding: 1rem 0 2.5rem;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+    }
+
+    .result-hero,
+    .selected-card,
+    .section-card {
+      background: white;
+      border: 1px solid #dbeafe;
+      border-radius: 1.15rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      margin: 0 0 0.35rem;
+      color: #2563eb;
+      font-size: 0.8rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .result-hero h1,
+    .section-card h2,
+    .bus-info h2 {
+      margin: 0 0 0.45rem;
+      color: #0f172a;
+      line-height: 1.15;
+    }
+
+    .result-hero p {
+      color: #475569;
+      margin: 0;
+    }
+
+    .selected-card {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 0.85rem;
+      align-items: stretch;
+    }
+
+    .photo-box {
+  width: 120px;
+  min-height: 132px;
+  border-radius: 1rem;
+  background: #20145a;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  align-self: stretch;
+}
+
+.photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+    .selected-label {
+      margin: 0 0 0.25rem;
+      color: #2563eb;
+      font-weight: 900;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+    }
+
+    .route-line {
+      color: #475569;
+      font-weight: 850;
+    }
+
+    .searched-stop {
+      text-decoration-line: underline;
+      text-decoration-color: #ff7a00;
+      text-decoration-thickness: 3px;
+      text-underline-offset: 4px;
+      font-weight: 950;
+    }
+
+    .time-grid,
+    .stop-times {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .time-grid div,
+    .stop-times div {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      background: #f8fafc;
+      padding: 0.55rem;
+    }
+
+    small {
+      display: block;
+      color: #64748b;
+      font-size: 0.72rem;
+      margin-bottom: 0.2rem;
+    }
+
+    strong,
+    b {
+      color: #0f172a;
+    }
+
+    .stop-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 0.85rem;
+      background: #f8fbff;
+      padding: 0.62rem;
+      margin-top: 0.55rem;
+    }
+
+    .stop-card.active-stop {
+      border-color: #ff7a00;
+      background: #fff7ed;
+    }
+
+    .stop-top {
+      display: flex;
+      gap: 0.55rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .stop-top span {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 0.74rem;
+      flex: 0 0 auto;
+    }
+
+    .stop-times em {
+      display: inline-flex;
+      margin-top: 0.25rem;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.14);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #15803d;
+      padding: 0.12rem 0.42rem;
+      font-size: 0.66rem;
+      font-style: normal;
+      font-weight: 900;
+    }
+
+    .back-row a {
+      color: #2563eb;
+      font-weight: 900;
+      text-decoration: none;
+    }
+
+    @media (max-width: 760px) {
+  .selected-card {
+    grid-template-columns: 104px 1fr;
+    gap: 0.75rem;
+  }
+
+  .photo-box {
+    width: 104px;
+    min-height: 124px;
+  }
+}
+    
+
+
+/* ULTRA FINAL OVERRIDE - RESULT PAGE PHOTO */
+.selected-card {
+  display: grid !important;
+  grid-template-columns: 122px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0.72rem !important;
+}
+.photo-box {
+  width: 122px !important;
+  height: 122px !important;
+  min-height: 122px !important;
+  max-height: 122px !important;
+  align-self: start !important;
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+  background: #20145a !important;
+}
+.photo-box img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+.bus-info { min-width: 0 !important; }
+
+@media (max-width: 760px) {
+  .selected-card {
+    grid-template-columns: 108px minmax(0, 1fr) !important;
+    gap: 0.58rem !important;
+    padding: 0.72rem !important;
+    align-items: start !important;
+  }
+  .photo-box {
+    width: 108px !important;
+    height: 108px !important;
+    min-height: 108px !important;
+    max-height: 108px !important;
+  }
+  .bus-info h2 { font-size: 1.18rem !important; line-height: 1.1 !important; }
+  .route-line { font-size: 0.82rem !important; }
+  .time-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 0.38rem !important; }
+  .time-grid div { padding: 0.42rem !important; }
+}
+
+  </style>
+</BaseLayout>

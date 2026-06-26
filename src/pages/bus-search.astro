@@ -1,65 +1,11 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { buildBusStopSuggestions } from '../lib/busSeoLinks';
 
 const from = Astro.url.searchParams.get('from') || '';
 const to = Astro.url.searchParams.get('to') || '';
 
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
-
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
-
-type BusRouteRow = {
-  source?: string | null;
-  destination?: string | null;
-  route_data?: Array<{ stoppage_name?: string | null }> | null;
-};
-
-async function loadStopSuggestions() {
-  const fallback = [
-    'Arambagh', 'আরামবাগ',
-    'Tarakeswar', 'তারকেশ্বর',
-    'Digha', 'দীঘা',
-    'Ghatal', 'ঘাটাল',
-    'Kolkata', 'কলকাতা',
-    'Howrah', 'হাওড়া',
-  ];
-
-  try {
-    const url = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/bus_routes?select=source,destination,route_data&limit=2000`;
-    const res = await fetch(url, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    });
-
-    if (!res.ok) return fallback;
-
-    const rows = (await res.json()) as BusRouteRow[];
-    const set = new Set<string>();
-
-    for (const row of rows) {
-      if (row.source) set.add(row.source.trim());
-      if (row.destination) set.add(row.destination.trim());
-
-      for (const stop of row.route_data || []) {
-        if (stop.stoppage_name) set.add(stop.stoppage_name.trim());
-      }
-    }
-
-    return Array.from(set)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b))
-      .slice(0, 600);
-  } catch {
-    return fallback;
-  }
-}
-
-const stopSuggestions = await loadStopSuggestions();
+const stopSuggestions = await buildBusStopSuggestions();
 ---
 
 <BaseLayout
@@ -70,47 +16,49 @@ const stopSuggestions = await loadStopSuggestions();
     <div class="container">
       <div class="bus-search-hero">
         <p class="eyebrow">🚌 Bus Route Finder</p>
+
         <h1
-  data-en="Search Bus Timetable in West Bengal"
-  data-bn="পশ্চিমবঙ্গে বাস টাইমটেবিল খুঁজুন"
->
-  Search Bus Timetable in West Bengal
-</h1>
-       <p
-  data-en="Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections."
-  data-bn="আগে সরাসরি বাস খুঁজুন। সরাসরি বাস না পেলে SoniaBuddy মাঝের স্টপ দিয়ে সংযোগ রুট দেখাবে।"
->
-  Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections.
-</p>
+          data-en="Search Bus Timetable in West Bengal"
+          data-bn="পশ্চিমবঙ্গে বাস টাইমটেবিল খুঁজুন"
+        >
+          Search Bus Timetable in West Bengal
+        </h1>
+
+        <p
+          data-en="Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections."
+          data-bn="আগে সরাসরি বাস খুঁজুন। সরাসরি বাস না পেলে SoniaBuddy মাঝের স্টপ দিয়ে সংযোগ রুট দেখাবে।"
+        >
+          Search direct buses first. If no direct bus is found, SoniaBuddy suggests indirect bus routes with middle-stop connections.
+        </p>
+
         <p class="bn-line">বাংলা বা English stop name লিখে bus route খুঁজুন।</p>
       </div>
 
       <div class="search-card">
         <form id="bus-search-form">
           <div class="search-grid">
-            <label>
+            <label class="field-wrap">
               <span data-en="From" data-bn="কোথা থেকে">From</span>
               <input
                 id="bus-from"
                 name="from"
                 type="text"
-                list="stop-suggestions"
                 placeholder="Arambagh / আরামবাগ"
                 data-placeholder-en="Arambagh"
-               data-placeholder-bn="আরামবাগ"
+                data-placeholder-bn="আরামবাগ"
                 value={from}
                 autocomplete="off"
                 required
               />
+              <div class="suggest-box" id="from-suggestions" hidden></div>
             </label>
 
-            <label>
+            <label class="field-wrap">
               <span data-en="To" data-bn="কোথায়">To</span>
               <input
                 id="bus-to"
                 name="to"
                 type="text"
-                list="stop-suggestions"
                 placeholder="Digha / দীঘা"
                 data-placeholder-en="Digha"
                 data-placeholder-bn="দীঘা"
@@ -118,22 +66,87 @@ const stopSuggestions = await loadStopSuggestions();
                 autocomplete="off"
                 required
               />
+              <div class="suggest-box" id="to-suggestions" hidden></div>
             </label>
 
-            <button type="submit" id="search-btn" data-en="Search" data-bn="খুঁজুন">Search</button>
+            <button type="submit" id="search-btn" data-en="Search" data-bn="খুঁজুন">
+              Search
+            </button>
+          </div>
+        </form>
+      </div>
+       <div class="rent-promo-strip">
+  <span
+    data-en="Need a car for tour, wedding, local trip, school-office or emergency? Check rent vehicles available near your city."
+    data-bn="ট্যুর, বিয়ে, লোকাল ট্রিপ, স্কুল-অফিস বা জরুরি কাজে গাড়ি লাগবে? আপনার শহরের কাছে ভাড়া গাড়ি দেখুন।"
+  >
+    Need a car for tour, wedding, local trip, school-office or emergency? Check rent vehicles available near your city.
+  </span>
+
+  <a
+    href="/rent-vehicle?tab=find"
+    data-en="Find Rent Vehicle"
+    data-bn="ভাড়া গাড়ি খুঁজুন"
+  >
+    Find Rent Vehicle
+  </a>
+</div>
+      <div id="disclaimer-modal" class="sb-modal hidden" aria-hidden="true">
+        <div class="sb-modal-backdrop" data-close-disclaimer></div>
+
+        <div class="sb-modal-panel" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+          <div class="sb-modal-head">
+            <span class="sb-alert-icon">⚠️</span>
+            <h2 id="disclaimer-title">Important Disclaimer</h2>
+            <button type="button" class="sb-modal-close" data-close-disclaimer>×</button>
           </div>
 
-          <datalist id="stop-suggestions">
-            {stopSuggestions.map((stop) => <option value={stop} />)}
-          </datalist>
-        </form>
+          <div class="sb-modal-body">
+            <p>Bus timing, route, stop, fare and availability may change without notice.</p>
+            <p>Please verify the latest timing from the bus operator, counter or local source before travelling.</p>
+            <p>Indirect route suggestions are guidance only. Transfer timing may vary due to traffic, delay, weather or route change.</p>
+            <p>বাসের সময়, রুট ও উপলব্ধতা পরিবর্তন হতে পারে। যাত্রার আগে কাউন্টার বা বাস অপারেটরের কাছ থেকে নিশ্চিত হয়ে নিন।</p>
+          </div>
+
+          <div class="sb-modal-foot">
+            <button type="button" data-close-disclaimer>Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="photo-zoom-modal" class="photo-zoom-modal hidden" aria-hidden="true">
+        <div class="photo-zoom-backdrop" data-close-photo-zoom></div>
+
+        <div class="photo-zoom-panel">
+          <button type="button" class="photo-zoom-close" data-close-photo-zoom>×</button>
+          <img id="photo-zoom-img" alt="Bus photo" />
+        </div>
       </div>
 
       <div id="status-box" class="status-box hidden"></div>
 
+      <section id="rent-section" class="rent-help hidden">
+        <h2 data-en="No bus route found" data-bn="কোনো বাস রুট পাওয়া যায়নি">
+          No bus route found
+        </h2>
+        <p>
+          We could not find direct or indirect bus routes for this search. You can try another spelling,
+          reverse direction, or find a car with driver.
+        </p>
+        <a
+          href="/rent-vehicle?tab=find"
+          class="rent-btn"
+          data-en="Find Rent Car / Cab"
+          data-bn="ভাড়া গাড়ি / ক্যাব খুঁজুন"
+        >
+          Find Rent Car / Cab
+        </a>
+      </section>
+
       <section id="direct-section" class="result-section hidden">
         <div class="section-head">
-          <h2 data-en="Direct buses found" data-bn="সরাসরি বাস পাওয়া গেছে">Direct buses found</h2>
+          <h2 data-en="Direct buses found" data-bn="সরাসরি বাস পাওয়া গেছে">
+            Direct buses found
+          </h2>
           <p id="direct-subtitle"></p>
         </div>
         <div id="direct-results" class="result-list"></div>
@@ -141,31 +154,19 @@ const stopSuggestions = await loadStopSuggestions();
 
       <section id="indirect-section" class="result-section hidden">
         <div class="section-head">
-          <h2 data-en="Suggested indirect routes" data-bn="প্রস্তাবিত সংযোগ রুট">Suggested indirect routes</h2>
+          <h2 data-en="Suggested indirect routes" data-bn="প্রস্তাবিত সংযোগ রুট">
+            Suggested indirect routes
+          </h2>
           <p
-  data-en="Use these routes when direct bus is not available or when middle-stop travel is better."
-  data-bn="সরাসরি বাস না থাকলে বা মাঝের স্টপ দিয়ে যাত্রা ভালো হলে এই রুটগুলো ব্যবহার করুন।"
->
-  Use these routes when direct bus is not available or when middle-stop travel is better.
-</p>
+            id="indirect-subtitle"
+            class="indirect-note"
+            data-en="Indirect bus suggestions are shown below. Use these when direct timing does not match or middle-stop travel is better."
+            data-bn="নিচে সংযোগ রুটের সাজেশন দেখানো হয়েছে। সরাসরি বাসের সময় না মিললে বা মাঝের স্টপ দিয়ে যাত্রা ভালো হলে এগুলো ব্যবহার করুন।"
+          >
+            Indirect bus suggestions are shown below. Use these when direct timing does not match or middle-stop travel is better.
+          </p>
         </div>
         <div id="indirect-results" class="result-list"></div>
-      </section>
-
-      <section id="rent-section" class="rent-help hidden">
-        <h2 data-en="No bus route found" data-bn="কোনো বাস রুট পাওয়া যায়নি">No bus route found</h2>
-        <p>
-          We could not find direct or indirect bus routes for this search. You can try another spelling, reverse direction,
-          or find a car with driver.
-        </p>
-        <a
-  href="/rent-vehicle?tab=find"
-  class="rent-btn"
-  data-en="Find Rent Car / Cab"
-  data-bn="ভাড়া গাড়ি / ক্যাব খুঁজুন"
->
-  Find Rent Car / Cab
-</a>
       </section>
 
       <section id="popular-section" class="popular-routes">
@@ -180,6 +181,10 @@ const stopSuggestions = await loadStopSuggestions();
     </div>
   </section>
 
+  <script define:vars={{ stopSuggestions }}>
+    window.__STOP_SUGGESTIONS__ = stopSuggestions;
+  </script>
+
   <script>
     import { findJourney } from '../lib/routeFinder';
 
@@ -188,16 +193,22 @@ const stopSuggestions = await loadStopSuggestions();
     const toInput = document.getElementById('bus-to');
     const searchBtn = document.getElementById('search-btn');
 
+    const fromSuggestBox = document.getElementById('from-suggestions');
+    const toSuggestBox = document.getElementById('to-suggestions');
+    const stopSuggestions = window.__STOP_SUGGESTIONS__ || [];
+
     const statusBox = document.getElementById('status-box');
     const directSection = document.getElementById('direct-section');
     const indirectSection = document.getElementById('indirect-section');
     const rentSection = document.getElementById('rent-section');
     const popularSection = document.getElementById('popular-section');
-
+    const directSubtitle = document.getElementById('direct-subtitle');
+    const indirectSubtitle = document.getElementById('indirect-subtitle');
     const directResults = document.getElementById('direct-results');
     const indirectResults = document.getElementById('indirect-results');
-    const directSubtitle = document.getElementById('direct-subtitle');
 
+    let lastSearchSource = '';
+    let lastSearchDestination = '';
     const escapeHtml = (value) =>
       String(value || '')
         .replaceAll('&', '&amp;')
@@ -205,7 +216,49 @@ const stopSuggestions = await loadStopSuggestions();
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
+    const getLang = () => {
+      try {
+        return (
+          document.body.getAttribute('data-lang') ||
+          localStorage.getItem('soniabuddy_lang') ||
+          localStorage.getItem('soniabuddy_rent_lang_v1') ||
+          'en'
+        );
+      } catch {
+        return document.body.getAttribute('data-lang') || 'en';
+      }
+    };
 
+    const t = (en, bn) => (getLang() === 'bn' ? bn : en);
+
+    const SEARCH_HISTORY_KEY = 'soniabuddy_bus_search_history_v1';
+
+    const readSearchHistory = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
+        return Array.isArray(saved) ? saved.slice(0, 8) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const saveSearchPair = (source, destination) => {
+      const from = String(source || '').trim();
+      const to = String(destination || '').trim();
+      if (!from || !to) return;
+
+      try {
+        const old = readSearchHistory();
+        const next = [
+          { from, to, label: `${from} → ${to}` },
+          ...old.filter((item) => !(item.from === from && item.to === to)),
+        ].slice(0, 8);
+
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+    };
     const slugify = (value) =>
       String(value || '')
         .normalize('NFKD')
@@ -214,35 +267,295 @@ const stopSuggestions = await loadStopSuggestions();
         .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
         .replace(/^-+|-+$/g, '');
 
-   const timetableUrl = (item, toArg, busIdArg) => {
-  const isBusObject = item && typeof item === 'object';
+    const normalizeSearch = (value) =>
+      String(value || '')
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[.,/\\&_+|:;'"!?\-]/g, ' ')
+        .replace(/\bbus\s*stand\b/g, ' ')
+        .replace(/\bbus\s*stop\b/g, ' ')
+        .replace(/\bbus\s*station\b/g, ' ')
+        .replace(/\bstand\b/g, ' ')
+        .replace(/বাস\s*স্ট্যান্ড/g, ' ')
+        .replace(/বাসস্ট্যান্ড/g, ' ')
+        .replace(/বাস\s*স্টপ/g, ' ')
+        .replace(/বাসস্টপ/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-  const displayFrom = isBusObject ? toArg : item;
-  const displayTo = isBusObject ? busIdArg : toArg;
+    const extractBengaliText = (value) => {
+      const text = String(value || '');
+      const parenMatch = text.match(/\(([^)]*[\u0980-\u09FF][^)]*)\)/);
+      if (parenMatch) return parenMatch[1].trim();
 
-  const routeFrom = isBusObject
-    ? item.route_source || item.routeSource || item.main_source || item.mainSource || item.source || item.from || displayFrom
-    : item;
+      const bnMatch = text.match(/[\u0980-\u09FF][\u0980-\u09FF\s\u09E6-\u09EF.,-]*/);
+      return bnMatch ? bnMatch[0].trim() : '';
+    };
 
-  const routeTo = isBusObject
-    ? item.route_destination || item.routeDestination || item.main_destination || item.mainDestination || item.destination || item.to || displayTo
-    : toArg;
+    const displayStopName = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw || getLang() !== 'bn') return raw;
 
-  const busId = isBusObject ? item.bus_id : busIdArg;
+      const key = normalizeSearch(raw);
+      const found = stopSuggestions.find((item) => {
+        const itemValue = normalizeSearch(item.value || '');
+        const itemLabel = normalizeSearch(item.label || '');
+        const itemSearch = normalizeSearch(item.search || '');
+        return itemValue === key || itemLabel === key || itemSearch.includes(key) || key.includes(itemValue);
+      });
 
-  const slug = `${slugify(routeFrom)}-to-${slugify(routeTo)}`;
-  let base = '/bus-timetable/result/';
+      return extractBengaliText(found?.label) || extractBengaliText(found?.search) || extractBengaliText(found?.value) || raw;
+    };
 
-  if (slug.length > 4) {
-    base = `/bus-timetable/${slug}/`;
+    const renderStop = (value) => escapeHtml(displayStopName(value));
+    const isSameStopName = (a, b) => {
+  const x = normalizeSearch(a);
+  const y = normalizeSearch(b);
+  return Boolean(x && y && (x === y || x.includes(y) || y.includes(x)));
+};
+
+const renderStopMarked = (value, searchFrom, searchTo) => {
+  const isSearchStop = isSameStopName(value, searchFrom) || isSameStopName(value, searchTo);
+  const className = isSearchStop ? 'searched-stop-name' : '';
+
+  return `<span class="${className}">${renderStop(value)}</span>`;
+};
+
+    const getSuggestionScore = (item, query) => {
+      const value = String(item.value || '').trim();
+      const label = String(item.label || value).trim();
+      const search = String(item.search || `${value} ${label}`).trim();
+
+      const valueText = normalizeSearch(value);
+      const labelText = normalizeSearch(label);
+      const searchText = normalizeSearch(search);
+
+      let score = 0;
+
+      if (valueText === query) score += 1000;
+      if (labelText === query) score += 950;
+
+      if (valueText.startsWith(query)) score += 850;
+      if (labelText.startsWith(query)) score += 820;
+
+      if (valueText.split(' ').some((part) => part.startsWith(query))) score += 720;
+      if (labelText.split(' ').some((part) => part.startsWith(query))) score += 700;
+      if (searchText.split(' ').some((part) => part.startsWith(query))) score += 650;
+
+      if (searchText.includes(query)) score += 260;
+      if (valueText.includes(query)) score += 240;
+      if (labelText.includes(query)) score += 220;
+
+      return score;
+    };
+
+    const showSuggestList = (input, box) => {
+  if (!input || !box) return;
+
+  const rawQuery = String(input.value || '').trim();
+  const query = normalizeSearch(rawQuery);
+  const history = readSearchHistory();
+
+  if (!query) {
+    if (!history.length) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+
+    box.innerHTML = history
+      .map(
+        (item) => `
+          <button
+            type="button"
+            class="suggest-item history-suggest"
+            data-value="${escapeHtml(input === fromInput ? item.from : item.to)}"
+          >
+            <span class="suggest-pin">🕘</span>
+            <span class="suggest-label">${escapeHtml(item.label)}</span>
+          </button>
+        `
+      )
+      .join('');
+
+    box.hidden = false;
+    return;
   }
 
-  const params = new URLSearchParams();
-  if (busId) params.set('bus_id', busId);
-  params.set('from', displayFrom || routeFrom || '');
-  params.set('to', displayTo || routeTo || '');
+  const scored = stopSuggestions
+    .map((item) => {
+      const value = String(item.value || '').trim();
+      const label = String(item.label || value).trim();
+      const score = getSuggestionScore(item, query);
 
-  return `${base}?${params.toString()}#selected-bus`;
+      return {
+        ...item,
+        value,
+        label,
+        score,
+      };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return String(a.label).localeCompare(String(b.label));
+    })
+    .slice(0, 8);
+
+  if (!scored.length) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+
+  box.innerHTML = scored
+    .map(
+      (item) => `
+        <button type="button" class="suggest-item" data-value="${escapeHtml(item.value)}">
+          <span class="suggest-pin">⌖</span>
+          <span class="suggest-label">${escapeHtml(item.label)}</span>
+        </button>
+      `
+    )
+    .join('');
+
+  box.hidden = false;
+};
+
+    const bindSuggest = (input, box) => {
+      if (!input || !box) return;
+
+      input.addEventListener('input', () => showSuggestList(input, box));
+      input.addEventListener('focus', () => showSuggestList(input, box));
+
+      box.addEventListener('click', (event) => {
+        const target = event.target;
+        const button = target?.closest?.('.suggest-item');
+        if (!button) return;
+
+        input.value = button.getAttribute('data-value') || '';
+        box.hidden = true;
+        input.focus();
+      });
+    };
+
+    bindSuggest(fromInput, fromSuggestBox);
+    bindSuggest(toInput, toSuggestBox);
+
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target?.closest?.('[data-close-photo-zoom]')) {
+  event.preventDefault();
+  closePhotoZoom();
+  return;
+}
+
+const zoomBtn = target?.closest?.('.photo-zoom-trigger');
+if (zoomBtn) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const src = zoomBtn.getAttribute('data-zoom-src');
+  if (src && src.trim()) {
+    openPhotoZoom(src);
+  }
+
+  return;
+}
+
+      if (target?.closest?.('[data-open-disclaimer]')) {
+        event.preventDefault();
+        openDisclaimer();
+        return;
+      }
+
+      if (target?.closest?.('[data-close-disclaimer]')) {
+        event.preventDefault();
+        closeDisclaimer();
+        return;
+      }
+
+      if (!target?.closest?.('.field-wrap')) {
+        if (fromSuggestBox) fromSuggestBox.hidden = true;
+        if (toSuggestBox) toSuggestBox.hidden = true;
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeDisclaimer();
+        closePhotoZoom();
+      }
+    });
+
+    const disclaimerModal = document.getElementById('disclaimer-modal');
+
+    const openDisclaimer = () => {
+      if (!disclaimerModal) return;
+      disclaimerModal.classList.remove('hidden');
+      disclaimerModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    };
+
+    const closeDisclaimer = () => {
+      if (!disclaimerModal) return;
+      disclaimerModal.classList.add('hidden');
+      disclaimerModal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    };
+
+    const photoZoomModal = document.getElementById('photo-zoom-modal');
+    const photoZoomImg = document.getElementById('photo-zoom-img');
+
+    let previousBodyOverflow = '';
+
+    const openPhotoZoom = (src) => {
+  if (!photoZoomModal || !photoZoomImg || !src) return;
+
+  previousBodyOverflow = document.body.style.overflow || '';
+  photoZoomImg.removeAttribute('src');
+  photoZoomImg.src = src;
+
+  photoZoomModal.classList.remove('hidden');
+  photoZoomModal.setAttribute('aria-hidden', 'false');
+
+  document.documentElement.classList.add('photo-zoom-open');
+  document.body.classList.add('photo-zoom-open');
+  document.body.style.overflow = 'hidden';
+};
+
+    const closePhotoZoom = () => {
+  if (!photoZoomModal || !photoZoomImg) return;
+
+  photoZoomModal.classList.add('hidden');
+  photoZoomModal.setAttribute('aria-hidden', 'true');
+  photoZoomImg.removeAttribute('src');
+
+  document.documentElement.classList.remove('photo-zoom-open');
+  document.body.classList.remove('photo-zoom-open');
+  document.body.style.overflow = previousBodyOverflow || '';
+  previousBodyOverflow = '';
+};
+
+    photoZoomImg?.addEventListener('error', () => {
+      closePhotoZoom();
+    });
+
+    const timetableUrl = (item, fromArg, toArg) => {
+  const isBusObject = item && typeof item === 'object';
+
+  const busId = isBusObject ? item.bus_id : '';
+  const displayFrom = fromArg || '';
+  const displayTo = toArg || '';
+
+  const params = new URLSearchParams();
+
+  if (busId) params.set('bus_id', busId);
+  params.set('from', displayFrom);
+  params.set('to', displayTo);
+
+  return `/bus-timetable/result/?${params.toString()}#selected-bus`;
 };
 
     const setHidden = (el, hidden) => {
@@ -266,88 +579,236 @@ const stopSuggestions = await loadStopSuggestions();
       if (indirectResults) indirectResults.innerHTML = '';
     };
 
+    const timeToMinutes = (value) => {
+      const raw = String(value || '').trim().toLowerCase();
+      if (!raw || raw.includes('not available')) return 99999;
+
+      const match = raw.match(/(\d{1,2})[:.](\d{2})\s*(am|pm)?/i);
+      if (!match) return 99999;
+
+      let hour = Number(match[1]);
+      const minute = Number(match[2]);
+      const meridiem = match[3];
+
+      if (meridiem === 'pm' && hour !== 12) hour += 12;
+      if (meridiem === 'am' && hour === 12) hour = 0;
+
+      return hour * 60 + minute;
+    };
+
+    const sortByDeparture = (items) =>
+      [...items].sort((a, b) => timeToMinutes(a.departure) - timeToMinutes(b.departure));
+
     const busCard = (bus, searchFrom, searchTo) => {
       const from = bus.from || searchFrom;
       const to = bus.to || searchTo;
       const url = timetableUrl(bus, from, to);
 
       return `
-        <article class="bus-card">
-          <div class="bus-photo">
+        <article class="old-bus-card">
+          <button
+            type="button"
+            class="old-bus-photo photo-zoom-trigger"
+            data-zoom-src="${escapeHtml(bus.image_url || '')}"
+            aria-label="Open bus photo"
+          >
             ${
               bus.image_url
-                ? `<img src="${escapeHtml(bus.image_url)}" alt="${escapeHtml(bus.bus_name || 'Bus')}" loading="lazy" />`
-                : `<span>🚌</span>`
+                ? `<img src="${escapeHtml(bus.image_url)}" alt="${escapeHtml(bus.bus_name || 'Bus')}" loading="eager" decoding="async" onerror="this.remove()" />`
+                : ''
             }
-          </div>
+            <span class="photo-fallback">🚌</span>
+          </button>
 
-          <div class="bus-info">
-            <div class="bus-title-row">
-              <h3>${escapeHtml(bus.bus_name || 'Bus')}</h3>
-              <span>${escapeHtml(bus.bus_type || 'Bus')}</span>
+          <div class="old-bus-body">
+            <div class="old-bus-top">
+              <div>
+                <h3>${escapeHtml(bus.bus_name || 'Bus')}</h3>
+                <div class="old-bus-type">
+                  ${escapeHtml(bus.bus_type || 'Bus')}
+                  <span class="old-day-pill">${escapeHtml(t(getDayPart(bus.departure), getDayPartBn(bus.departure)))}</span>
+                </div>
+              </div>
+
+              <button type="button" class="old-warning-btn" data-open-disclaimer title="Disclaimer">
+                ⚠️
+              </button>
             </div>
 
-            <p class="route-line">${escapeHtml(from)} → ${escapeHtml(to)}</p>
+            <div class="old-route-line">
+              <span class="green-dot"></span>
+              <b>${renderStopMarked(from, searchFrom, searchTo)}</b>
+<span class="arrow">→</span>
+<span class="red-dot"></span>
+<b>${renderStopMarked(to, searchFrom, searchTo)}</b>
+            </div>
 
-            <div class="time-grid">
+            <div class="old-time-row">
               <div>
-                <small>Departure</small>
+                <small>${t('Departure', 'ছাড়বে')}</small>
                 <strong>${escapeHtml(bus.departure || 'Time not available')}</strong>
               </div>
               <div>
-                <small>Arrival</small>
+                <small>${t('Arrival', 'পৌঁছাবে')}</small>
                 <strong>${escapeHtml(bus.arrival || 'Time not available')}</strong>
               </div>
-              <div>
-                <small>Fare</small>
-                <strong>${escapeHtml(bus.fare || '--')}</strong>
-              </div>
-              <div>
-                <small>Match</small>
-                <strong>${escapeHtml(bus.matchReason || 'direct')}</strong>
-              </div>
+              ${
+                bus.duration
+                  ? `<div>
+                      <small>${t('Duration', 'সময়')}</small>
+                      <strong>${escapeHtml(bus.duration)}</strong>
+                    </div>`
+                  : ''
+              }
+              ${
+                bus.distance
+                  ? `<div>
+                      <small>${t('Distance', 'দূরত্ব')}</small>
+                      <strong>${escapeHtml(bus.distance)}</strong>
+                    </div>`
+                  : ''
+              }
             </div>
 
-            <a class="view-btn" href="${url}">View Timetable</a>
+            <div class="old-card-actions">
+  <a class="old-schedule-btn" href="${url}">
+    ${t('View Full Schedule →', 'পুরো সময়সূচি দেখুন →')}
+  </a>
+</div>
           </div>
         </article>
       `;
     };
+    const getDayPart = (value) => {
+  const minutes = timeToMinutes(value);
 
+  if (minutes === 99999) return 'Time';
+  if (minutes < 360) return 'Night';
+  if (minutes < 720) return 'Morning';
+  if (minutes < 1020) return 'Day';
+  if (minutes < 1200) return 'Evening';
+  return 'Night';
+};
+const getDayPartBn = (value) => {
+  const part = getDayPart(value);
+
+  if (part === 'Morning') return 'সকাল';
+  if (part === 'Day') return 'দিন';
+  if (part === 'Evening') return 'সন্ধ্যা';
+  if (part === 'Night') return 'রাত';
+  return 'সময়';
+};
     const indirectCard = (option, searchFrom, searchTo) => {
       const step1 = option.step1 || {};
       const step2 = option.step2 || {};
       const mid = option.midpoint || option.midpointA || step1.to || step2.from || 'Middle stop';
 
       return `
-        <article class="indirect-card">
-          <div class="indirect-head">
-            <h3>Via ${escapeHtml(mid)}</h3>
-            ${option.waitMin ? `<span>Wait ${escapeHtml(option.waitMin)} min</span>` : ''}
+        <article class="old-indirect-card">
+          <div class="old-transfer-head">
+            <div>
+              <span class="old-transfer-pill">${t('TRANSFER ROUTE', 'সংযোগ রুট')}</span>
+              <h3>${t('Travel via', 'মাঝের স্টপ')} ${renderStop(mid)}</h3>
+            </div>
+
+            <div class="old-transfer-actions">
+              ${option.waitMin ? `<span class="old-wait-pill">${t('Wait', 'অপেক্ষা')} ${escapeHtml(option.waitMin)} ${t('min', 'মিনিট')}</span>` : ''}
+              <button type="button" class="old-warning-btn" data-open-disclaimer title="Disclaimer">⚠️</button>
+            </div>
           </div>
 
-          <div class="step-box">
-            <b>Step 1</b>
-            <p>${escapeHtml(step1.bus_name || 'Bus 1')}</p>
-            <small>${escapeHtml(step1.from || searchFrom)} → ${escapeHtml(step1.to || mid)}</small>
-            <small>${escapeHtml(step1.departure || 'Time not available')} → ${escapeHtml(step1.arrival || 'Time not available')}</small>
-            ${
-             step1.bus_id
-            ? `<a href="${timetableUrl(step1.from || searchFrom, step1.to || mid, step1.bus_id)}">Step 1 Timetable</a>`
-                : ''
-            }
-          </div>
+          <div class="old-step-grid">
+            <div class="old-step-card">
+              <div class="old-step-head">
+                <span>${t('STEP 1', 'ধাপ ১')}</span>
+                <b>${t('BUS LEG', 'বাস অংশ')}</b>
+              </div>
 
-          <div class="step-box">
-            <b>Step 2</b>
-            <p>${escapeHtml(step2.bus_name || 'Bus 2')}</p>
-            <small>${escapeHtml(step2.from || mid)} → ${escapeHtml(step2.to || searchTo)}</small>
-            <small>${escapeHtml(step2.departure || 'Time not available')} → ${escapeHtml(step2.arrival || 'Time not available')}</small>
-            ${
-          step2.bus_id
-                ? `<a href="${timetableUrl(step2.from || mid, step2.to || searchTo, step2.bus_id)}">Step 2 Timetable</a>`
-                : ''
-            }
+              <div class="old-step-main">
+                <button
+                  type="button"
+                  class="old-step-photo photo-zoom-trigger"
+                  data-zoom-src="${escapeHtml(step1.image_url || '')}"
+                  aria-label="Open bus photo"
+                >
+                  ${
+                    step1.image_url
+                      ? `<img src="${escapeHtml(step1.image_url)}" alt="${escapeHtml(step1.bus_name || 'Bus')}" loading="eager" decoding="async" onerror="this.remove()" />`
+                      : ''
+                  }
+                  <span class="photo-fallback">🚌</span>
+                </button>
+
+                <div class="old-step-info">
+                  <h4>${escapeHtml(step1.bus_name || 'Bus 1')}</h4>
+                  <span class="old-day-pill">${escapeHtml(t(getDayPart(step1.departure), getDayPartBn(step1.departure)))}</span>
+                </div>
+              </div>
+
+              <div class="old-board-box">
+                <small>${t('BOARD', 'উঠুন')}</small>
+                <strong>${renderStopMarked(step1.from || searchFrom, searchFrom, searchTo)}</strong>
+                <span>${escapeHtml(step1.departure || 'Time not available')}</span>
+              </div>
+
+              <div class="old-off-box">
+                <small>${t('GET OFF', 'নামুন')}</small>
+                <strong>${renderStopMarked(step1.to || mid, searchFrom, searchTo)}</strong>
+                <span>${escapeHtml(step1.arrival || 'Time not available')}</span>
+              </div>
+
+              ${
+                step1.bus_id
+                  ? `<a href="${timetableUrl(step1, step1.from || searchFrom, step1.to || mid)}">${t('View Schedule', 'সময়সূচি দেখুন')}</a>`
+                  : ''
+              }
+            </div>
+
+            <div class="old-step-card">
+              <div class="old-step-head">
+                <span>${t('STEP 2', 'ধাপ ২')}</span>
+                <b>${t('BUS LEG', 'বাস অংশ')}</b>
+              </div>
+
+              <div class="old-step-main">
+                <button
+                  type="button"
+                  class="old-step-photo photo-zoom-trigger"
+                  data-zoom-src="${escapeHtml(step2.image_url || '')}"
+                  aria-label="Open bus photo"
+                >
+                  ${
+                    step2.image_url
+                      ? `<img src="${escapeHtml(step2.image_url)}" alt="${escapeHtml(step2.bus_name || 'Bus')}" loading="eager" decoding="async" onerror="this.remove()" />`
+                      : ''
+                  }
+                  <span class="photo-fallback">🚌</span>
+                </button>
+
+                <div class="old-step-info">
+                  <h4>${escapeHtml(step2.bus_name || 'Bus 2')}</h4>
+                  <span class="old-day-pill">${escapeHtml(t(getDayPart(step2.departure), getDayPartBn(step2.departure)))}</span>
+                </div>
+              </div>
+
+              <div class="old-board-box">
+                <small>${t('BOARD', 'উঠুন')}</small>
+                <strong>${renderStopMarked(step2.from || mid, searchFrom, searchTo)}</strong>
+                <span>${escapeHtml(step2.departure || 'Time not available')}</span>
+              </div>
+
+              <div class="old-off-box">
+                <small>${t('GET OFF', 'নামুন')}</small>
+                <strong>${renderStopMarked(step2.to || searchTo, searchFrom, searchTo)}</strong>
+                <span>${escapeHtml(step2.arrival || 'Time not available')}</span>
+              </div>
+
+              ${
+                step2.bus_id
+                  ? `<a href="${timetableUrl(step2, step2.from || mid, step2.to || searchTo)}">${t('View Schedule', 'সময়সূচি দেখুন')}</a>`
+                  : ''
+              }
+            </div>
           </div>
         </article>
       `;
@@ -356,8 +817,12 @@ const stopSuggestions = await loadStopSuggestions();
     async function runSearch(from, to) {
       const source = String(from || '').trim();
       const destination = String(to || '').trim();
+
       if (!source || !destination) return;
 
+      lastSearchSource = source;
+      lastSearchDestination = destination;
+      saveSearchPair(source, destination);
       resetResults();
       setHidden(popularSection, true);
       setStatus('Searching bus routes...', 'loading');
@@ -372,10 +837,10 @@ const stopSuggestions = await loadStopSuggestions();
       try {
         const plan = await findJourney(source, destination);
 
-        const direct = plan.direct || [];
+        const direct = sortByDeparture(plan.direct || []);
         const indirect = plan.kind === 'indirect' ? plan.indirect || [] : [];
         const alternativeIndirect = plan.alternativeIndirect || [];
-        const allIndirect = [...indirect, ...alternativeIndirect].slice(0, 4);
+        const allIndirect = [...indirect, ...alternativeIndirect].slice(0, 6);
 
         setHidden(statusBox, true);
 
@@ -387,11 +852,42 @@ const stopSuggestions = await loadStopSuggestions();
 
         if (allIndirect.length && indirectResults) {
           setHidden(indirectSection, false);
+          if (indirectSubtitle) {
+            indirectSubtitle.textContent = direct.length
+              ? t(
+                  'Indirect bus suggestions are shown below, even though direct buses are available.',
+                  'সরাসরি বাস পাওয়া গেছে, তবুও নিচে সংযোগ রুটের সাজেশন দেখানো হয়েছে।'
+                )
+              : t(
+                  'No direct bus matched. Use these indirect bus suggestions with middle-stop transfer.',
+                  'সরাসরি বাস মেলেনি। মাঝের স্টপ দিয়ে এই সংযোগ রুটের সাজেশন ব্যবহার করুন।'
+                );
+          }
           indirectResults.innerHTML = allIndirect.map((option) => indirectCard(option, source, destination)).join('');
+        }
+
+        if (!direct.length && allIndirect.length) {
+          setHidden(rentSection, false);
+          const rentTitle = rentSection?.querySelector('h2');
+          const rentText = rentSection?.querySelector('p');
+
+          if (rentTitle) rentTitle.textContent = 'No direct bus found';
+          if (rentText) {
+            rentText.textContent =
+              'Direct bus is not available for this search. Please check the indirect bus suggestions below, or use a rent car/cab if urgent.';
+          }
         }
 
         if (!direct.length && !allIndirect.length) {
           setHidden(rentSection, false);
+          const rentTitle = rentSection?.querySelector('h2');
+          const rentText = rentSection?.querySelector('p');
+
+          if (rentTitle) rentTitle.textContent = 'No bus route found';
+          if (rentText) {
+            rentText.textContent =
+              'We could not find direct or indirect bus routes for this search. You can try another spelling, reverse direction, or find a car with driver.';
+          }
         }
       } catch (error) {
         console.error(error);
@@ -416,22 +912,36 @@ const stopSuggestions = await loadStopSuggestions();
     if (initialFrom && initialTo) {
       runSearch(initialFrom, initialTo);
     }
+    window.addEventListener('storage', () => {
+      if (lastSearchSource && lastSearchDestination) {
+        runSearch(lastSearchSource, lastSearchDestination);
+      }
+    });
   </script>
 
-  <style>
+  <style is:global>
     .bus-search-page {
-      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
       min-height: 100vh;
       padding: 1rem 0 2.5rem;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
+    }
+
+    .bus-search-hero,
+    .search-card,
+    .result-section,
+    .rent-help,
+    .popular-routes {
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 1.1rem;
+      padding: 1rem;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      margin-top: 1rem;
     }
 
     .bus-search-hero {
-      background: white;
-      border: 1px solid #dbeafe;
-      border-radius: 1.25rem;
+      margin-top: 0;
       padding: 1.35rem;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-      margin-bottom: 1rem;
     }
 
     .eyebrow {
@@ -446,7 +956,7 @@ const stopSuggestions = await loadStopSuggestions();
     .bus-search-hero h1 {
       margin: 0 0 0.5rem;
       color: #0f172a;
-      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
       line-height: 1.1;
     }
 
@@ -458,19 +968,7 @@ const stopSuggestions = await loadStopSuggestions();
 
     .bn-line {
       color: #0369a1 !important;
-      font-weight: 650;
-    }
-
-    .search-card,
-    .result-section,
-    .rent-help,
-    .popular-routes {
-      background: white;
-      border: 1px solid #dbeafe;
-      border-radius: 1rem;
-      padding: 1rem;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
-      margin-top: 1rem;
+      font-weight: 700;
     }
 
     .search-grid {
@@ -484,18 +982,23 @@ const stopSuggestions = await loadStopSuggestions();
       display: grid;
       gap: 0.35rem;
       color: #0f172a;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 0.9rem;
+    }
+
+    .field-wrap {
+      position: relative;
     }
 
     .search-grid input {
       width: 100%;
       border: 1px solid #bfdbfe;
-      border-radius: 0.75rem;
-      padding: 0.8rem 0.9rem;
+      border-radius: 0.8rem;
+      padding: 0.82rem 0.9rem;
       font: inherit;
       color: #0f172a;
       background: #f8fbff;
+      font-weight: 750;
     }
 
     .search-grid input:focus {
@@ -506,21 +1009,19 @@ const stopSuggestions = await loadStopSuggestions();
     }
 
     #search-btn,
-    .view-btn,
-    .rent-btn,
-    .step-box a {
+    .rent-btn {
       border: none;
-      border-radius: 0.75rem;
+      border-radius: 0.8rem;
       background: linear-gradient(135deg, #ff6b00, #ff8a00);
       color: white;
-      font-weight: 800;
+      font-weight: 900;
       text-decoration: none;
       padding: 0.82rem 1.15rem;
       cursor: pointer;
       display: inline-flex;
       justify-content: center;
       align-items: center;
-      min-height: 44px;
+      min-height: 46px;
     }
 
     #search-btn:disabled {
@@ -539,7 +1040,7 @@ const stopSuggestions = await loadStopSuggestions();
       background: #eff6ff;
       border: 1px solid #bfdbfe;
       color: #1e40af;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .status-box.error {
@@ -560,138 +1061,12 @@ const stopSuggestions = await loadStopSuggestions();
     .rent-help p {
       margin: 0 0 1rem;
       color: #64748b;
+      line-height: 1.5;
     }
 
     .result-list {
       display: grid;
-      gap: 0.85rem;
-    }
-
-    .bus-card,
-    .indirect-card {
-      display: grid;
-      grid-template-columns: 88px 1fr;
-      gap: 0.85rem;
-      border: 1px solid #e2e8f0;
-      border-radius: 1rem;
-      padding: 0.85rem;
-      background: #ffffff;
-    }
-
-    .bus-photo {
-      width: 88px;
-      height: 88px;
-      border-radius: 0.9rem;
-      background: #e0f2fe;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      font-size: 2rem;
-    }
-
-    .bus-photo img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .bus-title-row {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-    }
-
-    .bus-title-row h3 {
-      margin: 0;
-      color: #0f172a;
-      font-size: 1rem;
-    }
-
-    .bus-title-row span,
-    .indirect-head span {
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-      border-radius: 999px;
-      padding: 0.25rem 0.55rem;
-      font-size: 0.75rem;
-      font-weight: 800;
-    }
-
-    .route-line {
-      margin: 0.35rem 0 0.65rem;
-      color: #475569;
-      font-weight: 650;
-    }
-
-    .time-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.45rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .time-grid div {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.7rem;
-      padding: 0.5rem;
-    }
-
-    .time-grid small,
-    .step-box small {
-      display: block;
-      color: #64748b;
-      font-size: 0.72rem;
-      margin-bottom: 0.15rem;
-    }
-
-    .time-grid strong {
-      color: #0f172a;
-      font-size: 0.85rem;
-    }
-
-    .indirect-card {
-      grid-template-columns: 1fr;
-    }
-
-    .indirect-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .indirect-head h3 {
-      margin: 0;
-      color: #0f172a;
-    }
-
-    .step-box {
-      border: 1px solid #e2e8f0;
-      border-radius: 0.85rem;
-      padding: 0.75rem;
-      background: #f8fbff;
-      display: grid;
-      gap: 0.25rem;
-      margin-top: 0.6rem;
-    }
-
-    .step-box p {
-      margin: 0;
-      font-weight: 800;
-      color: #0f172a;
-    }
-
-    .step-box a {
-      margin-top: 0.4rem;
-      width: fit-content;
-      padding: 0.55rem 0.8rem;
-      min-height: auto;
-      font-size: 0.8rem;
+      gap: 0.9rem;
     }
 
     .popular-grid {
@@ -711,6 +1086,416 @@ const stopSuggestions = await loadStopSuggestions();
       font-size: 0.9rem;
     }
 
+    .suggest-box {
+      position: absolute;
+      z-index: 9999;
+      top: calc(100% + 0.35rem);
+      left: 0;
+      right: 0;
+      max-height: 310px;
+      overflow-y: auto;
+      background: #130b42;
+      border: 1px solid rgba(255, 122, 0, 0.65);
+      border-radius: 0 0 1rem 1rem;
+      box-shadow: 0 22px 44px rgba(0, 0, 0, 0.36);
+      padding: 0.35rem;
+    }
+
+    .suggest-item {
+      width: 100%;
+      border: 0;
+      border-radius: 0.75rem;
+      background: transparent;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.78rem 0.85rem;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      line-height: 1.25;
+    }
+
+    .suggest-pin {
+      flex: 0 0 auto;
+      color: #ff7a00;
+      font-size: 1rem;
+      font-weight: 900;
+    }
+
+    .suggest-label {
+      display: block;
+      color: #ffffff;
+      font-size: 0.94rem;
+      font-weight: 800;
+    }
+
+    .suggest-item:hover,
+    .suggest-item:focus {
+      background: rgba(255, 122, 0, 0.18);
+      outline: none;
+    }
+
+    .old-bus-card {
+      display: grid;
+      grid-template-columns: 142px 1fr;
+      gap: 0.95rem;
+      align-items: center;
+      background: #130b42;
+      border: 1px solid rgba(255, 122, 0, 0.45);
+      border-radius: 1.15rem;
+      padding: 0.85rem;
+      color: #ffffff;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    .old-bus-photo {
+      width: 142px;
+      height: 122px;
+      border-radius: 0.95rem;
+      overflow: hidden;
+      background: #20145a;
+      display: grid;
+      place-items: center;
+      font-size: 2rem;
+    }
+
+    .old-bus-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .old-bus-body {
+      min-width: 0;
+    }
+
+    .old-bus-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      align-items: flex-start;
+    }
+
+    .old-bus-top h3 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 1.05rem;
+      line-height: 1.18;
+      font-weight: 900;
+    }
+
+    .old-bus-type {
+      margin-top: 0.25rem;
+      color: #d9ccff;
+      font-size: 0.82rem;
+      font-weight: 750;
+    }
+
+    .old-warning-btn {
+      border: 1px solid rgba(248, 113, 113, 0.65);
+      background: rgba(127, 29, 29, 0.55);
+      color: #fecaca;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .old-route-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+      margin: 0.55rem 0;
+      color: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    .green-dot,
+    .red-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .green-dot {
+      background: #22c55e;
+    }
+
+    .red-dot {
+      background: #ef4444;
+    }
+
+    .old-route-line .arrow {
+      color: #ff7a00;
+      font-weight: 900;
+    }
+
+    .old-time-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin: 0.65rem 0;
+    }
+
+    .old-time-row div {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      padding: 0.5rem;
+    }
+
+    .old-time-row small {
+      display: block;
+      color: #c4b5fd;
+      font-size: 0.68rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .old-time-row strong {
+      color: #ffffff;
+      font-size: 0.82rem;
+    }
+
+    .old-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .old-type-pill {
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.22);
+      color: #dbeafe;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .old-schedule-btn,
+    .old-step-card a {
+      border-radius: 999px;
+      background: #ff7a00;
+      color: #ffffff;
+      padding: 0.55rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 900;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .old-indirect-card {
+      background: #130b42;
+      border: 1px solid rgba(34, 197, 94, 0.38);
+      border-radius: 1.15rem;
+      padding: 0.85rem;
+      color: #ffffff;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    .old-transfer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+
+    .old-transfer-pill {
+      display: inline-flex;
+      border-radius: 999px;
+      background: rgba(255, 122, 0, 0.18);
+      color: #ffb86b;
+      border: 1px solid rgba(255, 122, 0, 0.35);
+      padding: 0.28rem 0.65rem;
+      font-size: 0.7rem;
+      font-weight: 900;
+    }
+
+    .old-transfer-head h3 {
+      margin: 0.45rem 0 0;
+      color: #ffffff;
+      font-size: 1.05rem;
+    }
+
+    .old-transfer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.45rem;
+    }
+
+    .old-wait-pill {
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.18);
+      color: #86efac;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.76rem;
+      font-weight: 900;
+    }
+
+    .old-step-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.old-step-card {
+  padding: 0.55rem;
+}
+
+.old-step-main {
+  grid-template-columns: 42px 1fr;
+  gap: 0.4rem;
+}
+
+.old-step-photo {
+  width: 42px;
+  height: 42px;
+  border-radius: 0.65rem;
+}
+
+.old-step-card h4 {
+  font-size: 0.78rem !important;
+}
+
+.old-board-box,
+.old-off-box {
+  padding: 0.42rem;
+}
+
+.old-board-box strong,
+.old-off-box strong {
+  font-size: 0.78rem !important;
+}
+
+.old-board-box span,
+.old-off-box span {
+  font-size: 0.72rem !important;
+}
+
+.old-step-card a {
+  width: 100%;
+  font-size: 0.72rem;
+  padding: 0.45rem 0.5rem;
+}
+
+    .sb-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+
+    .sb-modal.hidden {
+      display: none !important;
+    }
+
+    .sb-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(4px);
+    }
+
+    .sb-modal-panel {
+      position: relative;
+      width: min(520px, 100%);
+      max-height: 82vh;
+      overflow: hidden;
+      border-radius: 1.2rem;
+      background: #111827;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+    }
+
+    .sb-modal-head {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: #1f2937;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sb-alert-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(251, 191, 36, 0.18);
+      border: 1px solid rgba(251, 191, 36, 0.55);
+    }
+
+    .sb-modal-head h2 {
+      flex: 1;
+      margin: 0;
+      color: #ffffff;
+      font-size: 1.05rem;
+    }
+
+    .sb-modal-close {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .sb-modal-body {
+      max-height: 55vh;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    .sb-modal-body p {
+      margin: 0 0 0.85rem;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    .sb-modal-body p::before {
+      content: '• ';
+      color: #fbbf24;
+      font-weight: 900;
+    }
+
+    .sb-modal-foot {
+      padding: 0.85rem 1rem;
+      background: #1f2937;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .sb-modal-foot button {
+      border: 0;
+      border-radius: 0.65rem;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      padding: 0.5rem 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
     @media (max-width: 760px) {
       .search-grid {
         grid-template-columns: 1fr;
@@ -720,18 +1505,524 @@ const stopSuggestions = await loadStopSuggestions();
         width: 100%;
       }
 
-      .bus-card {
-        grid-template-columns: 76px 1fr;
+      .old-bus-card {
+        grid-template-columns: 108px 1fr;
+        gap: 0.7rem;
       }
 
-      .bus-photo {
-        width: 76px;
-        height: 76px;
+      .old-bus-photo {
+        width: 108px;
+        height: 98px;
       }
 
-      .time-grid {
+      .old-time-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .old-step-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+}
     }
-  </style>
+    .rent-promo-strip {
+  margin-top: 0.75rem;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fed7aa;
+  border-radius: 1rem;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #7c2d12;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.rent-promo-strip a {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #ff7a00;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .rent-promo-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rent-promo-strip a {
+    width: 100%;
+    justify-content: center;
+    display: inline-flex;
+  }
+}
+.old-day-pill {
+  display: inline-flex;
+  width: fit-content;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
+  padding: 0.16rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.old-step-main {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  margin: 0.55rem 0;
+}
+
+.old-step-photo {
+  width: 54px;
+  height: 54px;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+}
+
+.old-step-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.old-step-info {
+  min-width: 0;
+}
+
+.old-step-info h4 {
+  margin: 0 0 0.25rem !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* FINAL FORCE: indirect STEP 1 + STEP 2 side by side on mobile */
+.old-step-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0.45rem !important;
+}
+
+.old-step-card {
+  min-width: 0 !important;
+}
+
+.old-step-main {
+  display: grid !important;
+  grid-template-columns: 42px 1fr !important;
+  gap: 0.42rem !important;
+  align-items: center !important;
+  margin: 0.48rem 0 !important;
+}
+
+.old-step-photo {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 0.65rem !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 1.25rem !important;
+  flex: 0 0 auto !important;
+}
+
+.old-step-photo img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.old-step-info {
+  min-width: 0 !important;
+}
+
+.old-step-info h4 {
+  margin: 0 0 0.22rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.78rem !important;
+}
+
+.old-day-pill {
+  display: inline-flex !important;
+  width: fit-content !important;
+  border-radius: 999px !important;
+  background: rgba(34, 197, 94, 0.16) !important;
+  border: 1px solid rgba(34, 197, 94, 0.35) !important;
+  color: #86efac !important;
+  padding: 0.16rem 0.42rem !important;
+  font-size: 0.66rem !important;
+  font-weight: 900 !important;
+}
+
+@media (max-width: 760px) {
+  .old-step-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.42rem !important;
+  }
+
+  .old-step-card {
+    padding: 0.48rem !important;
+  }
+
+  .old-step-main {
+    grid-template-columns: 38px 1fr !important;
+    gap: 0.35rem !important;
+  }
+
+  .old-step-photo {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .old-board-box,
+  .old-off-box {
+    padding: 0.38rem !important;
+  }
+
+  .old-board-box strong,
+  .old-off-box strong {
+    font-size: 0.72rem !important;
+  }
+
+  .old-board-box span,
+  .old-off-box span {
+    font-size: 0.68rem !important;
+  }
+
+  .old-step-card a {
+    width: 100% !important;
+    padding: 0.42rem 0.35rem !important;
+    font-size: 0.68rem !important;
+  }
+}
+
+/* FINAL CLEAN OVERRIDES */
+.old-step-card {
+  min-width: 0 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3) !important;
+  border-radius: 0.95rem !important;
+  padding: 0.55rem !important;
+}
+
+.old-step-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+}
+
+.old-step-head span {
+  border-radius: 999px !important;
+  background: #22c55e !important;
+  color: #ffffff !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.68rem !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+}
+
+.old-step-head b {
+  color: #ffb86b !important;
+  font-size: 0.72rem !important;
+  white-space: nowrap !important;
+}
+
+.old-board-box,
+.old-off-box {
+  border-radius: 0.8rem !important;
+  padding: 0.42rem !important;
+  margin-top: 0.45rem !important;
+}
+
+.old-board-box {
+  background: rgba(34, 197, 94, 0.16) !important;
+  border: 1px solid rgba(34, 197, 94, 0.35) !important;
+}
+
+.old-off-box {
+  background: rgba(244, 63, 94, 0.16) !important;
+  border: 1px solid rgba(244, 63, 94, 0.35) !important;
+}
+
+.old-board-box small,
+.old-off-box small {
+  display: block !important;
+  color: #c4b5fd !important;
+  font-size: 0.66rem !important;
+  font-weight: 900 !important;
+}
+
+.old-board-box strong,
+.old-off-box strong {
+  display: block !important;
+  color: #ffffff !important;
+  font-size: 0.78rem !important;
+  margin: 0.15rem 0 !important;
+}
+
+.old-board-box span,
+.old-off-box span {
+  color: #86efac !important;
+  font-size: 0.72rem !important;
+  font-weight: 900 !important;
+}
+
+.old-warning-text-btn {
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  background: rgba(127, 29, 29, 0.55);
+  color: #fecaca;
+  border-radius: 999px;
+  padding: 0.48rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+/* FINAL FIX: visible searched stop underline */
+.searched-stop-name {
+  display: inline-block !important;
+  color: inherit !important;
+  text-decoration-line: underline !important;
+  text-decoration-color: #ff7a00 !important;
+  text-decoration-thickness: 3px !important;
+  text-underline-offset: 4px !important;
+  font-weight: 950 !important;
+}
+
+/* FINAL FIX: direct bus card photo old-site style */
+.old-bus-card {
+  grid-template-columns: 150px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0.9rem !important;
+}
+
+.old-bus-photo {
+  width: 150px !important;
+  height: 100% !important;
+  min-height: 128px !important;
+  align-self: stretch !important;
+  border-radius: 1rem !important;
+  border: 1px solid rgba(255, 122, 0, 0.35) !important;
+  background: #20145a !important;
+}
+
+.old-bus-photo img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Bottom disclaimer removed, schedule button aligned */
+.old-card-actions {
+  justify-content: flex-end !important;
+}
+
+.old-schedule-btn {
+  min-width: 170px !important;
+}
+
+/* FINAL FIX: zoom modal should never get stuck */
+.photo-zoom-open {
+  overflow: hidden !important;
+}
+
+.photo-zoom-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 1rem !important;
+}
+
+.photo-zoom-modal.hidden {
+  display: none !important;
+}
+
+.photo-zoom-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  background: rgba(2, 6, 23, 0.82) !important;
+  backdrop-filter: blur(5px) !important;
+}
+
+.photo-zoom-panel {
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(760px, 96vw) !important;
+  max-height: 84vh !important;
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+  background: #020617 !important;
+  border: 1px solid rgba(255, 122, 0, 0.55) !important;
+}
+
+.photo-zoom-panel img {
+  display: block !important;
+  width: 100% !important;
+  max-height: 84vh !important;
+  object-fit: contain !important;
+  background: #020617 !important;
+}
+
+.photo-zoom-close {
+  position: fixed !important;
+  top: 1rem !important;
+  right: 1rem !important;
+  z-index: 3 !important;
+  width: 52px !important;
+  height: 52px !important;
+  border: 2px solid rgba(255, 255, 255, 0.75) !important;
+  border-radius: 999px !important;
+  background: rgba(0, 0, 0, 0.72) !important;
+  color: #ffffff !important;
+  font-size: 2rem !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.photo-zoom-trigger {
+  cursor: zoom-in !important;
+}
+
+.photo-zoom-trigger[data-zoom-src=''] {
+  cursor: default !important;
+}
+
+@media (max-width: 760px) {
+  .old-bus-card {
+    grid-template-columns: 112px minmax(0, 1fr) !important;
+    gap: 0.65rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .old-bus-photo {
+    width: 112px !important;
+    min-height: 126px !important;
+  }
+
+  .old-bus-top h3 {
+    font-size: 0.95rem !important;
+  }
+
+  .old-route-line {
+    font-size: 0.82rem !important;
+  }
+
+  .old-time-row {
+    gap: 0.38rem !important;
+  }
+
+  .old-time-row div {
+    padding: 0.45rem !important;
+  }
+
+  .old-schedule-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .photo-zoom-panel {
+    width: 96vw !important;
+    max-height: 78vh !important;
+  }
+
+  .photo-zoom-panel img {
+    max-height: 78vh !important;
+  }
+
+  .photo-zoom-close {
+    width: 56px !important;
+    height: 56px !important;
+    top: 0.8rem !important;
+    right: 0.8rem !important;
+  }
+}
+
+
+/* ULTRA FINAL OVERRIDE - BUS SEARCH PHOTO / ICON */
+.photo-fallback { display: none !important; }
+.photo-zoom-trigger:not(:has(img)) .photo-fallback { display: grid !important; place-items: center !important; }
+.photo-zoom-trigger img + .photo-fallback { display: none !important; }
+
+.old-bus-card {
+  display: grid !important;
+  grid-template-columns: 126px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 0.62rem !important;
+}
+.old-bus-photo {
+  width: 126px !important;
+  height: 126px !important;
+  min-height: 126px !important;
+  max-height: 126px !important;
+  align-self: center !important;
+  border-radius: 1rem !important;
+  overflow: hidden !important;
+  background: #20145a !important;
+}
+.old-bus-photo img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+.old-bus-body { min-width: 0 !important; }
+.old-card-actions { justify-content: flex-end !important; }
+
+@media (max-width: 760px) {
+  .old-bus-card {
+    grid-template-columns: 116px minmax(0, 1fr) !important;
+    gap: 0.54rem !important;
+    padding: 0.68rem !important;
+    align-items: stretch !important;
+  }
+  .old-bus-photo {
+    width: 116px !important;
+    height: 116px !important;
+    min-height: 116px !important;
+    max-height: 116px !important;
+    align-self: center !important;
+  }
+  .old-bus-top h3 {
+    font-size: 0.92rem !important;
+    line-height: 1.1 !important;
+  }
+  .old-bus-type { font-size: 0.72rem !important; }
+  .old-day-pill { font-size: 0.62rem !important; padding: 0.12rem 0.34rem !important; }
+  .old-route-line { font-size: 0.78rem !important; gap: 0.22rem !important; margin: 0.44rem 0 !important; }
+  .old-time-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.34rem !important;
+    margin: 0.42rem 0 !important;
+  }
+  .old-time-row div { padding: 0.4rem !important; }
+  .old-time-row small { font-size: 0.62rem !important; }
+  .old-time-row strong { font-size: 0.76rem !important; }
+  .old-schedule-btn { width: 100% !important; padding: 0.52rem 0.55rem !important; font-size: 0.76rem !important; }
+}
+
+</style>
 </BaseLayout>
