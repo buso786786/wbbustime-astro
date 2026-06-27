@@ -747,15 +747,32 @@ const primaryPurpose = titleCase(purposes[0] || 'Local Trip');
 const purposeList = purposes.map((purpose) => titleCase(purpose)).join(', ');
 
 const canonicalUrl = `${SITE_URL}/rent/${page.slug}/`;
+const shortUseCaseTitle: Record<string, string> = {
+  wedding: `Wedding Car and Bus Rental in ${city}`,
+  tour: `Tour Car and Bus Rental in ${city}`,
+  local: `Local Car, Toto and Auto Rental in ${city}`,
+  emergency: `Emergency Ambulance Rental in ${city}`,
+  goods: `Goods Pickup Van Rental in ${city}`,
+  'school-office': `School Office Car and Bus Rental in ${city}`,
+};
+
+const shortUseCaseSuffix: Record<string, string> = {
+  wedding: 'Bride Car, Guest Bus, Local Owners',
+  tour: 'Local Driver Vehicle Rent',
+  local: 'Short Trip, Station Pickup',
+  emergency: 'Local Ambulance & Car Listings',
+  goods: 'Local Parcel Transport',
+  'school-office': 'Staff & Student Transport',
+};
+
 const title = isUseCasePage
-  ? `${useCase.title} in ${city} | ${useCase.titleSuffix} | SoniaBuddy`
-  : `${page.vehicleTitle} in ${city} | Direct Owner Contacts | SoniaBuddy`;
+  ? `${shortUseCaseTitle[useCase.key] || `${useCase.title} in ${city}`} | ${shortUseCaseSuffix[useCase.key] || 'Local Vehicle Owners'} | SoniaBuddy`
+  : `${page.vehicleLabel} Rental in ${city} | Local ${page.vehicleLabel} Rent with Driver | SoniaBuddy`;
 
 const description = isUseCasePage
-  ? `Find ${useCase.title.toLowerCase()} in ${city}. Compare ${relatedVehicleText.toLowerCase()} listings for ${purposeList}, owner contact, seats, price text, availability and WhatsApp on SoniaBuddy.`
-  : `Find ${page.vehicleTitle.toLowerCase()} in ${city} for ${purposeList}. Compare active owner listings, seats, vehicle details, price text, call number and WhatsApp contact on SoniaBuddy.`;
+  ? `Find ${shortUseCaseTitle[useCase.key]?.toLowerCase() || useCase.title.toLowerCase()} with active local owner listings. Compare ${relatedVehicleText.toLowerCase()}, seats, model, price text, call number and WhatsApp contact on SoniaBuddy.`
+  : `Find ${page.vehicleLabel.toLowerCase()} rental in ${city} with driver. Compare active local owner listings, seats, vehicle model, price text, call number and WhatsApp contact on SoniaBuddy.`;
 const verifiedCount = listings.filter((listing) => listing.is_verified).length;
-
 const seatValues = listings
   .map((listing) => listing.seats)
   .filter((seat): seat is number => typeof seat === 'number' && seat > 0);
@@ -870,7 +887,7 @@ const breadcrumbJsonLd = {
 
 <BaseLayout title={title} description={description} canonical={canonicalUrl}>
   <Fragment slot="head">
-    <link rel="canonical" href={canonicalUrl} />
+    
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
@@ -1185,31 +1202,33 @@ const breadcrumbJsonLd = {
   }
 
   .seo-rent-card {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    gap: 0.55rem;
-    padding: 0.55rem;
-    border-radius: 0.72rem;
-    background: rgba(255, 255, 255, 0.085);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-  }
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 0.72rem;
+  padding: 0.72rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.085);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  align-items: start;
+}
 
-  .seo-rent-photo {
-    width: 48px;
-    height: 48px;
-    border-radius: 0.65rem;
-    overflow: hidden;
-    display: grid;
-    place-items: center;
-    background: rgba(255, 255, 255, 0.12);
-    font-size: 1.3rem;
-  }
+.seo-rent-photo {
+  width: 116px;
+  height: 116px;
+  border-radius: 0.78rem;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 2rem;
+  align-self: start;
+}
 
-  .seo-rent-photo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+.seo-rent-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
   .seo-rent-body {
     min-width: 0;
@@ -1223,9 +1242,9 @@ const breadcrumbJsonLd = {
   }
 
   .seo-rent-headline h3 {
-    font-size: 0.92rem;
-    line-height: 1.2;
-  }
+  font-size: 1rem;
+  line-height: 1.18;
+}
 
   .owner-line {
     margin: 0.1rem 0 0 !important;
@@ -1261,14 +1280,14 @@ const breadcrumbJsonLd = {
   }
 
   .facts span {
-    display: inline-flex;
-    padding: 0.18rem 0.38rem;
-    border-radius: 0.4rem;
-    background: rgba(255, 255, 255, 0.1);
-    font-size: 0.72rem;
-    line-height: 1.25;
-    color: rgba(255, 255, 255, 0.86);
-  }
+  display: inline-flex;
+  padding: 0.22rem 0.44rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.88);
+}
 
   .desc-line {
     margin: 0.35rem 0 0 !important;
@@ -1372,15 +1391,15 @@ const breadcrumbJsonLd = {
     }
 
     .seo-rent-card {
-      grid-template-columns: 46px 1fr;
-      gap: 0.48rem;
-      padding: 0.5rem;
-    }
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0.62rem;
+}
 
-    .seo-rent-photo {
-      width: 46px;
-      height: 46px;
-    }
+.seo-rent-photo {
+  width: 104px;
+  height: 104px;
+}
 
     .mini-btn {
       min-height: 25px;

@@ -5,12 +5,14 @@ interface Props {
   title: string;
   description: string;
   canonical?: string;
+  robots?: string;
 }
 
 const {
   title,
   description,
-  canonical
+  canonical,
+  robots
 } = Astro.props;
 
 const canonicalUrl = canonical || (Astro.site ? new URL(Astro.url.pathname, Astro.site).href : Astro.url.pathname);
@@ -26,6 +28,7 @@ const fullTitle = `${title} | ${siteName}`;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
+    {robots && <meta name="robots" content={robots} />}
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
@@ -40,6 +43,7 @@ const fullTitle = `${title} | ${siteName}`;
     <meta name="twitter:description" content={description} />
 
     <title>{fullTitle}</title>
+    <slot name="head" />
   </head>
 
   <body>
