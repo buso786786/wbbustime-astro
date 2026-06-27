@@ -432,15 +432,23 @@ const directionLabel =
   firstBus?.direction === 'down'
     ? 'return/down-side'
     : 'going/up-side';
+const directionIntro =
+  firstBus?.direction === 'down'
+    ? `${source} to ${destination} is shown as the return/down-side journey for this bus route. This page focuses on the opposite direction timing, down-time values and reverse stop order where data is available.`
+    : `${source} to ${destination} is shown as the going/up-side journey for this bus route. This page focuses on forward direction timing, up-time values and stop order from source towards destination.`;
 
+const timetableFocus =
+  firstBus?.direction === 'down'
+    ? 'down time, return-side stop order and reverse journey timing'
+    : 'up time, forward stop order and going-side journey timing';
 const reverseRouteText = `${destination} to ${source}`;
 
 const seoSummaryParagraphs = [
-  `${source} to ${destination} bus timetable on SoniaBuddy is built from available bus route records, listed bus names and stop-wise timing data. This page currently shows ${busCards.length} ${busCards.length === 1 ? 'bus option' : 'bus options'} for the ${directionLabel} journey. Available service information includes ${busNameSummary}, with bus type data such as ${busTypeSummary}. The page is focused on the selected travel direction, so the departure stop, arrival stop and timetable examples are shown for passengers travelling from ${source} towards ${destination}.`,
+  `${pageTitle} on SoniaBuddy is built from available bus route records, listed bus names and stop-wise timing data. ${directionIntro} This page currently shows ${busCards.length} ${busCards.length === 1 ? 'bus option' : 'bus options'} for passengers travelling from ${source} towards ${destination}. Available service information includes ${busNameSummary}, with bus type data such as ${busTypeSummary}.`,
 
-  `For this route segment, the important stop order includes ${segmentStopSummary}. This makes the page different from the reverse route page, because ${source} to ${destination} uses the stop order and timing direction for this journey, while ${reverseRouteText} uses the opposite side timing where available. Passengers can use the stop-wise timetable to understand where the bus starts, which major stops are covered, and where the selected destination appears on the route.`,
+  `For this ${source} to ${destination} route segment, important stops include ${segmentStopSummary}. The page is focused on ${timetableFocus}, so passengers can understand the correct travel side instead of only seeing the full route name. Use the stop-wise timetable to check where the bus starts, which major stops are covered, and where ${destination} appears in the route order.`,
 
-  `Timing examples available for this page include departure around ${departureSummary} and arrival or opposite-side timing around ${arrivalSummary}. These timings are based on the route data currently available in the database and may change due to traffic, road conditions, weather, local route updates or operator changes. Before starting the journey, passengers should confirm the latest bus timing from the counter, operator or local source and reach the stop early.`
+  `Timing examples for ${source} to ${destination} include departure around ${departureSummary} and arrival around ${arrivalSummary}. These timings are based on the route data currently available in the database and may change because of traffic, road condition, weather, local updates or operator changes. Before travelling, confirm the latest timing locally and reach the stop early.`
 ];
 
 const pageTitle = `${source} to ${destination} Bus Timetable`;
@@ -508,7 +516,7 @@ const faqJson = {
 <BaseLayout
   title={pageTitle}
   description={pageDescription}
-  canonical={canonical}
+  canonical={canonicalUrl}
 >
   <section class="timetable-page">
     <div class="container">
@@ -798,7 +806,15 @@ const faqJson = {
       padding: 1rem 0 2.5rem;
       background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 45%, #ffffff 100%);
     }
+    .timetable-page {
+  cursor: default;
+}
 
+.timetable-page a,
+.timetable-page button,
+.timetable-page summary {
+  cursor: pointer;
+}
     .hero-card,
     .selected-card,
     .section-card,

@@ -2,22 +2,28 @@
 
 export type RentCity = {
   id: string;
-  name: string;
-  slug: string;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
+  name: string | null;
+  slug: string | null;
+  active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
   name_en?: string | null;
   name_bn?: string | null;
   district_en?: string | null;
   district_bn?: string | null;
-  search_keywords_en?: string[] | null;
-  search_keywords_bn?: string[] | null;
+  search_keywords_en?: string | null;
+  search_keywords_bn?: string | null;
   sort_order?: number | null;
 };
 
-export async function listRentCities(): Promise<RentCity[]> {
-  const { data, error } = await supabase
+type ListRentCitiesOptions = {
+  onlyActive?: boolean;
+};
+
+export async function listRentCities(
+  options: ListRentCitiesOptions = {}
+): Promise<RentCity[]> {
+  let query = supabase
     .from("rent_cities")
     .select(`
       id,
@@ -34,9 +40,14 @@ export async function listRentCities(): Promise<RentCity[]> {
       search_keywords_bn,
       sort_order
     `)
-    .eq("active", true)
-    .order("sort_order", { ascending: true })
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name_en", { ascending: true });
+
+  if (options.onlyActive !== false) {
+    query = query.eq("active", true);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -45,5 +56,24 @@ export async function listRentCities(): Promise<RentCity[]> {
 
 export function cityDisplayName(city: RentCity): string {
   if (!city) return "";
+
   return city.name_en || city.name_bn || city.name || "";
+}
+
+export function citySearchText(city: RentCity): string {
+  if (!city) return "";
+
+  return [
+    city.name,
+    city.slug,
+    city.name_en,
+    city.name_bn,
+    city.district_en,
+    city.district_bn,
+    city.search_keywords_en,
+    city.search_keywords_bn,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }

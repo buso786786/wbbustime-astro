@@ -11,6 +11,10 @@ type RentCity = {
   name?: string | null;
   name_en?: string | null;
   name_bn?: string | null;
+  district_en?: string | null;
+  district_bn?: string | null;
+  search_keywords_en?: string | null;
+  search_keywords_bn?: string | null;
 };
 
 type RentListing = {
@@ -415,7 +419,7 @@ function titleForListing(listing: RentListing) {
   const model = cleanText(listing.vehicle_model);
   const seats = listing.seats ? `${listing.seats} seater` : '';
 
-  return [vehicle.label, model, seats].filter(Boolean).join(' · ');
+  return [vehicle.label, model].filter(Boolean).join(' · ');
 }
 
 function modelText(listing: RentListing) {
@@ -505,7 +509,7 @@ export async function getStaticPaths() {
 
     const { data: citiesData, error: cityError } = await supabase
       .from('rent_cities')
-      .select('id,name,name_en,name_bn')
+      .select('id,name,name_en,name_bn,district_en,district_bn,search_keywords_en,search_keywords_bn')
       .eq('active', true);
 
     if (cityError) {
@@ -905,7 +909,72 @@ const breadcrumbJsonLd = {
 
       <p>{heroIntro}</p>
     </section>
+         <section class="seo-listing-card">
+      <div class="section-heading-row">
+        <h2>{listingSectionTitle}</h2>
+        <p>{listings.length} active listing{listings.length === 1 ? '' : 's'} found from local owners.</p>
+      </div>
 
+      <div class="seo-rent-grid">
+        {listings.map((listing) => {
+          const phone = onlyDigits(listing.owner_phone);
+          const wa = whatsappNumber(listing);
+          const img = firstPhoto(listing);
+          const listingVehicle = vehicleInfo(listing.vehicle_type);
+          const listingModel = modelText(listing);
+          const listingPurposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
+          
+          return (
+            <article class="seo-rent-card">
+              <div class="seo-rent-photo">
+                {img ? (
+                  <img src={img} alt={`${listingVehicle.label} ${listingModel || 'rental'} in ${city}`} loading="lazy" decoding="async" />
+                ) : (
+                  <span>{listingVehicle.emoji}</span>
+                )}
+              </div>
+
+              <div class="seo-rent-body">
+                <div class="seo-rent-headline">
+                  <h3>{titleForListing(listing)}</h3>
+                  <span class="vehicle-type-pill">{listingVehicle.label}</span>
+                  {listing.is_verified && <span class="verified-pill">Verified</span>}
+                </div>
+
+                <p class="owner-line">Owner: {listing.owner_name || 'Local vehicle owner'}</p>
+
+                <div class="facts">
+  <span>Vehicle: {listingVehicle.label}</span>
+  {listingModel && <span>Model: {listingModel}</span>}
+  {listing.price_text && <span>Price: {listing.price_text}</span>}
+  {listingPurposes.length > 0 && (
+    <span class="purpose-fact">Purpose: {listingPurposes.map((purpose) => titleCase(purpose)).join(' • ')}</span>
+  )}
+</div>
+
+                
+
+                <div class="seo-rent-actions">
+                  {phone ? (
+                    <a class="mini-btn call" href={`tel:${phone}`}>📞 Call</a>
+                  ) : (
+                    <span class="mini-btn disabled">No Phone</span>
+                  )}
+
+                  {wa ? (
+                    <a class="mini-btn wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">
+                      💬 WhatsApp
+                    </a>
+                  ) : (
+                    <span class="mini-btn disabled">No WhatsApp</span>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
     <section class="content-card">
       <h2>{firstContentHeading}</h2>
 
@@ -928,71 +997,7 @@ const breadcrumbJsonLd = {
       )}
     </section>
 
-    <section class="seo-listing-card">
-      <div class="section-heading-row">
-        <h2>{listingSectionTitle}</h2>
-        <p>{listings.length} active listing{listings.length === 1 ? '' : 's'} found from local owners.</p>
-      </div>
-
-      <div class="seo-rent-grid">
-        {listings.map((listing) => {
-          const phone = onlyDigits(listing.owner_phone);
-          const wa = whatsappNumber(listing);
-          const img = firstPhoto(listing);
-          const listingVehicle = vehicleInfo(listing.vehicle_type);
-          const listingModel = modelText(listing);
-          const listingPurposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
-
-          return (
-            <article class="seo-rent-card">
-              <div class="seo-rent-photo">
-                {img ? (
-                  <img src={img} alt={`${listingVehicle.label} ${listingModel || 'rental'} in ${city}`} loading="lazy" decoding="async" />
-                ) : (
-                  <span>{listingVehicle.emoji}</span>
-                )}
-              </div>
-
-              <div class="seo-rent-body">
-                <div class="seo-rent-headline">
-                  <h3>{titleForListing(listing)}</h3>
-                  <span class="vehicle-type-pill">{listingVehicle.label}</span>
-                  {listing.is_verified && <span class="verified-pill">Verified</span>}
-                </div>
-
-                <p class="owner-line">Owner: {listing.owner_name || 'Local vehicle owner'}</p>
-
-                <div class="facts">
-                  <span>Vehicle: {listingVehicle.label}</span>
-                  {listingModel && <span>Model: {listingModel}</span>}
-                  {listing.price_text && <span>Price: {listing.price_text}</span>}
-                  {listing.seats && <span>Seats: {listing.seats}</span>}
-                  {listingPurposes.length > 0 && <span>Use: {listingPurposes.join(', ')}</span>}
-                </div>
-
-                {listing.description && <p class="desc-line">{listing.description}</p>}
-
-                <div class="seo-rent-actions">
-                  {phone ? (
-                    <a class="mini-btn call" href={`tel:${phone}`}>Call Now</a>
-                  ) : (
-                    <span class="mini-btn disabled">No Phone</span>
-                  )}
-
-                  {wa ? (
-                    <a class="mini-btn wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">
-                      WhatsApp
-                    </a>
-                  ) : (
-                    <span class="mini-btn disabled">No WhatsApp</span>
-                  )}
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
+    
 
     <section class="content-card">
       <h2>About {pageTitleText}</h2>
@@ -1000,7 +1005,7 @@ const breadcrumbJsonLd = {
       <p>
         SoniaBuddy is a local vehicle rental discovery page for people who need {aboutNeedText} in {city}.
         This page is generated from active owner listings and helps users compare available vehicles, seating capacity,
-        owner name, price text, purpose tags, call option and WhatsApp contact before making a booking decision.
+        owner name, price text, purpose tags, call option and 💬 WhatsApp contact before making a booking decision.
         Current listings include {ownerText}, {seatText}, and {verifiedCount > 0 ? `${verifiedCount} verified listing${verifiedCount === 1 ? '' : 's'}` : 'owner-submitted listings'}.
       </p>
 
@@ -1010,7 +1015,7 @@ const breadcrumbJsonLd = {
       </p>
 
       <p class="bn-line">
-        বাংলা: {city} এলাকায় {page.vehicleLabel} ভাড়া খুঁজতে এই পেজে সক্রিয় গাড়ির মালিকদের তথ্য, আসন সংখ্যা, ব্যবহার, ফোন এবং WhatsApp যোগাযোগ দেখা যায়।
+        বাংলা: {city} এলাকায় {page.vehicleLabel} ভাড়া খুঁজতে এই পেজে সক্রিয় গাড়ির মালিকদের তথ্য, আসন সংখ্যা, ব্যবহার, ফোন এবং 💬 WhatsApp যোগাযোগ দেখা যায়।
       </p>
     </section>
 
@@ -1406,4 +1411,8 @@ const breadcrumbJsonLd = {
       padding: 0.28rem 0.44rem;
     }
   }
+  .purpose-fact {
+  flex-basis: 100%;
+}
+
 </style>

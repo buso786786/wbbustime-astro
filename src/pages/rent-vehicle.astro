@@ -131,15 +131,35 @@ function publicPhotoUrl(path: string | null | undefined) {
   return data.publicUrl;
 }
 
-const citiesForClient = cities.map((city) => ({
-  id: city.id,
-  name: cityName(city),
-  district: cityDistrict(city),
-  name_en: city.name_en,
-  name_bn: city.name_bn,
-  search_keywords_en: city.search_keywords_en,
-  search_keywords_bn: city.search_keywords_bn,
-}));
+const citiesForClient = cities.map((city) => {
+  const nameEn = city.name_en || city.name || "";
+  const nameBn = city.name_bn || "";
+  const districtEn = city.district_en || "";
+  const districtBn = city.district_bn || "";
+  const keywordsEn = city.search_keywords_en || "";
+  const keywordsBn = city.search_keywords_bn || "";
+
+  return {
+    id: city.id,
+    name: cityName(city),
+    district: cityDistrict(city),
+    name_en: nameEn,
+    name_bn: nameBn,
+    district_en: districtEn,
+    district_bn: districtBn,
+    search_keywords_en: keywordsEn,
+    search_keywords_bn: keywordsBn,
+    search_text: [
+      nameEn,
+      nameBn,
+      city.name || "",
+      districtEn,
+      districtBn,
+      keywordsEn,
+      keywordsBn,
+    ].join(" "),
+  };
+});
 
 const listingsForClient = listings.map((listing) => {
   const baseCity = cities.find((city) => city.id === listing.base_city_id);
@@ -649,7 +669,8 @@ function setRentLang(nextLang) {
   localStorage.setItem(RENT_LANG_KEY, rentLang);
   document.documentElement.lang = rentLang === "bn" ? "bn" : "en";
   applyRentLanguage();
-  updateSearchButton();
+refreshCityDisplays();
+updateSearchButton();
 }
 
 function rentT(text) {
@@ -725,27 +746,55 @@ function applyRentLanguage() {
     }
 
     function getDisplayName(city) {
-      if (!city) return "";
-      return city.name || city.name_en || city.name_bn || "";
-    }
+  if (!city) return "";
+
+  const en = String(city.name_en || city.name || "").trim();
+  const bn = String(city.name_bn || "").trim();
+
+  if (rentLang === "bn") {
+    if (bn && en) return `${bn} / ${en}`;
+    return bn || en;
+  }
+
+  if (en && bn) return `${en} / ${bn}`;
+  return en || bn;
+}
+
+function getCityDistrictDisplay(city) {
+  if (!city) return "";
+
+  const en = String(city.district_en || city.district || "").trim();
+  const bn = String(city.district_bn || "").trim();
+
+  if (rentLang === "bn") {
+    if (bn && en) return `${bn} / ${en}`;
+    return bn || en;
+  }
+
+  if (en && bn) return `${en} / ${bn}`;
+  return en || bn;
+}
 
     function includesText(value, term) {
       return String(value || "").toLowerCase().includes(term);
     }
 
     function cityMatchesSearch(city, searchTerm) {
-      const term = String(searchTerm || "").trim().toLowerCase();
-      if (!term) return true;
+  const term = String(searchTerm || "").trim().toLowerCase();
+  if (!term) return true;
 
-      return (
-        includesText(city.name, term) ||
-        includesText(city.name_en, term) ||
-        includesText(city.name_bn, term) ||
-        includesText(city.district, term) ||
-        includesText(city.search_keywords_en, term) ||
-        includesText(city.search_keywords_bn, term)
-      );
-    }
+  return (
+    includesText(city.name, term) ||
+    includesText(city.name_en, term) ||
+    includesText(city.name_bn, term) ||
+    includesText(city.district, term) ||
+    includesText(city.district_en, term) ||
+    includesText(city.district_bn, term) ||
+    includesText(city.search_keywords_en, term) ||
+    includesText(city.search_keywords_bn, term) ||
+    includesText(city.search_text, term)
+  );
+}
 
     function getSelectedForType(type) {
       if (type === "mainCity") return state.mainCity ? [state.mainCity] : [];
@@ -788,10 +837,12 @@ if (type === "serviceCities" && state.baseCity) {
         btn.dataset.cityId = city.id;
         btn.dataset.selectorType = selectorType;
 
-        btn.innerHTML = `
-          <span class="city-name">${esc(getDisplayName(city))}</span>
-          ${city.district ? `<span class="city-district">${esc(city.district)}</span>` : ""}
-        `;
+        const districtText = getCityDistrictDisplay(city);
+
+btn.innerHTML = `
+  <span class="city-name">${esc(getDisplayName(city))}</span>
+  ${districtText ? `<span class="city-district">${esc(districtText)}</span>` : ""}
+`;
 
         dropdown.appendChild(btn);
       });
@@ -1191,9 +1242,9 @@ function setupRentCardAnalyticsObserver() {
           ${listing.vehicle_model ? ` • ${esc(listing.vehicle_model)}` : ""}
           ${listing.seats ? ` • ${esc(listing.seats)} seater` : ""}
         </p>
-        ${purposes.length ? `<p><strong>${rentT("Available:")}</strong> ${esc(purposes.map(rentLabel).join(" • "))}</p>` : ""}
-        ${listing.price_text ? `<p class="rent-price-line">${esc(listing.price_text)}</p>` : ""}
-        ${listing.description ? `<p class="rent-desc-line">${esc(listing.description)}</p>` : ""}
+        ${purposes.length ? `<p class="rent-purpose-line"><strong>${rentT("Purpose")}:</strong> ${esc(purposes.map(rentLabel).join(" • "))}</p>` : ""}
+${listing.price_text ? `<p class="rent-price-line">${esc(listing.price_text)}</p>` : ""}
+       
       </div>
 
             
@@ -1905,10 +1956,24 @@ async function handlePostLoginRestore() {
   }
 
   if (event.target.closest(".rent-detail-btn")) {
-    void trackRentListingEvent(listing, "view_details_click");
-    if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
-    return;
-  }
+  void trackRentListingEvent(listing, "view_details_click");
+  if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
+
+  const details = [
+    listing.vehicle_model ? `Model: ${listing.vehicle_model}` : "",
+    listing.seats ? `Seats: ${listing.seats}` : "",
+    Array.isArray(listing.purposes) && listing.purposes.length
+      ? `Purpose: ${listing.purposes.map(rentLabel).join(" • ")}`
+      : "",
+    listing.price_text ? `Price: ${listing.price_text}` : "",
+    listing.description ? `\nDetails:\n${listing.description}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  alert(details || "No extra details available.");
+  return;
+}
 });
 
 document.addEventListener("click", (event) => {
@@ -3577,6 +3642,9 @@ body:has(#find-tab.active) .trust-cards {
 .rent-panel.hidden {
   display: none !important;
 }
-  
+  .rent-purpose-line {
+  color: rgba(255, 255, 255, 0.86) !important;
+  font-weight: 700;
+}
   </style>
 </BaseLayout>
