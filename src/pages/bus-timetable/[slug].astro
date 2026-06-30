@@ -25,7 +25,13 @@ type BusRoute = {
   image_url: string | null;
   route_data: StopTime[] | null;
 };
-
+type MajorStop = {
+  canonical_name: string;
+  slug: string;
+  display_name: string | null;
+  seo_priority: number | null;
+  aliases: string[] | null;
+};
 type StopRow = {
   name: string;
   up_time: string;
@@ -141,8 +147,11 @@ function makeBusCard(route: BusRoute, fromName: string, toName: string): BusCard
 }
 
 export async function getStaticPaths() {
-  const url =
+  const routesUrl =
     'https://ytxtyphbguszjndtpakm.supabase.co/rest/v1/bus_routes?select=id,bus_name,source,destination,bus_type,image_url,route_data&limit=3000';
+
+  const majorStopsUrl =
+    'https://ytxtyphbguszjndtpakm.supabase.co/rest/v1/major_bus_stops?select=canonical_name,slug,display_name,seo_priority,aliases&active=eq.true&order=seo_priority.desc&limit=500';
 
   const anonKey =
     'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
@@ -171,62 +180,261 @@ export async function getStaticPaths() {
   };
 
   let routes: BusRoute[] = [];
+  let majorStops: MajorStop[] = [];
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-      },
-    });
+    const [routesRes, majorStopsRes] = await Promise.all([
+      fetch(routesUrl, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      }),
+      fetch(majorStopsUrl, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+      }),
+    ]);
 
-    if (res.ok) {
-      routes = (await res.json()) as BusRoute[];
+    if (routesRes.ok) {
+      routes = (await routesRes.json()) as BusRoute[];
+    }
+
+    if (majorStopsRes.ok) {
+      majorStops = (await majorStopsRes.json()) as MajorStop[];
     }
   } catch {
     routes = [];
+    majorStops = [];
   }
 
   const pairMap = new Map<
-    string,
-    { source: string; destination: string; routes: BusRoute[] }
-  >();
+  string,
+  { source: string; destination: string; routes: BusRoute[]; isMiddle: boolean }
+>();
 
-  const addMainPair = (
-    sourceRaw: string | null | undefined,
-    destinationRaw: string | null | undefined,
-    route: BusRoute
-  ) => {
-    const source = cleanPath(sourceRaw);
-    const destination = cleanPath(destinationRaw);
+  const addPair = (
+  sourceRaw: string | null | undefined,
+  destinationRaw: string | null | undefined,
+  route: BusRoute,
+  isMiddlePage = false
+) => {
+  const source = cleanPath(sourceRaw);
+  const destination = cleanPath(destinationRaw);
 
-    if (!source || !destination) return;
-    if (sameStopPath(source, destination)) return;
+  if (!source || !destination) return;
+  if (sameStopPath(source, destination)) return;
 
-    const slug = `${slugifyPath(source)}-to-${slugifyPath(destination)}`;
-    if (!slug || slug.includes('--')) return;
+  const slug = `${slugifyPath(source)}-to-${slugifyPath(destination)}`;
+  if (!slug || slug.includes('--')) return;
 
-    const existing =
-      pairMap.get(slug) ||
-      {
-        source,
-        destination,
-        routes: [] as BusRoute[],
-      };
+  const existing =
+    pairMap.get(slug) ||
+    {
+      source,
+      destination,
+      routes: [] as BusRoute[],
+      isMiddle: isMiddlePage,
+    };
 
-    if (!existing.routes.some((item) => item.id === route.id)) {
-      existing.routes.push(route);
+  if (!existing.routes.some((item) => item.id === route.id)) {
+    existing.routes.push(route);
+  }
+
+  existing.isMiddle = existing.isMiddle || isMiddlePage;
+
+  pairMap.set(slug, existing);
+};
+    
+  
+    const fullStopsPath = (route: BusRoute): StopRow[] => {
+    const rows: StopRow[] = [];
+
+    if (route.source) {
+      rows.push({ name: route.source, up_time: '', down_time: '' });
     }
 
-    pairMap.set(slug, existing);
+    for (const stop of route.route_data || []) {
+      const name = cleanPath(stop.stoppage_name);
+      if (!name) continue;
+
+      const last = rows[rows.length - 1];
+
+      if (last && sameStopPath(last.name, name)) {
+        if (!last.up_time && stop.up_time) last.up_time = cleanPath(stop.up_time);
+        if (!last.down_time && stop.down_time) last.down_time = cleanPath(stop.down_time);
+        continue;
+      }
+
+      rows.push({
+        name,
+        up_time: cleanPath(stop.up_time),
+        down_time: cleanPath(stop.down_time),
+      });
+    }
+
+    if (route.destination) {
+      const last = rows[rows.length - 1];
+
+      if (!last || !sameStopPath(last.name, route.destination)) {
+        rows.push({ name: route.destination, up_time: '', down_time: '' });
+      }
+    }
+
+    return rows;
+  };
+       const findMajorStop = (stopName: string) => {
+    const name = cleanPath(stopName);
+    if (!name) return null;
+
+    return (
+      majorStops.find((major) => {
+        if (sameStopPath(name, major.canonical_name)) return true;
+        if (major.display_name && sameStopPath(name, major.display_name)) return true;
+
+        return (major.aliases || []).some((alias) => sameStopPath(name, alias));
+      }) || null
+    );
+  };
+
+    
+
+  const addMiddlePairsForRoute = (route: BusRoute) => {
+    const routeStart = cleanPath(route.source);
+    const routeEnd = cleanPath(route.destination);
+
+    if (!routeStart || !routeEnd) return;
+
+    const routeStops = fullStopsPath(route);
+    if (routeStops.length < 4) return;
+
+    const mainSlug = `${slugifyPath(routeStart)}-to-${slugifyPath(routeEnd)}`;
+    const reverseSlug = `${slugifyPath(routeEnd)}-to-${slugifyPath(routeStart)}`;
+
+    const majorInRoute: {
+      index: number;
+      canonical_name: string;
+      slug: string;
+      seo_priority: number;
+    }[] = [];
+
+    const seenMajor = new Set<string>();
+
+    routeStops.forEach((stop, index) => {
+      const major = findMajorStop(stop.name);
+      if (!major?.slug || !major?.canonical_name) return;
+
+      // Start and final destination already handled by existing SEO system.
+      if (sameStopPath(major.canonical_name, routeStart)) return;
+      if (sameStopPath(major.canonical_name, routeEnd)) return;
+
+      if (seenMajor.has(major.slug)) return;
+      seenMajor.add(major.slug);
+
+      majorInRoute.push({
+        index,
+        canonical_name: major.canonical_name,
+        slug: major.slug,
+        seo_priority: Number(major.seo_priority || 50),
+      });
+    });
+   
+      
+    if (majorInRoute.length === 0) return;
+
+    majorInRoute.sort((a, b) => a.index - b.index);
+       const usedSlugs = new Set<string>();
+    const candidates: {
+      source: string;
+      destination: string;
+      score: number;
+    }[] = [];
+
+    const pushCandidate = (source: string, destination: string, score: number) => {
+      if (!source || !destination) return;
+      if (sameStopPath(source, destination)) return;
+
+      const slug = `${slugifyPath(source)}-to-${slugifyPath(destination)}`;
+
+      // Do not recreate existing start-end or reverse page.
+      if (slug === mainSlug || slug === reverseSlug) return;
+
+      // Middle reverse default OFF. Only forward route-order section pages.
+      candidates.push({ source, destination, score });
+    };
+
+            const orderedMajors = [...majorInRoute].sort((a, b) => a.index - b.index);
+
+    const firstMajor = orderedMajors[0];
+    const secondMajor = orderedMajors[1];
+
+    // 1) First middle stop → final destination
+    // Example: Arambagh → Itaberia
+    if (firstMajor) {
+      pushCandidate(
+        firstMajor.canonical_name,
+        routeEnd,
+        1000 + firstMajor.seo_priority
+      );
+    }
+
+    // 2) Second major stop → final destination
+    // Example: Ghatal → Itaberia
+    if (secondMajor) {
+      pushCandidate(
+        secondMajor.canonical_name,
+        routeEnd,
+        900 + secondMajor.seo_priority
+      );
+    }
+
+    // 3) First major stop → second major stop
+    // Example: Arambagh → Ghatal
+    if (firstMajor && secondMajor) {
+      pushCandidate(
+        firstMajor.canonical_name,
+        secondMajor.canonical_name,
+        800 + firstMajor.seo_priority + secondMajor.seo_priority
+      );
+    }
+
+    // Backup: if route has more major stops, keep useful fallback candidates
+    for (const major of orderedMajors.slice(2)) {
+      pushCandidate(
+        major.canonical_name,
+        routeEnd,
+        500 + major.seo_priority
+      );
+    }
+
+    
+
+    candidates
+      .sort((a, b) => b.score - a.score)
+      .filter((pair) => {
+        const slug = `${slugifyPath(pair.source)}-to-${slugifyPath(pair.destination)}`;
+        if (usedSlugs.has(slug)) return false;
+        usedSlugs.add(slug);
+        return true;
+      })
+      .slice(0, 5)
+      .forEach((pair) => {
+        addPair(pair.source, pair.destination, route, true);
+      });
   };
 
   for (const route of routes) {
-    // Main route page: Arambagh → Digha
-    addMainPair(route.source, route.destination, route);
+    // Existing main route page: Tarakeswar → Digha
+    addPair(route.source, route.destination, route);
 
-    // Reverse route page: Digha → Arambagh
-    addMainPair(route.destination, route.source, route);
+    // Existing reverse route page: Digha → Tarakeswar
+    addPair(route.destination, route.source, route);
+
+    // New middle SEO pages, max 3 per route
+    addMiddlePairsForRoute(route);
+    
   }
 
   return Array.from(pairMap.entries())
@@ -235,13 +443,15 @@ export async function getStaticPaths() {
       params: { slug },
       props: value,
     }));
+
+
 }
 const { slug } = Astro.params;
-
-const { source, destination, routes } = Astro.props as {
+const { source, destination, routes, isMiddle = false } = Astro.props as {
   source: string;
   destination: string;
   routes: BusRoute[];
+  isMiddle?: boolean;
 };
 const busCards = routes
   .map((route) => makeBusCard(route, source, destination))
@@ -252,6 +462,30 @@ const selectedBusId = Astro.url.searchParams.get('bus_id') || '';
 const firstBus = selectedBusId
   ? busCards.find((bus) => bus.id === selectedBusId) || busCards[0]
   : busCards[0];
+  const getSegmentStopRows = (bus: BusCard | undefined) => {
+  if (!bus?.stops?.length) return [];
+
+  const fromIndex = findStopIndex(bus.stops, source);
+  const toIndex = findStopIndex(bus.stops, destination);
+
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+    return bus.stops;
+  }
+
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+
+  const segment = bus.stops.slice(start, end + 1);
+
+  return fromIndex > toIndex ? segment.reverse() : segment;
+};
+
+const segmentStopRows = getSegmentStopRows(firstBus);
+const displayStopRows = isMiddle
+  ? segmentStopRows
+  : firstBus?.direction === 'down'
+    ? [...(firstBus?.stops || [])].reverse()
+    : firstBus?.stops || [];
 const selectedPhoto =
   firstBus?.image_url || busCards.find((bus) => bus.image_url)?.image_url || '';
 const uniqueStops = Array.from(
@@ -432,6 +666,7 @@ const directionLabel =
   firstBus?.direction === 'down'
     ? 'return/down-side'
     : 'going/up-side';
+
 const directionIntro =
   firstBus?.direction === 'down'
     ? `${source} to ${destination} is shown as the return/down-side journey for this bus route. This page focuses on the opposite direction timing, down-time values and reverse stop order where data is available.`
@@ -441,7 +676,11 @@ const timetableFocus =
   firstBus?.direction === 'down'
     ? 'down time, return-side stop order and reverse journey timing'
     : 'up time, forward stop order and going-side journey timing';
+
 const reverseRouteText = `${destination} to ${source}`;
+
+const pageTitle = `${source} to ${destination} Bus Timetable`;
+const pageDescription = `Check ${source} to ${destination} bus timetable with bus names, stop-wise up time, down time and route details on SoniaBuddy.`;
 
 const seoSummaryParagraphs = [
   `${pageTitle} on SoniaBuddy is built from available bus route records, listed bus names and stop-wise timing data. ${directionIntro} This page currently shows ${busCards.length} ${busCards.length === 1 ? 'bus option' : 'bus options'} for passengers travelling from ${source} towards ${destination}. Available service information includes ${busNameSummary}, with bus type data such as ${busTypeSummary}.`,
@@ -451,8 +690,6 @@ const seoSummaryParagraphs = [
   `Timing examples for ${source} to ${destination} include departure around ${departureSummary} and arrival around ${arrivalSummary}. These timings are based on the route data currently available in the database and may change because of traffic, road condition, weather, local updates or operator changes. Before travelling, confirm the latest timing locally and reach the stop early.`
 ];
 
-const pageTitle = `${source} to ${destination} Bus Timetable`;
-const pageDescription = `Check ${source} to ${destination} bus timetable with bus names, stop-wise up time, down time and route details on SoniaBuddy.`;
 const canonical = `/bus-timetable/${slug}/`;
 const canonicalUrl = `${SITE_URL}${canonical}`;
 
@@ -517,6 +754,7 @@ const faqJson = {
   title={pageTitle}
   description={pageDescription}
   canonical={canonicalUrl}
+  disableLangScript={true}
 >
   <section class="timetable-page">
     <div class="container">
@@ -676,7 +914,7 @@ const faqJson = {
                 </tr>
               </thead>
               <tbody>
-                {firstBus.stops.map((stop) => (
+                {displayStopRows.map((stop) => (
                   <tr class={isSearchStop(stop.name) ? 'highlight-row exact-search-row' : ''}>
                     <td>
                       <span class={isSearchStop(stop.name) ? 'exact-stop-name stop-name' : 'stop-name'} data-en={stop.name} data-bn={stopBn(stop.name)}>
@@ -706,7 +944,7 @@ const faqJson = {
           </div>
 
           <div class="mobile-stop-list">
-            {firstBus.stops.map((stop, index) => (
+            {displayStopRows.map((stop, index) => (
               <article class={`stop-card thin-stop-card ${isSearchStop(stop.name) ? 'active-stop exact-search-row' : ''}`}>
                 <div class="stop-top">
                   <span>{index + 1}</span>
