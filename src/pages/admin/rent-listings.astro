@@ -3,60 +3,36 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import '../../styles/admin-compact.css';
 ---
 
-<BaseLayout
-  title="Rent Listings Admin - SoniaBuddy"
-  description="Admin manage rent listings, verification, rejection, status and photos."
-  robots="noindex,nofollow"
->
+<BaseLayout title="Rent Listings Admin - SoniaBuddy" description="Admin manage rent listings, rejection, removal and restore." robots="noindex,nofollow">
+  <div id="admin-access-cover" class="admin-access-cover"><div class="admin-access-card"><strong>Official Admin Work Only</strong><p>This area is restricted for SoniaBuddy internal admin work.</p></div></div>
+
   <section class="admin-page">
     <div class="admin-container">
       <div class="admin-header">
-        <div>
-          <p class="eyebrow">SoniaBuddy Admin</p>
-          <h1>Rent Listings</h1>
-          <p>Verify badge, reject fake listings, restore listings and check owner details.</p>
-        </div>
-
-        <div class="top-actions">
-          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
-        </div>
+        <div><p class="eyebrow">SoniaBuddy Admin</p><h1>Rent Listings</h1><p>Review listings, reject spam, remove junk and restore valid listings.</p></div>
+        <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
       </div>
 
-      <div id="auth-box" class="notice-card">
-        <strong>Checking admin access...</strong>
-      </div>
-
+      <div id="auth-box" class="notice-card"><strong>Checking admin access...</strong></div>
       <div id="message-box" class="message hidden"></div>
 
       <div id="admin-filter-card" class="filter-card hidden">
         <button class="filter-btn active" type="button" data-filter="all">All</button>
         <button class="filter-btn" type="button" data-filter="active">Active</button>
         <button class="filter-btn" type="button" data-filter="rejected">Rejected</button>
-        <button class="filter-btn" type="button" data-filter="verified">Verified</button>
-        <button class="filter-btn" type="button" data-filter="unverified">Unverified</button>
+        <button class="filter-btn" type="button" data-filter="cancelled">Cancelled</button>
+        <input id="listing-search-input" class="admin-search-input" type="search" placeholder="Search email, phone, vehicle, reg no..." />
       </div>
 
       <div id="stats-grid" class="stats-grid hidden">
-        <div class="stat-card">
-          <span>Total</span>
-          <strong id="stat-total">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Active</span>
-          <strong id="stat-active">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Rejected</span>
-          <strong id="stat-rejected">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Verified</span>
-          <strong id="stat-verified">0</strong>
-        </div>
+        <div class="stat-card"><span>Total</span><strong id="stat-total">0</strong></div>
+        <div class="stat-card"><span>Active</span><strong id="stat-active">0</strong></div>
+        <div class="stat-card"><span>Rejected</span><strong id="stat-rejected">0</strong></div>
+        <div class="stat-card"><span>Cancelled</span><strong id="stat-cancelled">0</strong></div>
       </div>
 
       <div id="loader" class="notice-card hidden">Loading listings...</div>
-      <div id="listings-grid" class="listings-grid"></div>
+      <div id="listings-grid" class="admin-dynamic-grid"></div>
     </div>
   </section>
 
@@ -65,10 +41,10 @@ import '../../styles/admin-compact.css';
 
     const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
     const PHOTO_BUCKET = 'rent-listing-photos';
-
     let currentUser = null;
     let listings = [];
     let activeFilter = 'all';
+    let searchQuery = '';
 
     function esc(value) {
       return String(value || '')
@@ -79,818 +55,191 @@ import '../../styles/admin-compact.css';
         .replaceAll("'", '&#039;');
     }
 
-    function photoUrl(path) {
-      if (!path) return '';
-      if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    async function guardAdminPage() {
+      const cover = document.getElementById('admin-access-cover');
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email?.toLowerCase() || '';
+      if (ADMIN_EMAILS.includes(email)) {
+        currentUser = data.session.user;
+        cover?.classList.add('hidden');
+        return true;
+      }
+      cover?.classList.remove('hidden');
+      return false;
+    }
 
-      const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
-      return data.publicUrl;
+    function isAdmin() {
+      return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase()));
     }
 
     function showMessage(text, type = 'info') {
       const box = document.getElementById('message-box');
       if (!box) return;
-
       box.textContent = text;
       box.className = `message ${type}`;
     }
 
     function hideMessage() {
-      const box = document.getElementById('message-box');
-      if (box) box.classList.add('hidden');
+      document.getElementById('message-box')?.classList.add('hidden');
     }
 
-    function isAdmin() {
-      return Boolean(
-        currentUser?.email &&
-        ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
-      );
-    }
-
-    function statusClass(status) {
-      if (status === 'active') return 'status-active';
-      if (status === 'rejected') return 'status-rejected';
-      return 'status-pending';
+    function photoUrl(path) {
+      if (!path) return '';
+      if (String(path).startsWith('http://') || String(path).startsWith('https://')) return path;
+      return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
     }
 
     function formatDate(value) {
       if (!value) return '-';
-
       try {
-        return new Intl.DateTimeFormat('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }).format(new Date(value));
+        return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
       } catch {
         return '-';
       }
     }
 
+    function statusClass(status) {
+      if (status === 'active') return 'active';
+      if (status === 'rejected') return 'rejected';
+      if (status === 'cancelled') return 'cancelled';
+      return 'pending';
+    }
+
     function renderPhotos(photos) {
       const items = Array.isArray(photos) ? photos.slice(0, 4) : [];
-
-      return `
-        <div class="photo-grid">
-          ${[0, 1, 2, 3].map((index) => {
-            const photo = items[index];
-            const url = photo ? photoUrl(photo) : '';
-
-            return `
-              <button class="photo-box" type="button" data-photo-url="${esc(url)}">
-                ${
-                  url
-                    ? `<img src="${esc(url)}" alt="Vehicle photo ${index + 1}" loading="lazy" />`
-                    : `<span>📷</span>`
-                }
-              </button>
-            `;
-          }).join('')}
-        </div>
-      `;
+      return `<div class="photo-grid">${[0, 1, 2, 3].map((index) => {
+        const url = items[index] ? photoUrl(items[index]) : '';
+        return `<button class="photo-box" type="button" data-photo-url="${esc(url)}">${url ? `<img src="${esc(url)}" loading="lazy" alt="Vehicle photo" />` : '📷'}</button>`;
+      }).join('')}</div>`;
     }
 
     function filteredListings() {
-      if (activeFilter === 'active') {
-        return listings.filter((listing) => listing.status === 'active');
+      let rows = listings;
+      if (activeFilter !== 'all') rows = rows.filter((listing) => (listing.status || '') === activeFilter);
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        rows = rows.filter((listing) => [listing.id, listing.owner_email, listing.owner_name, listing.owner_phone, listing.owner_whatsapp, listing.vehicle_type, listing.vehicle_model, listing.reg_number, listing.price_text, listing.status].filter(Boolean).join(' ').toLowerCase().includes(q));
       }
-
-      if (activeFilter === 'rejected') {
-        return listings.filter((listing) => listing.status === 'rejected');
-      }
-
-      if (activeFilter === 'verified') {
-        return listings.filter((listing) => listing.is_verified === true);
-      }
-
-      if (activeFilter === 'unverified') {
-        return listings.filter((listing) => listing.is_verified !== true);
-      }
-
-      return listings;
+      return rows;
     }
 
     function updateStats() {
-      const total = listings.length;
-      const active = listings.filter((listing) => listing.status === 'active').length;
-      const rejected = listings.filter((listing) => listing.status === 'rejected').length;
-      const verified = listings.filter((listing) => listing.is_verified === true).length;
-
-      const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = String(value);
-      };
-
-      setText('stat-total', total);
-      setText('stat-active', active);
-      setText('stat-rejected', rejected);
-      setText('stat-verified', verified);
+      const count = (status) => listings.filter((listing) => listing.status === status).length;
+      const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = String(value); };
+      setText('stat-total', listings.length);
+      setText('stat-active', count('active'));
+      setText('stat-rejected', count('rejected'));
+      setText('stat-cancelled', count('cancelled'));
     }
 
     function renderListingCard(listing) {
       const photos = Array.isArray(listing.photos) ? listing.photos : [];
-      const serviceCount = Array.isArray(listing.service_city_ids)
-        ? listing.service_city_ids.length
-        : 0;
-      const purposes = Array.isArray(listing.purposes)
-        ? listing.purposes.filter(Boolean)
-        : [];
-
+      const serviceCount = Array.isArray(listing.service_city_ids) ? listing.service_city_ids.length : 0;
+      const purposes = Array.isArray(listing.purposes) ? listing.purposes.filter(Boolean) : [];
       const status = listing.status || '-';
-      const verifiedText = listing.is_verified ? 'Verified' : 'Not verified';
-      const vehicleLine = [
-        listing.vehicle_type || 'Vehicle',
-        listing.seats ? `${listing.seats} seats` : '',
-        listing.reg_number || '',
-      ].filter(Boolean).join(' • ');
+      const vehicleLine = [listing.vehicle_type || 'Vehicle', listing.seats ? `${listing.seats} seats` : '', listing.reg_number || ''].filter(Boolean).join(' • ');
 
-      return `
-        <article class="listing-card admin-listing-row" data-listing-id="${esc(listing.id)}">
-          <div class="admin-listing-media">
-            ${renderPhotos(photos)}
-          </div>
+      const actions = status === 'cancelled'
+        ? `<button class="btn btn-primary status-btn" type="button" data-status="active" data-listing-id="${esc(listing.id)}">Restore Active</button>`
+        : status === 'rejected'
+          ? `<button class="btn btn-primary status-btn" type="button" data-status="active" data-listing-id="${esc(listing.id)}">Restore Active</button><button class="btn btn-danger status-btn" type="button" data-status="cancelled" data-listing-id="${esc(listing.id)}">🗑 Remove</button>`
+          : `<button class="btn btn-danger status-btn" type="button" data-status="rejected" data-listing-id="${esc(listing.id)}">Reject</button><button class="btn btn-danger status-btn" type="button" data-status="cancelled" data-listing-id="${esc(listing.id)}">🗑 Remove</button>`;
 
-          <div class="admin-listing-main">
-            <div class="admin-listing-title-row">
-              <div>
-                <h3>${esc(listing.vehicle_model || listing.vehicle_type || 'Rent vehicle')}</h3>
-                <p class="admin-listing-sub">${esc(vehicleLine)}</p>
-              </div>
-
-              <div class="admin-badges">
-                <span class="status-pill ${statusClass(status)}">${esc(status)}</span>
-                <span class="verify-pill ${listing.is_verified ? 'ok' : ''}">${verifiedText}</span>
-              </div>
-            </div>
-
-            <div class="admin-info-line">
-              <span><strong>Owner</strong> ${esc(listing.owner_name || '-')}</span>
-              <span><strong>Email</strong> ${esc(listing.owner_email || '-')}</span>
-              <span><strong>Phone</strong> ${esc(listing.owner_phone || '-')}</span>
-              <span><strong>WhatsApp</strong> ${esc(listing.owner_whatsapp || '-')}</span>
-              <span><strong>Price</strong> ${esc(listing.price_text || '-')}</span>
-              <span><strong>Service cities</strong> ${serviceCount}</span>
-              <span><strong>Purposes</strong> ${esc(purposes.join(' • ') || '-')}</span>
-              <span><strong>Created</strong> ${formatDate(listing.created_at)}</span>
-            </div>
-          </div>
-
-          <div class="listing-actions admin-listing-actions">
-            ${
-              listing.is_verified
-                ? `<button class="btn btn-outline verify-btn" type="button" data-verified="false" data-listing-id="${esc(listing.id)}">Remove Verified</button>`
-                : `<button class="btn btn-primary verify-btn" type="button" data-verified="true" data-listing-id="${esc(listing.id)}">Mark Verified</button>`
-            }
-
-            ${
-              listing.status === 'rejected'
-                ? `<button class="btn btn-primary status-btn" type="button" data-status="active" data-listing-id="${esc(listing.id)}">Restore Active</button>`
-                : `<button class="btn btn-danger status-btn" type="button" data-status="rejected" data-listing-id="${esc(listing.id)}">Reject</button>`
-            }
-          </div>
-        </article>
-      `;
+      return `<article class="admin-row-card" data-listing-id="${esc(listing.id)}">
+        <div class="row-title"><div><h3>${esc(listing.vehicle_model || listing.vehicle_type || 'Rent vehicle')}</h3><p class="sub">${esc(vehicleLine)}</p></div><span class="pill ${statusClass(status)}">${esc(status)}</span></div>
+        ${renderPhotos(photos)}
+        <div class="info-grid">
+          <span><strong>Owner</strong>${esc(listing.owner_name || '-')}</span>
+          <span><strong>Email</strong>${esc(listing.owner_email || '-')}</span>
+          <span><strong>Phone</strong>${esc(listing.owner_phone || '-')}</span>
+          <span><strong>WhatsApp</strong>${esc(listing.owner_whatsapp || '-')}</span>
+          <span><strong>Price</strong>${esc(listing.price_text || '-')}</span>
+          <span><strong>Service cities</strong>${serviceCount}</span>
+          <span><strong>Purposes</strong>${esc(purposes.join(' • ') || '-')}</span>
+          <span><strong>Created</strong>${formatDate(listing.created_at)}</span>
+        </div>
+        <div class="actions">${actions}</div>
+      </article>`;
     }
 
     function renderListings() {
       updateStats();
-
-      const loader = document.getElementById('loader');
+      document.getElementById('loader')?.classList.add('hidden');
       const grid = document.getElementById('listings-grid');
-
-      if (loader) loader.classList.add('hidden');
       if (!grid) return;
-
-      if (!isAdmin()) {
-        grid.innerHTML = '';
-        return;
-      }
-
+      if (!isAdmin()) { grid.innerHTML = ''; return; }
       const rows = filteredListings();
-
-      if (!rows.length) {
-        grid.innerHTML = `
-          <div class="notice-card">
-            <strong>No listings found.</strong>
-            <p>Change filter or refresh.</p>
-          </div>
-        `;
-        return;
-      }
-
-      grid.innerHTML = rows.map(renderListingCard).join('');
+      grid.innerHTML = rows.length ? rows.map(renderListingCard).join('') : '<div class="notice-card"><strong>No listings found.</strong><p>Change filter or refresh.</p></div>';
     }
 
     async function refreshSession() {
-      const authBox = document.getElementById('auth-box');
-
+      const auth = document.getElementById('auth-box');
       const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        currentUser = null;
-        if (authBox) {
-          authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
-        }
-        return;
-      }
-
-      currentUser = data.session?.user || null;
-
-      if (!currentUser) {
-        if (authBox) {
-          authBox.innerHTML = `
-            <strong>Admin access blocked.</strong>
-            <p>This page is only for SoniaBuddy super admin. Login button is disabled here.</p>
-          `;
-        }
-        document.getElementById('admin-filter-card')?.classList.add('hidden');
-document.getElementById('stats-grid')?.classList.add('hidden');
-document.getElementById('loader')?.classList.add('hidden');
-document.getElementById('listings-grid')?.replaceChildren();
-        return;
-      }
-
+      currentUser = error ? null : data.session?.user || null;
       if (!isAdmin()) {
-        if (authBox) {
-          authBox.innerHTML = `
-            <strong>Access denied.</strong>
-            <p>${esc(currentUser.email)} is not allowed for this admin page.</p>
-          `;
-        }
+        if (auth) auth.innerHTML = '<strong>Admin access blocked.</strong><p>This page is only for SoniaBuddy super admin.</p>';
         return;
       }
-
-      if (authBox) {
-        authBox.innerHTML = `
-          <strong>Admin:</strong> ${esc(currentUser.email)}
-          <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>
-        `;
-      }
+      if (auth) auth.innerHTML = `<strong>Admin:</strong> ${esc(currentUser.email)} <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>`;
       document.getElementById('admin-filter-card')?.classList.remove('hidden');
-document.getElementById('stats-grid')?.classList.remove('hidden');
-      document.getElementById('logout-btn')?.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.reload();
-      });
+      document.getElementById('stats-grid')?.classList.remove('hidden');
+      document.getElementById('logout-btn')?.addEventListener('click', async () => { await supabase.auth.signOut(); window.location.reload(); });
     }
 
     async function loadListings() {
       hideMessage();
-
       const loader = document.getElementById('loader');
-      if (loader) {
-        loader.textContent = 'Loading listings...';
-        loader.classList.remove('hidden');
-      }
-
-      if (!isAdmin()) {
-        if (loader) loader.classList.add('hidden');
-        renderListings();
-        return;
-      }
+      if (loader) { loader.textContent = 'Loading listings...'; loader.classList.remove('hidden'); }
+      if (!isAdmin()) { loader?.classList.add('hidden'); renderListings(); return; }
 
       const { data, error } = await supabase
         .from('rent_listings')
-        .select(`
-          id,
-          owner_user_id,
-          owner_email,
-          owner_name,
-          owner_phone,
-          owner_whatsapp,
-          reg_number,
-          vehicle_type,
-          vehicle_model,
-          seats,
-          purposes,
-          base_city_id,
-          service_city_ids,
-          price_text,
-          photos,
-          description,
-          status,
-          created_at,
-          updated_at,
-          is_verified,
-          verified_at,
-          verified_by
-        `)
-        .order('updated_at', { ascending: false });
+        .select('id,owner_user_id,owner_email,owner_name,owner_phone,owner_whatsapp,reg_number,vehicle_type,vehicle_model,seats,purposes,base_city_id,service_city_ids,price_text,photos,description,status,created_at,updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(500);
 
-      if (error) {
-        if (loader) loader.classList.add('hidden');
-        showMessage(error.message, 'error');
-        return;
-      }
-
+      loader?.classList.add('hidden');
+      if (error) { showMessage(error.message, 'error'); return; }
       listings = Array.isArray(data) ? data : [];
       renderListings();
     }
 
-    async function updateVerified(listingId, verified) {
+    async function updateListingStatus(id, status) {
       if (!isAdmin()) return;
-
-      showMessage(verified ? 'Marking verified...' : 'Removing verified...', 'info');
-
-      const payload = verified
-        ? {
-            is_verified: true,
-            verified_at: new Date().toISOString(),
-            verified_by: currentUser.id,
-            updated_at: new Date().toISOString(),
-          }
-        : {
-            is_verified: false,
-            verified_at: null,
-            verified_by: null,
-            updated_at: new Date().toISOString(),
-          };
-
-      const { error } = await supabase
-        .from('rent_listings')
-        .update(payload)
-        .eq('id', listingId);
-
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
-      }
-
-      showMessage(verified ? 'Listing verified.' : 'Verified removed.', 'success');
-      await loadListings();
-    }
-
-    async function updateListingStatus(listingId, status) {
-      if (!isAdmin()) return;
-
-      const label = status === 'rejected' ? 'reject this listing' : 'restore this listing';
+      const label = status === 'cancelled' ? 'remove this listing from public search' : status === 'rejected' ? 'reject this listing' : 'restore this listing';
       if (!confirm(`Are you sure you want to ${label}?`)) return;
-
       showMessage('Updating listing status...', 'info');
-
-      const { error } = await supabase
-        .from('rent_listings')
-        .update({
-          status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', listingId);
-
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
-      }
-
+      const { error } = await supabase.from('rent_listings').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) { showMessage(error.message, 'error'); return; }
       showMessage(`Listing status updated to ${status}.`, 'success');
       await loadListings();
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await guardAdminPage();
+      if (!ok) return;
       document.getElementById('refresh-btn')?.addEventListener('click', loadListings);
-
-      document.querySelectorAll('.filter-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-btn').forEach((item) => {
-            item.classList.remove('active');
-          });
-
-          btn.classList.add('active');
-          activeFilter = btn.dataset.filter || 'all';
-          renderListings();
-        });
-      });
-
+      document.querySelectorAll('.filter-btn').forEach((btn) => btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach((item) => item.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter || 'all';
+        renderListings();
+      }));
+      document.getElementById('listing-search-input')?.addEventListener('input', (event) => { searchQuery = event.target?.value || ''; renderListings(); });
       document.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
-
         const photoBtn = target.closest('.photo-box');
-        if (photoBtn) {
-          const url = photoBtn.dataset.photoUrl;
-          if (url) window.open(url, '_blank', 'noopener,noreferrer');
-          return;
-        }
-
-        const verifyBtn = target.closest('.verify-btn');
-        if (verifyBtn) {
-          const listingId = verifyBtn.dataset.listingId;
-          const verified = verifyBtn.dataset.verified === 'true';
-          if (listingId) updateVerified(listingId, verified);
-          return;
-        }
-
+        if (photoBtn) { const url = photoBtn.dataset.photoUrl; if (url) window.open(url, '_blank', 'noopener,noreferrer'); return; }
         const statusBtn = target.closest('.status-btn');
-        if (statusBtn) {
-          const listingId = statusBtn.dataset.listingId;
-          const status = statusBtn.dataset.status;
-          if (listingId && status) updateListingStatus(listingId, status);
-        }
+        if (statusBtn) updateListingStatus(statusBtn.dataset.listingId, statusBtn.dataset.status);
       });
-
       await refreshSession();
       await loadListings();
     });
   </script>
 
-  <style>
-    .admin-page {
-      min-height: 100vh;
-      padding: 1rem 1rem 3rem;
-      background:
-        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
-        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
-      color: white;
-    }
-
-    .admin-container {
-      max-width: 1180px;
-      margin: 0 auto;
-    }
-
-    .admin-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: flex-start;
-      margin-bottom: 1rem;
-    }
-
-    .eyebrow {
-      margin: 0 0 0.35rem;
-      color: #ff8a00;
-      font-size: 0.75rem;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 0 0 0.35rem;
-      font-size: clamp(1.7rem, 4vw, 2.35rem);
-      color: white;
-    }
-
-    .admin-header p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 0.92rem;
-    }
-
-    .top-actions {
-      display: flex;
-      gap: 0.55rem;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 34px;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.65rem;
-      border: 0;
-      font-weight: 900;
-      text-decoration: none;
-      cursor: pointer;
-      font-size: 0.78rem;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    .btn-primary {
-      color: white;
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-    }
-
-    .btn-outline {
-      color: white;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-    }
-
-    .btn-danger {
-      color: white;
-      background: rgba(239, 68, 68, 0.7);
-      border: 1px solid rgba(239, 68, 68, 0.35);
-    }
-
-    .btn-small {
-      min-height: 28px;
-      padding: 0.38rem 0.65rem;
-      font-size: 0.72rem;
-      margin-left: 0.5rem;
-    }
-
-    .notice-card,
-    .message,
-    .filter-card,
-    .stat-card,
-    .listing-card {
-      border-radius: 0.9rem;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.07);
-    }
-
-    .notice-card {
-      padding: 0.9rem 1rem;
-      margin-bottom: 1rem;
-      color: rgba(255, 255, 255, 0.82);
-    }
-
-    .notice-card p {
-      margin: 0.35rem 0 0;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .message {
-      padding: 0.9rem 1rem;
-      margin-bottom: 1rem;
-      font-weight: 900;
-    }
-
-    .message.info {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.12);
-      border-color: rgba(59, 130, 246, 0.3);
-    }
-
-    .message.success {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.12);
-      border-color: rgba(34, 197, 94, 0.3);
-    }
-
-    .message.error {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.12);
-      border-color: rgba(239, 68, 68, 0.3);
-    }
-
-    .filter-card {
-      padding: 0.65rem;
-      display: flex;
-      gap: 0.45rem;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-    }
-
-    .filter-btn {
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.76);
-      border-radius: 999px;
-      padding: 0.42rem 0.7rem;
-      font-weight: 900;
-      cursor: pointer;
-      font-size: 0.76rem;
-    }
-
-    .filter-btn.active {
-      color: white;
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-      border-color: transparent;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.65rem;
-      margin-bottom: 1rem;
-    }
-
-    .stat-card {
-      padding: 0.75rem;
-      text-align: center;
-    }
-
-    .stat-card span {
-      display: block;
-      color: rgba(255, 255, 255, 0.66);
-      font-size: 0.76rem;
-      font-weight: 800;
-      margin-bottom: 0.28rem;
-    }
-
-    .stat-card strong {
-      display: block;
-      color: #ff8a00;
-      font-size: 1.35rem;
-      line-height: 1;
-    }
-
-    .listings-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
-
-    .admin-listing-row {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.65rem;
-      padding: 0.75rem;
-      min-height: auto;
-    }
-
-    .admin-listing-media .photo-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.35rem;
-      width: 100%;
-      margin: 0;
-    }
-
-    .admin-listing-media .photo-box {
-      width: 100%;
-      height: 54px;
-      aspect-ratio: auto;
-      border: 0;
-      border-radius: 0.55rem;
-      padding: 0;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.07);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: rgba(255, 255, 255, 0.45);
-      font-size: 0.7rem;
-    }
-
-    .admin-listing-media .photo-box img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .admin-listing-title-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 0.65rem;
-      margin-bottom: 0.55rem;
-    }
-
-    .admin-listing-title-row h3 {
-      margin: 0 0 0.2rem;
-      font-size: 0.95rem;
-      line-height: 1.15;
-      color: white;
-    }
-
-    .admin-listing-sub {
-      margin: 0;
-      font-size: 0.75rem;
-      line-height: 1.25;
-      color: rgba(255, 255, 255, 0.76);
-    }
-
-    .admin-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.3rem;
-      justify-content: flex-end;
-    }
-
-    .status-pill,
-    .verify-pill {
-      display: inline-flex;
-      align-items: center;
-      min-height: 22px;
-      padding: 0.18rem 0.45rem;
-      border-radius: 999px;
-      font-size: 0.64rem;
-      font-weight: 900;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      color: rgba(255, 255, 255, 0.82);
-      white-space: nowrap;
-    }
-
-    .status-active {
-      background: rgba(34, 197, 94, 0.15);
-      color: #86efac;
-    }
-
-    .status-rejected {
-      background: rgba(239, 68, 68, 0.15);
-      color: #fca5a5;
-    }
-
-    .status-pending {
-      background: rgba(250, 204, 21, 0.14);
-      color: #fde68a;
-    }
-
-    .verify-pill.ok {
-      background: rgba(34, 197, 94, 0.16);
-      color: #86efac;
-    }
-
-    .admin-info-line {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.35rem;
-    }
-
-    .admin-info-line span {
-      min-width: 0;
-      padding: 0.42rem 0.5rem;
-      border-radius: 0.5rem;
-      background: rgba(255, 255, 255, 0.045);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.86);
-      font-size: 0.72rem;
-      line-height: 1.25;
-      word-break: break-word;
-    }
-
-    .admin-info-line strong {
-      display: block;
-      margin-bottom: 0.12rem;
-      color: white;
-      font-size: 0.64rem;
-      opacity: 0.75;
-    }
-
-    .admin-listing-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      align-items: center;
-      justify-content: flex-start;
-    }
-
-    .admin-listing-actions .btn,
-    .admin-listing-actions button,
-    .admin-listing-actions a {
-      width: auto;
-      min-height: 30px;
-      padding: 0.4rem 0.6rem;
-      border-radius: 0.55rem;
-      font-size: 0.72rem;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    @media (min-width: 820px) {
-      .admin-listing-row {
-        grid-template-columns: 132px minmax(0, 1fr) 150px;
-        align-items: start;
-        gap: 0.85rem;
-      }
-
-      .admin-listing-media .photo-grid {
-        grid-template-columns: repeat(2, 58px);
-        width: 120px;
-      }
-
-      .admin-listing-media .photo-box {
-        width: 58px;
-        height: 48px;
-      }
-
-      .admin-info-line {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      .admin-listing-actions {
-        justify-content: flex-end;
-        align-content: flex-start;
-      }
-
-      .admin-listing-actions .btn {
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 720px) {
-      .admin-page {
-        padding: 0.8rem 0.75rem 2rem;
-      }
-
-      .admin-header {
-        flex-direction: column;
-      }
-
-      .top-actions,
-      .top-actions .btn {
-        width: 100%;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .admin-info-line {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
+  <style is:global>
+    .admin-page{min-height:100vh;padding:1rem 1rem 3rem;background:radial-gradient(circle at top left,rgba(255,107,0,.16),transparent 30%),linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);color:#fff}.admin-container{max-width:1180px;margin:0 auto}.admin-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem}.eyebrow{margin:0 0 .35rem;color:#ff8a00;font-size:.75rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}h1{margin:0 0 .35rem;font-size:clamp(1.7rem,4vw,2.35rem);color:#fff}.admin-header p{margin:0;color:rgba(255,255,255,.72);font-size:.92rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:.5rem .75rem;border-radius:.65rem;border:0;font-weight:900;text-decoration:none;cursor:pointer;font-size:.78rem;line-height:1;white-space:nowrap}.btn-primary{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00)}.btn-outline{color:white;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22)}.btn-danger{color:white;background:rgba(239,68,68,.72);border:1px solid rgba(239,68,68,.35)}.btn-small{min-height:28px;padding:.38rem .65rem;font-size:.72rem}.notice-card,.message,.filter-card,.stat-card,.admin-row-card{border-radius:.9rem;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff}.notice-card{padding:.9rem 1rem;margin-bottom:1rem;color:rgba(255,255,255,.82)}.hidden{display:none!important}.message{padding:.9rem 1rem;margin-bottom:1rem;font-weight:900}.message.info{color:#93c5fd;background:rgba(59,130,246,.12)}.message.success{color:#86efac;background:rgba(34,197,94,.12)}.message.error{color:#fca5a5;background:rgba(239,68,68,.12)}.filter-card{padding:.65rem;display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem}.filter-btn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(255,255,255,.76);border-radius:999px;padding:.42rem .7rem;font-weight:900;cursor:pointer;font-size:.76rem}.filter-btn.active{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00);border-color:transparent}.admin-search-input{min-height:36px;flex:1 1 260px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;padding:.42rem .75rem;font-size:.78rem;font-weight:800;outline:none}.admin-search-input::placeholder{color:rgba(255,255,255,.5)}.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;margin-bottom:1rem}.stat-card{padding:.75rem;text-align:center}.stat-card span{display:block;color:rgba(255,255,255,.66);font-size:.76rem;font-weight:800;margin-bottom:.28rem}.stat-card strong{display:block;color:#ff8a00;font-size:1.35rem;line-height:1}.admin-dynamic-grid{display:grid;grid-template-columns:1fr;gap:.75rem}.admin-row-card{padding:.75rem;display:grid;gap:.55rem}.row-title{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start}.row-title h3{margin:0 0 .2rem;font-size:.95rem;line-height:1.15;color:#fff}.sub{margin:0;color:rgba(255,255,255,.72);font-size:.75rem}.pill{display:inline-flex;align-items:center;min-height:22px;padding:.18rem .45rem;border-radius:999px;font-size:.64rem;font-weight:900;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.82);white-space:nowrap}.pill.active{background:rgba(34,197,94,.15);color:#86efac}.pill.rejected,.pill.cancelled{background:rgba(239,68,68,.15);color:#fca5a5}.pill.pending{background:rgba(250,204,21,.14);color:#fde68a}.info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem}.info-grid span{min-width:0;padding:.42rem .5rem;border-radius:.5rem;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.86);font-size:.72rem;line-height:1.25;word-break:break-word}.info-grid strong{display:block;margin-bottom:.12rem;color:white;font-size:.64rem;opacity:.75}.actions{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;justify-content:flex-start}.photo-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem;width:100%;margin:0}.photo-box{width:100%;height:54px;border:0;border-radius:.55rem;padding:0;overflow:hidden;background:rgba(255,255,255,.07);cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font-size:.7rem}.photo-box img{width:100%;height:100%;object-fit:cover;display:block}.admin-access-cover{position:fixed;inset:0;z-index:99999;min-height:100vh;padding:1rem;background:linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);display:flex;align-items:flex-start;justify-content:center}.admin-access-card{width:min(100%,980px);margin-top:4.5rem;padding:1rem;border-radius:1rem;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.32);color:#fde68a}.admin-access-card strong{display:block;margin-bottom:.35rem;color:#facc15;font-weight:950;font-size:1rem}.admin-access-card p{margin:0;color:rgba(255,255,255,.86);line-height:1.45}@media(max-width:760px){.admin-page{padding:.8rem .75rem 2rem}.admin-header{flex-direction:column}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </BaseLayout>

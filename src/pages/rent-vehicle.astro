@@ -33,7 +33,7 @@ type RentListing = {
   status: string | null;
   created_at: string | null;
   updated_at: string | null;
-  is_verified: boolean | null;
+  
   is_promoted?: boolean;
 };
 
@@ -57,8 +57,7 @@ const { data: listingsData, error: listingsError } = await supabase
     description,
     status,
     created_at,
-    updated_at,
-    is_verified
+    updated_at
   `)
   .eq("status", "active")
   .order("updated_at", { ascending: false })
@@ -86,9 +85,7 @@ if (listingIds.length) {
       expires_at
     `)
     .in("listing_id", listingIds)
-    .eq("plan_type", "featured")
-    .eq("status", "active")
-    .eq("ads_status", "active");
+    .eq("status", "active");
 
   membershipsData = result.data ?? [];
   membershipsError = result.error;
@@ -100,19 +97,39 @@ if (membershipsError) {
 
 const nowMs = Date.now();
 
+function membershipIsLive(membership: any) {
+  const startsOk =
+    !membership.starts_at || new Date(membership.starts_at).getTime() <= nowMs;
+
+  const expiresOk =
+    membership.expires_at && new Date(membership.expires_at).getTime() > nowMs;
+
+  return startsOk && expiresOk;
+}
+
 const promotedListingIds = new Set(
   membershipsData
     .filter((membership) => {
-      const startsOk =
-        !membership.starts_at || new Date(membership.starts_at).getTime() <= nowMs;
-
-      const expiresOk =
-        membership.expires_at && new Date(membership.expires_at).getTime() > nowMs;
-
-      return startsOk && expiresOk;
+      return (
+        membership.plan_type === "featured" &&
+        membership.ads_status === "active" &&
+        membershipIsLive(membership)
+      );
     })
     .map((membership) => membership.listing_id)
 );
+
+const verifiedListingIds = new Set(
+  membershipsData
+    .filter((membership) => {
+      return (
+        membership.plan_type === "basic" &&
+        membershipIsLive(membership)
+      );
+    })
+    .map((membership) => membership.listing_id)
+);
+
 function cityName(city: RentCity | undefined | null) {
   if (!city) return "";
   return city.name_en || city.name_bn || city.name || "";
@@ -168,8 +185,9 @@ const listingsForClient = listings.map((listing) => {
     .filter(Boolean) as RentCity[];
 
   return {
-        ...listing,
+    ...listing,
     is_promoted: promotedListingIds.has(listing.id),
+    is_verified_badge: verifiedListingIds.has(listing.id),
     base_city_name: cityName(baseCity),
     service_city_names: serviceCities.map(cityName),
     photo_urls: (listing.photos ?? []).slice(0, 4).map(publicPhotoUrl),
@@ -1140,8 +1158,8 @@ function setupRentCardAnalyticsObserver() {
 
       if (adA !== adB) return adA - adB;
 
-      const verifiedA = a.is_verified ? 0 : 1;
-      const verifiedB = b.is_verified ? 0 : 1;
+      const verifiedA = a.is_verified_badge ? 0 : 1;
+const verifiedB = b.is_verified_badge ? 0 : 1;
 
       if (verifiedA !== verifiedB) return verifiedA - verifiedB;
 
@@ -1194,9 +1212,9 @@ function setupRentCardAnalyticsObserver() {
   const adLabel = listing.is_promoted
     ? `<span class="rent-ad-badge">Ad</span>`
     : "";
-      const verifiedLabel = listing.is_verified
-    ? `<span class="rent-verified-badge">Verified</span>`
-    : "";
+      const verifiedLabel = listing.is_verified_badge
+  ? `<span class="rent-verified-badge">Verified Badge</span>`
+  : "";
 
   
     

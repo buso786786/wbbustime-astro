@@ -3,88 +3,41 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import '../../styles/admin-compact.css';
 ---
 
-<BaseLayout
-  title="Rent Listings Admin - SoniaBuddy"
-  description="Admin manage rent listings, verification, rejection, status and photos."
-  robots="noindex,nofollow"
->
+<BaseLayout title="Rent Events Admin - SoniaBuddy" description="Track rent listing views, calls and analytics." robots="noindex,nofollow">
+  <div id="admin-access-cover" class="admin-access-cover"><div class="admin-access-card"><strong>Official Admin Work Only</strong><p>This area is restricted for SoniaBuddy internal admin work.</p></div></div>
+
   <section class="admin-page">
     <div class="admin-container">
       <div class="admin-header">
-        <div>
-          <p class="eyebrow">SoniaBuddy Admin</p>
-          <h1>Rent Events</h1>
-          <p>Track listing views, calls, WhatsApp clicks, details clicks and photo opens.</p>
-        </div>
-
-        <div class="top-actions">
-          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
-        </div>
+        <div><p class="eyebrow">SoniaBuddy Admin</p><h1>Rent Events</h1><p>Analytics summary with clean/remove controls.</p></div>
+        <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
       </div>
 
-      <div id="auth-box" class="notice-card">
-        <strong>Checking admin access...</strong>
-      </div>
-
+      <div id="auth-box" class="notice-card">Checking admin access...</div>
       <div id="message-box" class="message hidden"></div>
 
-      <div class="filter-card">
+      <div id="stats-grid" class="stats-grid hidden">
+        <div class="stat-card"><span>Total</span><strong id="stat-total">0</strong></div>
+        <div class="stat-card"><span>Views</span><strong id="stat-views">0</strong></div>
+        <div class="stat-card"><span>Calls</span><strong id="stat-calls">0</strong></div>
+        <div class="stat-card"><span>WhatsApp</span><strong id="stat-wa">0</strong></div>
+      </div>
+
+      <div id="filter-card" class="filter-card hidden">
         <button class="filter-btn active" type="button" data-filter="all">All</button>
         <button class="filter-btn" type="button" data-filter="listing_view">Views</button>
         <button class="filter-btn" type="button" data-filter="call_click">Calls</button>
         <button class="filter-btn" type="button" data-filter="whatsapp_click">WhatsApp</button>
         <button class="filter-btn" type="button" data-filter="view_details_click">Details</button>
         <button class="filter-btn" type="button" data-filter="photo_open">Photos</button>
-        <button class="filter-btn" type="button" data-filter="membership_click">Membership</button>
+        <input id="event-search-input" class="admin-search-input" type="search" placeholder="Search email, phone, listing id, vehicle..." />
       </div>
 
-      <div id="stats-grid" class="stats-grid">
-        <div class="stat-card">
-          <span>Total</span>
-          <strong id="stat-total">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Views</span>
-          <strong id="stat-views">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Calls</span>
-          <strong id="stat-calls">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>WhatsApp</span>
-          <strong id="stat-whatsapp">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Details</span>
-          <strong id="stat-details">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Photos</span>
-          <strong id="stat-photos">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Membership</span>
-          <strong id="stat-membership">0</strong>
-        </div>
-        <div class="stat-card">
-          <span>Listings</span>
-          <strong id="stat-listings">0</strong>
-        </div>
-      </div>
-
-      <div class="section-row">
-        <h2>Listing summary</h2>
-        <p id="summary-count">0 listings</p>
-      </div>
-
-      <div id="loader" class="notice-card">Loading events...</div>
-      <div id="summary-grid" class="summary-grid"></div>
-
-      <details class="raw-events-card">
-        <summary>Raw events</summary>
-        <div id="events-list" class="events-list"></div>
-      </details>
+      <div id="loader" class="notice-card hidden">Loading events...</div>
+      <h2 class="subhead hidden" id="summary-title">Listing summary</h2>
+      <div id="summary-grid" class="admin-dynamic-grid"></div>
+      <h2 class="subhead hidden" id="events-title">Raw events</h2>
+      <div id="events-grid" class="admin-dynamic-grid"></div>
     </div>
   </section>
 
@@ -92,765 +45,135 @@ import '../../styles/admin-compact.css';
     import { supabase } from '../../lib/supabase';
 
     const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
-
     let currentUser = null;
     let events = [];
+    let listingsById = {};
     let activeFilter = 'all';
+    let searchQuery = '';
 
-    function esc(value) {
-      return String(value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
+    function esc(value) { return String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
+    function fmt(value) { if (!value) return '-'; try { return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); } catch { return '-'; } }
+    function showMessage(text, type = 'info') { const box = document.getElementById('message-box'); if (!box) return; box.textContent = text; box.className = `message ${type}`; }
+    function isAdmin() { return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())); }
+    function eventType(event) { return event.event_type || event.type || '-'; }
 
-    function isAdmin() {
-      return Boolean(
-        currentUser?.email &&
-        ADMIN_EMAILS.includes(currentUser.email.toLowerCase())
-      );
-    }
-
-    function showMessage(text, type = 'info') {
-      const box = document.getElementById('message-box');
-      if (!box) return;
-
-      box.textContent = text;
-      box.className = `message ${type}`;
-    }
-
-    function hideMessage() {
-      const box = document.getElementById('message-box');
-      if (box) box.classList.add('hidden');
-    }
-
-    function formatDateTime(value) {
-      if (!value) return '-';
-
-      try {
-        return new Intl.DateTimeFormat('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        }).format(new Date(value));
-      } catch {
-        return '-';
-      }
-    }
-
-    function eventType(event) {
-      return (
-        event.event_type ||
-        event.type ||
-        event.event_name ||
-        event.action ||
-        'event'
-      );
-    }
-
-    function eventLabel(type) {
-      const labels = {
-        listing_view: 'View',
-        call_click: 'Call',
-        whatsapp_click: 'WhatsApp',
-        view_details_click: 'Details',
-        photo_open: 'Photo',
-        membership_click: 'Membership',
-      };
-
-      return labels[type] || type;
-    }
-
-    function eventClass(type) {
-      if (type === 'call_click') return 'event-call';
-      if (type === 'whatsapp_click') return 'event-whatsapp';
-      if (type === 'listing_view') return 'event-view';
-      if (type === 'view_details_click') return 'event-details';
-      if (type === 'photo_open') return 'event-photo';
-      if (type === 'membership_click') return 'event-membership';
-      return 'event-other';
-    }
-
-    function compactUa(userAgent) {
-      const ua = String(userAgent || '').toLowerCase();
-
-      const browser = ua.includes('edg')
-        ? 'Edge'
-        : ua.includes('chrome')
-          ? 'Chrome'
-          : ua.includes('safari')
-            ? 'Safari'
-            : ua.includes('firefox')
-              ? 'Firefox'
-              : 'Browser';
-
-      const device = ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')
-        ? 'Mobile'
-        : 'Desktop';
-
-      return `${browser} / ${device}`;
-    }
-
-    function shortId(id) {
-      const value = String(id || '');
-      if (!value) return '-';
-      return value.length > 8 ? value.slice(0, 8) : value;
+    async function guardAdmin() {
+      const cover = document.getElementById('admin-access-cover');
+      const { data } = await supabase.auth.getSession();
+      currentUser = data.session?.user || null;
+      if (isAdmin()) { cover?.classList.add('hidden'); return true; }
+      cover?.classList.remove('hidden');
+      return false;
     }
 
     function filteredEvents() {
-      if (activeFilter === 'all') return events;
-      return events.filter((event) => eventType(event) === activeFilter);
+      let rows = events;
+      if (activeFilter !== 'all') rows = rows.filter((event) => eventType(event) === activeFilter);
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        rows = rows.filter((event) => {
+          const listing = listingsById[event.listing_id] || {};
+          return [event.id, event.listing_id, eventType(event), event.city_id, event.vehicle_type, event.rent_type, listing.owner_email, listing.owner_name, listing.owner_phone, listing.owner_whatsapp, listing.vehicle_type, listing.vehicle_model, listing.reg_number].filter(Boolean).join(' ').toLowerCase().includes(q);
+        });
+      }
+      return rows;
     }
 
-    function countByType(rows, type) {
-      return rows.filter((event) => eventType(event) === type).length;
-    }
-
-    function setText(id, value) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = String(value);
+    function groupedEvents() {
+      const map = new Map();
+      filteredEvents().forEach((event) => {
+        const id = event.listing_id || 'no-listing';
+        if (!map.has(id)) {
+          map.set(id, { id, listing: listingsById[id] || {}, views: 0, calls: 0, wa: 0, details: 0, photos: 0, membership: 0, total: 0, last: event.created_at });
+        }
+        const item = map.get(id);
+        item.total += 1;
+        item.last = event.created_at || item.last;
+        if (eventType(event) === 'listing_view') item.views += 1;
+        if (eventType(event) === 'call_click') item.calls += 1;
+        if (eventType(event) === 'whatsapp_click') item.wa += 1;
+        if (eventType(event) === 'view_details_click') item.details += 1;
+        if (eventType(event) === 'photo_open') item.photos += 1;
+        if (eventType(event) === 'membership_click') item.membership += 1;
+      });
+      return Array.from(map.values()).sort((a, b) => b.total - a.total);
     }
 
     function updateStats() {
       const rows = filteredEvents();
-      const listingIds = new Set(
-        rows.map((event) => event.listing_id || event.rent_listing_id || event.listingId).filter(Boolean)
-      );
-
+      const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = String(value); };
       setText('stat-total', rows.length);
-      setText('stat-views', countByType(rows, 'listing_view'));
-      setText('stat-calls', countByType(rows, 'call_click'));
-      setText('stat-whatsapp', countByType(rows, 'whatsapp_click'));
-      setText('stat-details', countByType(rows, 'view_details_click'));
-      setText('stat-photos', countByType(rows, 'photo_open'));
-      setText('stat-membership', countByType(rows, 'membership_click'));
-      setText('stat-listings', listingIds.size);
+      setText('stat-views', rows.filter((event) => eventType(event) === 'listing_view').length);
+      setText('stat-calls', rows.filter((event) => eventType(event) === 'call_click').length);
+      setText('stat-wa', rows.filter((event) => eventType(event) === 'whatsapp_click').length);
     }
 
-    function groupByListing(rows) {
-      const map = new Map();
-
-      rows.forEach((event) => {
-        const listingId =
-          event.listing_id ||
-          event.rent_listing_id ||
-          event.listingId ||
-          'unknown';
-
-        if (!map.has(listingId)) {
-          map.set(listingId, {
-            listingId,
-            vehicleType: event.vehicle_type || '-',
-            city: event.city || event.city_name || event.base_city_name || '-',
-            rentType: event.rent_type || event.purpose || '-',
-            views: 0,
-            calls: 0,
-            whatsapp: 0,
-            details: 0,
-            photos: 0,
-            membership: 0,
-            total: 0,
-            lastAt: '',
-          });
-        }
-
-        const item = map.get(listingId);
-        const type = eventType(event);
-
-        item.total += 1;
-        if (type === 'listing_view') item.views += 1;
-        if (type === 'call_click') item.calls += 1;
-        if (type === 'whatsapp_click') item.whatsapp += 1;
-        if (type === 'view_details_click') item.details += 1;
-        if (type === 'photo_open') item.photos += 1;
-        if (type === 'membership_click') item.membership += 1;
-
-        const createdAt = event.created_at || event.inserted_at || event.timestamp;
-        if (!item.lastAt || new Date(createdAt) > new Date(item.lastAt)) {
-          item.lastAt = createdAt;
-        }
-      });
-
-      return Array.from(map.values()).sort((a, b) => {
-        return new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime();
-      });
-    }
-
-    function renderSummary() {
-      const grid = document.getElementById('summary-grid');
-      const count = document.getElementById('summary-count');
-      if (!grid) return;
-
-      const rows = filteredEvents();
-      const grouped = groupByListing(rows);
-
-      if (count) count.textContent = `${grouped.length} listings`;
-
-      if (!isAdmin()) {
-        grid.innerHTML = '';
-        return;
-      }
-
-      if (!grouped.length) {
-        grid.innerHTML = `
-          <div class="notice-card">
-            <strong>No events found.</strong>
-            <p>Try another filter or refresh.</p>
-          </div>
-        `;
-        return;
-      }
-
-      grid.innerHTML = grouped.map((item) => `
-        <article class="listing-event-card">
-          <div class="event-card-head">
-            <div>
-              <h3>${esc(item.vehicleType || 'Rent listing')}</h3>
-              <p>Listing: ${esc(shortId(item.listingId))} · ${esc(item.city)}</p>
-            </div>
-            <span class="last-activity">${formatDateTime(item.lastAt)}</span>
-          </div>
-
-          <div class="event-metrics">
-            <span><strong>${item.views}</strong> Views</span>
-            <span><strong>${item.calls}</strong> Calls</span>
-            <span><strong>${item.whatsapp}</strong> WhatsApp</span>
-            <span><strong>${item.details}</strong> Details</span>
-            <span><strong>${item.photos}</strong> Photos</span>
-            <span><strong>${item.membership}</strong> Membership</span>
-          </div>
-        </article>
-      `).join('');
-    }
-
-    function renderRawEvents() {
-      const list = document.getElementById('events-list');
-      if (!list) return;
-
-      const rows = filteredEvents()
-        .slice()
-        .sort((a, b) => {
-          const aDate = a.created_at || a.inserted_at || a.timestamp || '';
-          const bDate = b.created_at || b.inserted_at || b.timestamp || '';
-          return new Date(bDate).getTime() - new Date(aDate).getTime();
-        })
-        .slice(0, 100);
-
-      if (!isAdmin()) {
-        list.innerHTML = '';
-        return;
-      }
-
-      if (!rows.length) {
-        list.innerHTML = `<div class="notice-card"><strong>No raw events.</strong></div>`;
-        return;
-      }
-
-      list.innerHTML = rows.map((event) => {
-        const type = eventType(event);
-        const createdAt = event.created_at || event.inserted_at || event.timestamp;
-        const listingId = event.listing_id || event.rent_listing_id || event.listingId || '-';
-
-        return `
-          <div class="event-row">
-            <span class="event-pill ${eventClass(type)}">${eventLabel(type)}</span>
-            <span>${formatDateTime(createdAt)}</span>
-            <span>Listing ${esc(shortId(listingId))}</span>
-            <span>${esc(event.vehicle_type || '-')}</span>
-            <span>${esc(event.city || event.city_name || '-')}</span>
-            <span>${esc(compactUa(event.user_agent || event.ua || ''))}</span>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderAll() {
+    function render() {
       updateStats();
+      document.getElementById('loader')?.classList.add('hidden');
+      document.getElementById('summary-title')?.classList.remove('hidden');
+      document.getElementById('events-title')?.classList.remove('hidden');
+      const summaryGrid = document.getElementById('summary-grid');
+      const eventsGrid = document.getElementById('events-grid');
+      const groups = groupedEvents();
 
-      const loader = document.getElementById('loader');
-      if (loader) loader.classList.add('hidden');
-
-      renderSummary();
-      renderRawEvents();
-    }
-
-    async function refreshSession() {
-      const authBox = document.getElementById('auth-box');
-
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        currentUser = null;
-        if (authBox) {
-          authBox.innerHTML = `<strong>Session error:</strong> ${esc(error.message)}`;
-        }
-        return;
+      if (summaryGrid) {
+        summaryGrid.innerHTML = groups.length ? groups.map((group) => {
+          const listing = group.listing || {};
+          return `<article class="admin-row-card"><div class="row-title"><div><h3>${esc(listing.vehicle_model || listing.vehicle_type || 'Listing')}</h3><p class="sub">Listing: ${esc(String(group.id).slice(0, 8))} · ${esc(listing.owner_email || '-')} · ${esc(listing.owner_phone || '-')}</p></div><span class="pill active">${group.total} events</span></div><div class="info-grid"><span><strong>Views</strong>${group.views}</span><span><strong>Calls</strong>${group.calls}</span><span><strong>WhatsApp</strong>${group.wa}</span><span><strong>Details</strong>${group.details}</span><span><strong>Photos</strong>${group.photos}</span><span><strong>Membership</strong>${group.membership}</span><span><strong>Last</strong>${fmt(group.last)}</span><span><strong>Reg</strong>${esc(listing.reg_number || '-')}</span></div><div class="actions"><button class="btn btn-danger clear-listing-events-btn" type="button" data-listing-id="${esc(group.id)}">🗑 Clear Events</button></div></article>`;
+        }).join('') : '<div class="notice-card">No listing summary found.</div>';
       }
 
-      currentUser = data.session?.user || null;
-
-      if (!currentUser) {
-        if (authBox) {
-          authBox.innerHTML = `
-            <strong>Admin access blocked.</strong>
-            <p>This page is only for SoniaBuddy super admin. Login button is disabled here.</p>
-          `;
-        }
-        return;
+      const rows = filteredEvents().slice(0, 150);
+      if (eventsGrid) {
+        eventsGrid.innerHTML = rows.length ? rows.map((event) => `<article class="admin-row-card raw-event"><div class="row-title"><div><h3>${esc(eventType(event))}</h3><p class="sub">${esc(String(event.listing_id || '-').slice(0, 12))} · ${fmt(event.created_at)}</p></div><span class="pill">event</span></div></article>`).join('') : '<div class="notice-card">No events found.</div>';
       }
-
-      if (!isAdmin()) {
-        if (authBox) {
-          authBox.innerHTML = `
-            <strong>Access denied.</strong>
-            <p>${esc(currentUser.email)} is not allowed for this admin page.</p>
-          `;
-        }
-        return;
-      }
-
-      if (authBox) {
-        authBox.innerHTML = `
-          <strong>Admin:</strong> ${esc(currentUser.email)}
-          <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>
-        `;
-      }
-
-      document.getElementById('logout-btn')?.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.reload();
-      });
     }
 
     async function loadEvents() {
-      hideMessage();
-
-      const loader = document.getElementById('loader');
-      if (loader) {
-        loader.textContent = 'Loading events...';
-        loader.classList.remove('hidden');
-      }
-
-      if (!isAdmin()) {
-        events = [];
-        if (loader) loader.classList.add('hidden');
-        renderAll();
-        return;
-      }
-
+      document.getElementById('loader')?.classList.remove('hidden');
       const { data, error } = await supabase
         .from('rent_listing_events')
-        .select('*')
+        .select('id,listing_id,event_type,city_id,vehicle_type,rent_type,user_agent,created_at')
         .order('created_at', { ascending: false })
-        .limit(500);
-
-      if (error) {
-        events = [];
-        if (loader) loader.classList.add('hidden');
-        showMessage(error.message, 'error');
-        renderAll();
-        return;
-      }
-
+        .limit(1000);
+      if (error) { document.getElementById('loader')?.classList.add('hidden'); showMessage(error.message, 'error'); return; }
       events = Array.isArray(data) ? data : [];
-      renderAll();
+
+      const ids = [...new Set(events.map((event) => event.listing_id).filter(Boolean))];
+      listingsById = {};
+      if (ids.length) {
+        const result = await supabase.from('rent_listings').select('id,owner_email,owner_name,owner_phone,owner_whatsapp,vehicle_type,vehicle_model,reg_number').in('id', ids);
+        (result.data || []).forEach((listing) => { listingsById[listing.id] = listing; });
+      }
+      render();
+    }
+
+    async function clearEventsForListing(id) {
+      if (!confirm('Delete analytics events for this listing? This cleans admin panel but removes old stats.')) return;
+      const { error } = await supabase.from('rent_listing_events').delete().eq('listing_id', id);
+      if (error) return showMessage(error.message, 'error');
+      showMessage('Events removed for listing.', 'success');
+      await loadEvents();
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await guardAdmin();
+      const auth = document.getElementById('auth-box');
+      if (!ok) { if (auth) auth.innerHTML = '<strong>Admin access blocked.</strong>'; return; }
+      if (auth) auth.innerHTML = `<strong>Logged in as</strong> ${esc(currentUser.email)} <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>`;
+      document.getElementById('stats-grid')?.classList.remove('hidden');
+      document.getElementById('filter-card')?.classList.remove('hidden');
+      document.getElementById('logout-btn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
       document.getElementById('refresh-btn')?.addEventListener('click', loadEvents);
-
-      document.querySelectorAll('.filter-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-btn').forEach((item) => {
-            item.classList.remove('active');
-          });
-
-          btn.classList.add('active');
-          activeFilter = btn.dataset.filter || 'all';
-          renderAll();
-        });
-      });
-
-      await refreshSession();
+      document.querySelectorAll('.filter-btn').forEach((btn) => btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter || 'all'; render(); }));
+      document.getElementById('event-search-input')?.addEventListener('input', (event) => { searchQuery = event.target?.value || ''; render(); });
+      document.addEventListener('click', (event) => { const target = event.target; if (!(target instanceof Element)) return; const btn = target.closest('.clear-listing-events-btn'); if (btn) clearEventsForListing(btn.dataset.listingId); });
       await loadEvents();
     });
   </script>
 
-  <style>
-    .admin-page {
-      min-height: 100vh;
-      padding: 1rem 1rem 3rem;
-      background:
-        radial-gradient(circle at top left, rgba(255, 107, 0, 0.16), transparent 30%),
-        linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
-      color: white;
-    }
-
-    .admin-container {
-      max-width: 1180px;
-      margin: 0 auto;
-    }
-
-    .admin-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: flex-start;
-      margin-bottom: 1rem;
-    }
-
-    .eyebrow {
-      margin: 0 0 0.35rem;
-      color: #ff8a00;
-      font-size: 0.75rem;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 0 0 0.35rem;
-      font-size: clamp(1.7rem, 4vw, 2.35rem);
-      color: white;
-    }
-
-    .admin-header p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.72);
-      font-size: 0.92rem;
-    }
-
-    .top-actions {
-      display: flex;
-      gap: 0.55rem;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 34px;
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.65rem;
-      border: 0;
-      font-weight: 900;
-      text-decoration: none;
-      cursor: pointer;
-      font-size: 0.78rem;
-      line-height: 1;
-      white-space: nowrap;
-    }
-
-    .btn-primary {
-      color: white;
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-    }
-
-    .btn-outline {
-      color: white;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-    }
-
-    .btn-small {
-      min-height: 28px;
-      padding: 0.38rem 0.65rem;
-      font-size: 0.72rem;
-      margin-left: 0.5rem;
-    }
-
-    .notice-card,
-    .message,
-    .filter-card,
-    .stat-card,
-    .listing-event-card,
-    .raw-events-card {
-      border-radius: 0.9rem;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(255, 255, 255, 0.07);
-    }
-
-    .notice-card {
-      padding: 0.9rem 1rem;
-      margin-bottom: 1rem;
-      color: rgba(255, 255, 255, 0.82);
-    }
-
-    .notice-card p {
-      margin: 0.35rem 0 0;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .message {
-      padding: 0.9rem 1rem;
-      margin-bottom: 1rem;
-      font-weight: 900;
-    }
-
-    .message.info {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.12);
-      border-color: rgba(59, 130, 246, 0.3);
-    }
-
-    .message.success {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.12);
-      border-color: rgba(34, 197, 94, 0.3);
-    }
-
-    .message.error {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.12);
-      border-color: rgba(239, 68, 68, 0.3);
-    }
-
-    .filter-card {
-      padding: 0.65rem;
-      display: flex;
-      gap: 0.45rem;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-    }
-
-    .filter-btn {
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.76);
-      border-radius: 999px;
-      padding: 0.42rem 0.7rem;
-      font-weight: 900;
-      cursor: pointer;
-      font-size: 0.76rem;
-    }
-
-    .filter-btn.active {
-      color: white;
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-      border-color: transparent;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.65rem;
-      margin-bottom: 1rem;
-    }
-
-    .stat-card {
-      padding: 0.75rem;
-      text-align: center;
-    }
-
-    .stat-card span {
-      display: block;
-      color: rgba(255, 255, 255, 0.66);
-      font-size: 0.76rem;
-      font-weight: 800;
-      margin-bottom: 0.28rem;
-    }
-
-    .stat-card strong {
-      display: block;
-      color: #ff8a00;
-      font-size: 1.35rem;
-      line-height: 1;
-    }
-
-    .section-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: baseline;
-      margin: 1rem 0 0.75rem;
-    }
-
-    .section-row h2 {
-      margin: 0;
-      color: white;
-      font-size: 1.1rem;
-    }
-
-    .section-row p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.85rem;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
-    }
-
-    .listing-event-card {
-      padding: 0.75rem;
-    }
-
-    .event-card-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      align-items: flex-start;
-      margin-bottom: 0.65rem;
-    }
-
-    .event-card-head h3 {
-      margin: 0 0 0.2rem;
-      color: white;
-      font-size: 0.95rem;
-      line-height: 1.15;
-    }
-
-    .event-card-head p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.68);
-      font-size: 0.74rem;
-    }
-
-    .last-activity {
-      white-space: nowrap;
-      border-radius: 999px;
-      padding: 0.25rem 0.5rem;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.78);
-      font-size: 0.7rem;
-      font-weight: 900;
-    }
-
-    .event-metrics {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.35rem;
-    }
-
-    .event-metrics span {
-      border-radius: 0.5rem;
-      padding: 0.45rem 0.5rem;
-      background: rgba(255, 255, 255, 0.045);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.82);
-      font-size: 0.72rem;
-    }
-
-    .event-metrics strong {
-      display: block;
-      color: #ff8a00;
-      font-size: 1rem;
-      line-height: 1;
-      margin-bottom: 0.15rem;
-    }
-
-    .raw-events-card {
-      padding: 0.75rem;
-      margin-top: 1rem;
-    }
-
-    .raw-events-card summary {
-      cursor: pointer;
-      font-weight: 900;
-      color: white;
-    }
-
-    .events-list {
-      display: grid;
-      gap: 0.45rem;
-      margin-top: 0.75rem;
-    }
-
-    .event-row {
-      display: grid;
-      grid-template-columns: 100px 120px 110px 1fr 1fr 120px;
-      gap: 0.45rem;
-      align-items: center;
-      padding: 0.48rem;
-      border-radius: 0.55rem;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.78);
-      font-size: 0.72rem;
-      word-break: break-word;
-    }
-
-    .event-pill {
-      display: inline-flex;
-      justify-content: center;
-      border-radius: 999px;
-      padding: 0.25rem 0.45rem;
-      font-size: 0.64rem;
-      font-weight: 900;
-      color: white;
-      white-space: nowrap;
-    }
-
-    .event-call {
-      background: rgba(249, 115, 22, 0.85);
-    }
-
-    .event-whatsapp {
-      background: rgba(34, 197, 94, 0.85);
-    }
-
-    .event-view {
-      background: rgba(59, 130, 246, 0.85);
-    }
-
-    .event-details {
-      background: rgba(168, 85, 247, 0.85);
-    }
-
-    .event-photo {
-      background: rgba(236, 72, 153, 0.85);
-    }
-
-    .event-membership {
-      background: rgba(234, 179, 8, 0.85);
-    }
-
-    .event-other {
-      background: rgba(148, 163, 184, 0.85);
-    }
-
-    @media (min-width: 820px) {
-      .summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .event-metrics {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 760px) {
-      .admin-page {
-        padding: 0.8rem 0.75rem 2rem;
-      }
-
-      .admin-header {
-        flex-direction: column;
-      }
-
-      .top-actions,
-      .top-actions .btn {
-        width: 100%;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .event-row {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
+  <style is:global>
+    .admin-page{min-height:100vh;padding:1rem 1rem 3rem;background:radial-gradient(circle at top left,rgba(255,107,0,.16),transparent 30%),linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);color:#fff}.admin-container{max-width:1180px;margin:0 auto}.admin-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem}.eyebrow{margin:0 0 .35rem;color:#ff8a00;font-size:.75rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}h1{margin:0 0 .35rem;font-size:clamp(1.7rem,4vw,2.35rem);color:#fff}.admin-header p{margin:0;color:rgba(255,255,255,.72);font-size:.92rem}.subhead{font-size:1rem;margin:1rem 0 .5rem;color:#fff}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:.5rem .75rem;border-radius:.65rem;border:0;font-weight:900;text-decoration:none;cursor:pointer;font-size:.78rem;line-height:1;white-space:nowrap}.btn-primary{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00)}.btn-outline{color:white;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22)}.btn-danger{color:white;background:rgba(239,68,68,.72);border:1px solid rgba(239,68,68,.35)}.btn-small{min-height:28px;padding:.38rem .65rem;font-size:.72rem}.notice-card,.message,.filter-card,.stat-card,.admin-row-card{border-radius:.9rem;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff}.notice-card{padding:.9rem 1rem;margin-bottom:1rem;color:rgba(255,255,255,.82)}.hidden{display:none!important}.message{padding:.9rem 1rem;margin-bottom:1rem;font-weight:900}.message.info{color:#93c5fd;background:rgba(59,130,246,.12)}.message.success{color:#86efac;background:rgba(34,197,94,.12)}.message.error{color:#fca5a5;background:rgba(239,68,68,.12)}.filter-card{padding:.65rem;display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem}.filter-btn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(255,255,255,.76);border-radius:999px;padding:.42rem .7rem;font-weight:900;cursor:pointer;font-size:.76rem}.filter-btn.active{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00);border-color:transparent}.admin-search-input{min-height:36px;flex:1 1 260px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;padding:.42rem .75rem;font-size:.78rem;font-weight:800;outline:none}.admin-search-input::placeholder{color:rgba(255,255,255,.5)}.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;margin-bottom:1rem}.stat-card{padding:.75rem;text-align:center}.stat-card span{display:block;color:rgba(255,255,255,.66);font-size:.76rem;font-weight:800;margin-bottom:.28rem}.stat-card strong{display:block;color:#ff8a00;font-size:1.35rem;line-height:1}.admin-dynamic-grid{display:grid;grid-template-columns:1fr;gap:.75rem}.admin-row-card{padding:.75rem;display:grid;gap:.55rem}.raw-event{opacity:.95}.row-title{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start}.row-title h3{margin:0 0 .2rem;font-size:.95rem;line-height:1.15;color:#fff}.sub{margin:0;color:rgba(255,255,255,.72);font-size:.75rem}.pill{display:inline-flex;align-items:center;min-height:22px;padding:.18rem .45rem;border-radius:999px;font-size:.64rem;font-weight:900;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.82);white-space:nowrap}.pill.active{background:rgba(34,197,94,.15);color:#86efac}.info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem}.info-grid span{min-width:0;padding:.42rem .5rem;border-radius:.5rem;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.86);font-size:.72rem;line-height:1.25;word-break:break-word}.info-grid strong{display:block;margin-bottom:.12rem;color:white;font-size:.64rem;opacity:.75}.actions{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;justify-content:flex-start}.admin-access-cover{position:fixed;inset:0;z-index:99999;min-height:100vh;padding:1rem;background:linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);display:flex;align-items:flex-start;justify-content:center}.admin-access-card{width:min(100%,980px);margin-top:4.5rem;padding:1rem;border-radius:1rem;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.32);color:#fde68a}.admin-access-card strong{display:block;margin-bottom:.35rem;color:#facc15;font-weight:950;font-size:1rem}.admin-access-card p{margin:0;color:rgba(255,255,255,.86);line-height:1.45}@media(max-width:760px){.admin-page{padding:.8rem .75rem 2rem}.admin-header{flex-direction:column}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </BaseLayout>

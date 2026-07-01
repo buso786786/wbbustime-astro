@@ -1,0 +1,233 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import '../../styles/admin-compact.css';
+---
+
+<BaseLayout
+  title="Payment - SoniaBuddy"
+  description="Complete vehicle listing membership payment on SoniaBuddy."
+  robots="noindex,nofollow"
+>
+  <section class="payment-page">
+    <div class="payment-container">
+      <a href="/owner/rent-dashboard#my-listings" class="back-link">← Back to Dashboard</a>
+
+      <div class="payment-card">
+        <div class="payment-icon">💳</div>
+
+        <div id="valid-payment" class="hidden">
+          <h1 id="plan-title">Payment</h1>
+          <p id="plan-desc" class="payment-desc"></p>
+
+          <div class="price-box">
+            <span id="plan-price" class="price"></span>
+            <span id="plan-duration" class="duration"></span>
+          </div>
+
+          <div class="info-box">
+            <p><strong>Listing ID:</strong> <span id="listing-id-text"></span></p>
+            <p><strong>Plan:</strong> <span id="plan-key-text"></span></p>
+            <p><strong>Status:</strong> Secure payment setup is being prepared</p>
+          </div>
+
+          <div class="warning-box">
+  SoniaBuddy payments are opening soon. Your listing plan is ready — once online checkout goes live, you can activate this plan securely and start getting the selected benefits.
+</div>
+
+          <button id="coming-soon-btn" class="btn btn-primary" type="button">
+            Online Checkout Coming Soon
+          </button>
+
+          <a href="/owner/rent-dashboard#my-listings" class="btn btn-outline">
+            Back to My Listings
+          </a>
+        </div>
+
+        <div id="invalid-payment">
+          <h1>Invalid Payment Link</h1>
+          <p class="payment-desc">Plan details not found. Please go back and choose a plan again.</p>
+          <a href="/owner/rent-dashboard#my-listings" class="btn btn-primary">
+            Back to Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+  const planMap = {
+    verified_badge: {
+      title: 'Verified Badge',
+      price: '₹299',
+      duration: '1 month price · 3 months active',
+      description: 'Build more trust with a clear Verified Badge on your vehicle listing.',
+    },
+    small_visibility: {
+      title: 'Small Vehicle Visibility',
+      price: '₹199',
+      duration: '1 month price · 3 months active',
+      description: 'Give your Toto / Auto listing better placement and more attention in local searches.',
+    },
+    car_pickup_ambulance_visibility: {
+      title: 'Car / Pickup / Ambulance Visibility',
+      price: '₹1000',
+      duration: '1 month price · 3 months active',
+      description: 'Boost your car, pickup or ambulance listing for stronger visibility in your service area.',
+    },
+    bus_visibility: {
+      title: 'Bus Visibility',
+      price: '₹1500',
+      duration: '1 month price · 3 months active',
+      description: 'Promote your bus listing for wedding, tour, school and local transport enquiries.',
+    },
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const listingId = params.get('listing_id') || '';
+  const plan = params.get('plan') || '';
+  const selectedPlan = planMap[plan];
+
+  const validBox = document.getElementById('valid-payment');
+  const invalidBox = document.getElementById('invalid-payment');
+
+  if (selectedPlan && listingId) {
+    invalidBox?.classList.add('hidden');
+    validBox?.classList.remove('hidden');
+
+    const planTitle = document.getElementById('plan-title');
+    const planDesc = document.getElementById('plan-desc');
+    const planPrice = document.getElementById('plan-price');
+    const planDuration = document.getElementById('plan-duration');
+    const listingIdText = document.getElementById('listing-id-text');
+    const planKeyText = document.getElementById('plan-key-text');
+
+    if (planTitle) planTitle.textContent = selectedPlan.title;
+    if (planDesc) planDesc.textContent = selectedPlan.description;
+    if (planPrice) planPrice.textContent = selectedPlan.price;
+    if (planDuration) planDuration.textContent = selectedPlan.duration;
+    if (listingIdText) listingIdText.textContent = listingId;
+    if (planKeyText) planKeyText.textContent = plan;
+  }
+
+  document.getElementById('coming-soon-btn')?.addEventListener('click', () => {
+    alert('Online checkout is opening soon on SoniaBuddy. Your plan is ready and you will be able to activate it securely from here.');
+  });
+</script>
+
+  <style is:global>
+    .hidden {
+      display: none !important;
+    }
+
+    .payment-page {
+      min-height: 100vh;
+      padding: 1rem;
+      background: linear-gradient(135deg, #0b0628 0%, #120844 55%, #1a0e38 100%);
+      color: #fff;
+    }
+
+    .payment-container {
+      width: min(100%, 560px);
+      margin: 0 auto;
+      padding-top: 1rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 0.75rem;
+      color: #bfdbfe;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+
+    .payment-card {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 1rem;
+      background: rgba(255, 255, 255, 0.065);
+      padding: 1rem;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.25);
+    }
+
+    .payment-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 122, 0, 0.18);
+      border: 1px solid rgba(255, 122, 0, 0.35);
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .payment-card h1 {
+      margin: 0 0 0.35rem;
+      color: #fff;
+      font-size: 1.35rem;
+      line-height: 1.15;
+      font-weight: 950;
+    }
+
+    .payment-desc {
+      margin: 0 0 0.9rem;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .price-box {
+      display: flex;
+      align-items: end;
+      gap: 0.45rem;
+      margin: 0.8rem 0;
+      padding: 0.75rem;
+      border-radius: 0.85rem;
+      background: rgba(255, 122, 0, 0.12);
+      border: 1px solid rgba(255, 122, 0, 0.28);
+    }
+
+    .price {
+      color: #ff8a00;
+      font-size: 1.55rem;
+      line-height: 1;
+      font-weight: 950;
+    }
+
+    .duration {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+
+    .info-box,
+    .warning-box {
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      border-radius: 0.85rem;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .info-box p {
+      margin: 0.25rem 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 0.78rem;
+      word-break: break-all;
+    }
+
+    .warning-box {
+      color: #fde68a;
+      background: rgba(250, 204, 21, 0.12);
+      border-color: rgba(250, 204, 21, 0.28);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .payment-card .btn {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+  </style>
+</BaseLayout>

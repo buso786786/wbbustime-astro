@@ -56,8 +56,8 @@ import '../../styles/admin-compact.css';
       <div class="free-notice">
         <span class="notice-icon">🎉</span>
         <div class="notice-content">
-          <h3>First 3 Months Free</h3>
-          <p>Every new rental listing gets first 3 months free. After the free trial, choose Verified Badge for trust or Visibility Boost for sponsored placement.</p>
+          <h3>Pay for 1 Month, Get 2 Months Free</h3>
+          <p>Limited offer: pay for 1 month and get 2 months free. Your Verified Badge or Visibility Boost stays active for 3 months.</p>
         </div>
       </div>
 
@@ -69,28 +69,28 @@ import '../../styles/admin-compact.css';
         <div class="plan-card">
           <h3>✅ Verified Badge</h3>
           <div class="plan-price">₹299</div>
-          <p class="plan-duration">for 3 months</p>
+          <p class="plan-duration">1 month price · 3 months active</p>
           <p class="plan-description">Trust badge only. No ads boost included.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="verified">▶ See features</button>
         </div>
         <div class="plan-card">
           <h3>🚀 Small Vehicle Visibility</h3>
           <div class="plan-price">₹199</div>
-          <p class="plan-duration">for 3 months</p>
+          <p class="plan-duration">1 month price · 3 months active</p>
           <p class="plan-description">For Toto and Auto. Sponsored visibility + ad tracking.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="small">▶ See features</button>
         </div>
         <div class="plan-card">
           <h3>🚀 Car / Pickup / Ambulance Visibility</h3>
           <div class="plan-price">₹1000</div>
-          <p class="plan-duration">for 3 months</p>
+          <p class="plan-duration">1 month price · 3 months active</p>
           <p class="plan-description">Sponsored visibility for car, pickup and ambulance.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="medium">▶ See features</button>
         </div>
         <div class="plan-card">
           <h3>🚀 Bus Visibility</h3>
           <div class="plan-price">₹1500</div>
-          <p class="plan-duration">for 3 months</p>
+          <p class="plan-duration">1 month price · 3 months active</p>
           <p class="plan-description">For bus, wedding bus, tour bus and school bus.</p>
           <button class="btn btn-small btn-orange plan-feature-btn" type="button" data-feature="bus">▶ See features</button>
         </div>
@@ -218,25 +218,46 @@ import '../../styles/admin-compact.css';
     }
 
     function renderRequestButton(listing, planType, amount, label, extraClass = '') {
-      const requested = hasMembershipRequest(listing.id, planType);
-      const text = requested ? 'Requested' : `${label} · ₹${amount}`;
-      const disabled = requested ? 'disabled' : '';
-      const disabledClass = requested ? 'btn-disabled' : '';
-      return `<button class="btn btn-primary btn-small request-plan-btn ${extraClass} ${disabledClass}" type="button" data-listing-id="${esc(listing.id)}" data-plan-type="${esc(planType)}" data-amount="${amount}" ${disabled}>${esc(text)}</button>`;
-    }
+  const activePlan = activePlanFor(listing.id, planType);
+
+  if (activePlan) {
+    const expiresText = formatDate(activePlan.expires_at) || 'active';
+    const planLabel = planType === 'verified_badge' ? 'Verified Badge' : 'Visibility Boost';
+
+    return `<button class="btn btn-outline btn-small active-plan-btn ${extraClass}" type="button" data-plan-label="${esc(planLabel)}" data-expires-at="${esc(expiresText)}">Active until ${esc(expiresText)}</button>`;
+  }
+
+  const requested = hasMembershipRequest(listing.id, planType);
+  const text = requested ? 'Requested' : `${label} · ₹${amount}`;
+  const disabled = requested ? 'disabled' : '';
+  const disabledClass = requested ? 'btn-disabled' : '';
+
+  return `<button class="btn btn-primary btn-small request-plan-btn ${extraClass} ${disabledClass}" type="button" data-listing-id="${esc(listing.id)}" data-plan-type="${esc(planType)}" data-amount="${amount}" ${disabled}>${esc(text)}</button>`;
+}
 
     function getActiveMemberships(listingId) {
       return activeMembershipsByListing[listingId] || [];
     }
 
     function getVerifiedMembership(listingId) {
-      return getActiveMemberships(listingId).find((item) => item.plan_type === 'verified' || item.plan_type === 'verified_badge') || null;
-    }
+  return getActiveMemberships(listingId).find(
+    (item) =>
+      item.plan_type === 'basic' ||
+      item.plan_type === 'verified' ||
+      item.plan_type === 'verified_badge'
+  ) || null;
+}
 
     function getAdMembership(listingId) {
       return getActiveMemberships(listingId).find((item) => item.plan_type === 'featured' && item.ads_status === 'active') || null;
     }
+    function activePlanFor(listingId, planType) {
+  if (planType === 'verified_badge') {
+    return getVerifiedMembership(listingId);
+  }
 
+  return getAdMembership(listingId);
+}
     function campaignStartMs(campaign) {
       const value = campaign?.starts_at || campaign?.created_at;
       const ms = value ? new Date(value).getTime() : 0;
@@ -334,6 +355,11 @@ import '../../styles/admin-compact.css';
       const avatarUrl = brandLogoUrl || firstPhotoUrl;
       const verified = getVerifiedMembership(listing.id);
       const ad = getAdMembership(listing.id);
+      const verifiedStartText = verified?.starts_at ? formatDate(verified.starts_at) : '';
+      const verifiedExpiryText = verified?.expires_at ? formatDate(verified.expires_at) : '';
+
+      const adStartText = ad?.starts_at ? formatDate(ad.starts_at) : '';
+      const adExpiryText = ad?.expires_at ? formatDate(ad.expires_at) : '';
       const hasVerifiedRequest = hasMembershipRequest(listing.id, 'verified_badge');
       const hasBoostRequest = hasMembershipRequest(listing.id, visibilityPlan.plan_type);
       const currentAds = currentAdStats(listing.id);
@@ -431,8 +457,10 @@ import '../../styles/admin-compact.css';
           <div class="payment-cards per-listing-payment">
             <div class="payment-card">
               <h3>🗓️ Verified Badge</h3>
-              <p class="payment-amount">₹299 · 3 months</p>
+              <p class="payment-amount">₹299 · 1 month price · 3 months active</p>
               <p class="payment-status">Status: ${verified ? 'Active' : hasVerifiedRequest ? 'Requested' : 'Not active'}</p>
+              ${verifiedStartText ? `<p class="plan-expiry-text">Started on ${esc(verifiedStartText)}</p>` : ''}
+${verifiedExpiryText ? `<p class="plan-expiry-text">Expires on ${esc(verifiedExpiryText)}</p>` : ''}
               <p class="free-expiry">Free listing trial expiry: ${esc(trialExpiry || '-')}</p>
               <label class="checkbox-label"><input type="checkbox" class="verified-disclaimer" data-listing-id="${esc(listing.id)}" /><span>I understand this badge helps users trust my listing. Calls and bookings depend on user demand, location and availability.</span></label>
               ${renderRequestButton(listing, 'verified_badge', 299, 'Get Verified Badge')}
@@ -441,6 +469,8 @@ import '../../styles/admin-compact.css';
               <h3>⭐ Visibility Boost</h3>
               <p class="selected-plan">Auto selected plan: ${esc(visibilityPlan.label)} · ₹${visibilityPlan.amount_inr}</p>
               <p class="payment-status">Status: ${ad ? 'Active' : hasBoostRequest ? 'Requested' : 'Not active'}</p>
+              ${adStartText ? `<p class="plan-expiry-text">Ads started on ${esc(adStartText)}</p>` : ''}
+${adExpiryText ? `<p class="plan-expiry-text">Ads running until ${esc(adExpiryText)}</p>` : ''}
               <label class="checkbox-label"><input type="checkbox" class="visibility-disclaimer" data-listing-id="${esc(listing.id)}" /><span>I understand boost can help my listing appear with more visibility. Results depend on city, vehicle type and user demand.</span></label>
               ${renderRequestButton(listing, visibilityPlan.plan_type, visibilityPlan.amount_inr, 'Boost Visibility')}
             </div>
@@ -487,27 +517,67 @@ import '../../styles/admin-compact.css';
     }
 
     async function refreshSession() {
-      const { data, error } = await supabase.auth.getSession();
-      currentUser = error ? null : data.session?.user || null;
-      const loginEmail = document.getElementById('login-email');
-      const loginBtn = document.getElementById('login-btn');
-      const logoutBtn = document.getElementById('logout-btn');
-      if (currentUser?.email) {
-        if (loginEmail) loginEmail.textContent = currentUser.email;
-        loginBtn?.classList.add('hidden');
-        logoutBtn?.classList.remove('hidden');
-      } else {
-        if (loginEmail) loginEmail.textContent = 'Not logged in';
-        loginBtn?.classList.remove('hidden');
-        logoutBtn?.classList.add('hidden');
-      }
-      return currentUser;
+  const { data, error } = await supabase.auth.getSession();
+  currentUser = error ? null : data.session?.user || null;
+
+  const loginEmail = document.getElementById('login-email');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  if (currentUser?.email) {
+    if (loginEmail) loginEmail.textContent = currentUser.email;
+
+    // Logged-in user: login button completely off
+    loginBtn?.classList.add('hidden');
+    logoutBtn?.classList.remove('hidden');
+
+    if (loginBtn) {
+      loginBtn.disabled = true;
+      loginBtn.style.display = 'none';
     }
 
-    async function loginWithGoogle() {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/owner/rent-dashboard` } });
-      if (error) showMessage(error.message, 'error');
+    if (logoutBtn) {
+      logoutBtn.disabled = false;
+      logoutBtn.style.display = '';
     }
+  } else {
+    if (loginEmail) loginEmail.textContent = 'Not logged in';
+
+    // New / logged-out user: login button visible
+    loginBtn?.classList.remove('hidden');
+    logoutBtn?.classList.add('hidden');
+
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.style.display = '';
+    }
+
+    if (logoutBtn) {
+      logoutBtn.disabled = true;
+      logoutBtn.style.display = 'none';
+    }
+  }
+
+  return currentUser;
+}
+
+    async function loginWithGoogle() {
+  await refreshSession();
+
+  if (currentUser?.email) {
+    showMessage('You are already logged in.', 'info');
+    return;
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/owner/rent-dashboard`,
+    },
+  });
+
+  if (error) showMessage(error.message, 'error');
+}
 
     async function logout() {
       const { error } = await supabase.auth.signOut();
@@ -532,11 +602,31 @@ import '../../styles/admin-compact.css';
         renderListings();
         return;
       }
-      const { data, error } = await supabase
-        .from('rent_listings')
-        .select('id,owner_user_id,owner_email,owner_name,owner_phone,owner_whatsapp,reg_number,vehicle_type,vehicle_model,seats,purposes,base_city_id,service_city_ids,price_text,photos,description,status,created_at,updated_at,is_verified')
-        .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
-        .order('updated_at', { ascending: false });
+   const { data, error } = await supabase
+  .from('rent_listings')
+  .select(`
+    id,
+    owner_user_id,
+    owner_email,
+    owner_name,
+    owner_phone,
+    owner_whatsapp,
+    reg_number,
+    vehicle_type,
+    vehicle_model,
+    seats,
+    purposes,
+    base_city_id,
+    service_city_ids,
+    price_text,
+    photos,
+    description,
+    status,
+    created_at,
+    updated_at
+  `)
+  .or(`owner_user_id.eq.${currentUser.id},owner_email.eq.${currentUser.email}`)
+  .order('updated_at', { ascending: false });
       if (error) {
         showMessage(error.message, 'error');
         currentListings = [];
@@ -643,7 +733,7 @@ async function refreshDashboardStats() {
       const { error } = await supabase
         .from('rent_memberships')
         .update({
-          ads_status: 'inactive',
+          ads_status: 'stopped',
           expires_at: now,
           updated_at: now,
         })
@@ -720,7 +810,15 @@ async function refreshDashboardStats() {
         activeMembershipsByListing[item.listing_id].push(item);
       });
     }
+    function openPaymentPage(listingId, planType) {
+  if (!listingId || !planType) {
+    showMessage('Payment link missing listing or plan.', 'error');
+    return;
+  }
 
+  const url = `/owner/payment?listing_id=${encodeURIComponent(listingId)}&plan=${encodeURIComponent(planType)}`;
+  window.location.href = url;
+}
     async function requestMembership(listingId, planType, amountInr) {
       if (!currentUser?.id || !currentUser?.email) return showMessage('Please login first.', 'error');
       const listing = currentListings.find((item) => item.id === listingId);
@@ -874,13 +972,21 @@ async function refreshDashboardStats() {
           if (listingId) await stopCurrentAds(listingId);
           return;
         }
-
+        const activePlanBtn = target.closest('.active-plan-btn');
+if (activePlanBtn) {
+  const label = activePlanBtn.dataset.planLabel || 'Plan';
+  const expiresAt = activePlanBtn.dataset.expiresAt || '-';
+  showMessage(`${label} is already active until ${expiresAt}.`, 'info');
+  return;
+}
         const requestBtn = target.closest('.request-plan-btn');
         if (requestBtn && !requestBtn.disabled) {
           const listingId = requestBtn.dataset.listingId;
           const planType = requestBtn.dataset.planType;
           const amount = Number(requestBtn.dataset.amount || 0);
-          if (listingId && planType) requestMembership(listingId, planType, amount);
+          if (listingId && planType) {
+  openPaymentPage(listingId, planType);
+}
           return;
         }
         const editBtn = target.closest('.edit-contact-btn');
@@ -1651,5 +1757,17 @@ setInterval(async () => {
       grid-template-columns: 1fr !important;
     }
   }
+  .plan-expiry-text {
+  margin: 0.25rem 0 0 !important;
+  color: #93c5fd !important;
+  font-size: 0.72rem !important;
+  font-weight: 850 !important;
+}
+
+.active-plan-btn {
+  color: #bfdbfe !important;
+  border-color: rgba(147, 197, 253, 0.45) !important;
+  background: rgba(37, 99, 235, 0.18) !important;
+}
 </style>
 </BaseLayout>

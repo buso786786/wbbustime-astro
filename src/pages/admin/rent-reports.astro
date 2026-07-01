@@ -3,714 +3,131 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import '../../styles/admin-compact.css';
 ---
 
-<BaseLayout
-  title="Rent Reports Admin - SoniaBuddy"
-  description="Review rent listing reports, reject reports and remove fake listings."
-  robots="noindex,nofollow"
->
-  <section class="rent-reports-admin">
+<BaseLayout title="Rent Reports Admin - SoniaBuddy" description="Review rent listing reports." robots="noindex,nofollow">
+  <div id="admin-access-cover" class="admin-access-cover"><div class="admin-access-card"><strong>Official Admin Work Only</strong><p>This area is restricted for SoniaBuddy internal admin work.</p></div></div>
+
+  <section class="admin-page">
     <div class="admin-container">
-      <div class="topbar">
-        <div>
-          <a class="back-link" href="/admin/rent-memberships">← Rent Memberships</a>
-          <h1>🚩 Rent Listing Reports</h1>
-          <p>Review fake listings, wrong phone, bad photos and spam reports.</p>
-        </div>
-        <div class="top-actions">
-          <a class="btn btn-outline" href="/rent-vehicle">Rent Page</a>
-          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
-        </div>
+      <div class="admin-header">
+        <div><p class="eyebrow">SoniaBuddy Admin</p><h1>Rent Reports</h1><p>Review reports, resolve issues and cancel fake listings.</p></div>
+        <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
       </div>
 
-      <div id="auth-card" class="card auth-card">
-        <div>
-          <span class="label">Admin session</span>
-          <strong id="admin-email">Checking login...</strong>
-        </div>
-        <div class="auth-actions">
-          <button id="login-btn" class="btn btn-primary" type="button">Login with Google</button>
-          <button id="logout-btn" class="btn btn-outline hidden" type="button">Logout</button>
-        </div>
+      <div id="auth-box" class="notice-card">Checking admin access...</div>
+      <div id="message-box" class="message hidden"></div>
+
+      <div id="filter-card" class="filter-card hidden">
+        <button class="filter-btn active" type="button" data-filter="pending">Pending</button>
+        <button class="filter-btn" type="button" data-filter="reviewed">Reviewed</button>
+        <button class="filter-btn" type="button" data-filter="resolved">Resolved</button>
+        <button class="filter-btn" type="button" data-filter="rejected">Rejected</button>
+        <button class="filter-btn" type="button" data-filter="all">All</button>
+        <input id="report-search-input" class="admin-search-input" type="search" placeholder="Search Gmail, phone, listing id, vehicle..." />
       </div>
 
-      <div id="message-box" class="message-box hidden"></div>
-
-      <div class="filters card">
-        <button class="filter-btn active" type="button" data-status="pending">Pending</button>
-        <button class="filter-btn" type="button" data-status="reviewed">Reviewed</button>
-        <button class="filter-btn" type="button" data-status="dismissed">Dismissed</button>
-        <button class="filter-btn" type="button" data-status="resolved">Resolved</button>
-        <button class="filter-btn" type="button" data-status="all">All</button>
-      </div>
-
-      <div class="summary-grid">
-        <div class="summary-card"><span>Pending</span><strong id="count-pending">0</strong></div>
-        <div class="summary-card"><span>Reviewed</span><strong id="count-reviewed">0</strong></div>
-        <div class="summary-card"><span>Dismissed</span><strong id="count-dismissed">0</strong></div>
-        <div class="summary-card"><span>Resolved</span><strong id="count-resolved">0</strong></div>
-      </div>
-
-      <div id="loader" class="card loader-card">Loading reports...</div>
-      <div id="reports-grid" class="reports-grid"></div>
+      <div id="loader" class="notice-card hidden">Loading reports...</div>
+      <div id="reports-grid" class="admin-dynamic-grid"></div>
     </div>
   </section>
 
   <script>
     import { supabase } from '../../lib/supabase';
 
-    const ADMIN_EMAILS = ['buso786786@gmail.com', 'soniabuddy73@gmail.com'];
-    const REASON_LABELS = {
-      inappropriate_photo: 'Inappropriate photo',
-      wrong_text: 'Wrong text / details',
-      fraud_spam: 'Fraud / spam',
-      phone_not_working: 'Phone not working',
-      other: 'Other',
-    };
-    const STATUS_LABELS = {
-      pending: 'Pending',
-      reviewed: 'Reviewed',
-      dismissed: 'Dismissed',
-      resolved: 'Resolved',
-    };
-
+    const ADMIN_EMAILS = ['buso786786@gmail.com', 'zisakho2024@gmail.com'];
     let currentUser = null;
-    let currentFilter = 'pending';
     let reports = [];
     let listingMap = new Map();
+    let activeFilter = 'pending';
+    let searchQuery = '';
 
-    function esc(value) {
-      return String(value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
+    function esc(value) { return String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
+    function fmt(value) { if (!value) return '-'; try { return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); } catch { return '-'; } }
+    function showMessage(text, type = 'info') { const box = document.getElementById('message-box'); if (!box) return; box.textContent = text; box.className = `message ${type}`; }
+    function isAdmin() { return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())); }
+
+    async function guardAdmin() {
+      const cover = document.getElementById('admin-access-cover');
+      const { data } = await supabase.auth.getSession();
+      currentUser = data.session?.user || null;
+      if (isAdmin()) { cover?.classList.add('hidden'); return true; }
+      cover?.classList.remove('hidden');
+      return false;
     }
 
-    function showMessage(message, type = 'info') {
-      const box = document.getElementById('message-box');
-      if (!box) return;
-      box.textContent = message;
-      box.classList.remove('hidden', 'success', 'error', 'info');
-      box.classList.add(type);
-    }
-
-    function hideMessage() {
-      document.getElementById('message-box')?.classList.add('hidden');
-    }
-
-    function isAdmin(user) {
-      const email = String(user?.email || '').toLowerCase();
-      return ADMIN_EMAILS.includes(email);
-    }
-
-    function formatDate(value) {
-      if (!value) return 'N/A';
-      try {
-        return new Intl.DateTimeFormat('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }).format(new Date(value));
-      } catch {
-        return 'N/A';
+    function filteredReports() {
+      let rows = reports;
+      if (activeFilter !== 'all') rows = rows.filter((report) => (report.status || 'pending') === activeFilter);
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        rows = rows.filter((report) => {
+          const listing = listingMap.get(report.listing_id) || {};
+          return [report.id, report.listing_id, report.reason, report.message, report.reporter_name, report.reporter_email, report.reporter_phone, report.status, listing.owner_name, listing.owner_email, listing.owner_phone, listing.owner_whatsapp, listing.vehicle_type, listing.vehicle_model, listing.reg_number].filter(Boolean).join(' ').toLowerCase().includes(q);
+        });
       }
+      return rows;
     }
 
-    async function refreshSession() {
-      const { data, error } = await supabase.auth.getSession();
-      currentUser = error ? null : data.session?.user || null;
-
-      const emailEl = document.getElementById('admin-email');
-      const loginBtn = document.getElementById('login-btn');
-      const logoutBtn = document.getElementById('logout-btn');
-
-      if (currentUser?.email) {
-        emailEl.textContent = currentUser.email;
-        loginBtn?.classList.add('hidden');
-        logoutBtn?.classList.remove('hidden');
-      } else {
-        emailEl.textContent = 'Not logged in';
-        loginBtn?.classList.remove('hidden');
-        logoutBtn?.classList.add('hidden');
-      }
-
-      return currentUser;
-    }
-
-    async function loginWithGoogle() {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/admin/rent-reports` },
-      });
-      if (error) showMessage(error.message, 'error');
-    }
-
-    async function logout() {
-      await supabase.auth.signOut();
-      currentUser = null;
-      reports = [];
-      listingMap = new Map();
-      await refreshSession();
-      renderReports();
+    function render() {
+      document.getElementById('loader')?.classList.add('hidden');
+      const grid = document.getElementById('reports-grid');
+      if (!grid) return;
+      const rows = filteredReports();
+      grid.innerHTML = rows.length ? rows.map((report) => {
+        const listing = listingMap.get(report.listing_id) || {};
+        const status = report.status || 'pending';
+        return `<article class="admin-row-card"><div class="row-title"><div><h3>${esc(report.reason || 'Report')}</h3><p class="sub">${esc(status)} · ${fmt(report.created_at)}</p></div><span class="pill ${status === 'pending' ? 'pending' : 'active'}">${esc(status)}</span></div><div class="info-grid"><span><strong>Message</strong>${esc(report.message || 'N/A')}</span><span><strong>Reporter</strong>${esc(report.reporter_email || report.reporter_phone || report.reporter_name || 'Anonymous')}</span><span><strong>Owner</strong>${esc(listing.owner_name || '-')}</span><span><strong>Email</strong>${esc(listing.owner_email || '-')}</span><span><strong>Phone</strong>${esc(listing.owner_phone || '-')}</span><span><strong>Vehicle</strong>${esc(listing.vehicle_type || '-')}</span><span><strong>Model</strong>${esc(listing.vehicle_model || '-')}</span><span><strong>Listing status</strong>${esc(listing.status || '-')}</span></div><div class="actions"><button class="btn btn-outline report-status-btn" type="button" data-id="${esc(report.id)}" data-status="reviewed">Reviewed</button><button class="btn btn-outline report-status-btn" type="button" data-id="${esc(report.id)}" data-status="rejected">Reject Report</button><button class="btn btn-primary report-status-btn" type="button" data-id="${esc(report.id)}" data-status="resolved">Resolve</button>${report.listing_id ? `<button class="btn btn-danger cancel-listing-btn" type="button" data-listing-id="${esc(report.listing_id)}">Cancel Listing</button>` : ''}</div></article>`;
+      }).join('') : '<div class="notice-card"><strong>No reports found.</strong></div>';
     }
 
     async function loadReports() {
-      const loader = document.getElementById('loader');
-      if (loader) {
-        loader.textContent = 'Loading reports...';
-        loader.classList.remove('hidden');
-      }
-
-      if (!currentUser) {
-        renderReports('Please login with Google.');
-        return;
-      }
-
-      if (!isAdmin(currentUser)) {
-        renderReports('Access denied. This page is only for admin emails.');
-        return;
-      }
-
-      let query = supabase
+      document.getElementById('loader')?.classList.remove('hidden');
+      const { data, error } = await supabase
         .from('rent_listing_reports')
-        .select('id,listing_id,reporter_name,reporter_email,reporter_phone,reason,message,status,admin_note,reviewed_at,reviewed_by,created_at')
+        .select('id,listing_id,reason,message,reporter_name,reporter_email,reporter_phone,status,created_at')
         .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (currentFilter !== 'all') query = query.eq('status', currentFilter);
-
-      const { data, error } = await query;
-
-      if (error) {
-        showMessage(error.message, 'error');
-        reports = [];
-        renderReports();
-        return;
-      }
-
+        .limit(500);
+      if (error) { document.getElementById('loader')?.classList.add('hidden'); showMessage(error.message, 'error'); return; }
       reports = Array.isArray(data) ? data : [];
-      await loadListingsForReports();
-      await loadCounts();
-      hideMessage();
-      renderReports();
-    }
 
-    async function loadListingsForReports() {
+      const ids = [...new Set(reports.map((report) => report.listing_id).filter(Boolean))];
       listingMap = new Map();
-      const ids = Array.from(new Set(reports.map((r) => r.listing_id).filter(Boolean)));
-      if (!ids.length) return;
-
-      const { data, error } = await supabase
-        .from('rent_listings')
-        .select('id,owner_name,owner_email,owner_phone,owner_whatsapp,vehicle_type,vehicle_model,reg_number,price_text,description,status,created_at,updated_at')
-        .in('id', ids);
-
-      if (error) {
-        console.warn('Listing fetch failed:', error);
-        return;
+      if (ids.length) {
+        const result = await supabase.from('rent_listings').select('id,owner_name,owner_email,owner_phone,owner_whatsapp,vehicle_type,vehicle_model,reg_number,status').in('id', ids);
+        (result.data || []).forEach((listing) => listingMap.set(listing.id, listing));
       }
-
-      (data || []).forEach((listing) => listingMap.set(listing.id, listing));
+      render();
     }
 
-    async function loadCounts() {
-      const { data, error } = await supabase
-        .from('rent_listing_reports')
-        .select('status')
-        .limit(1000);
-
-      const counts = { pending: 0, reviewed: 0, dismissed: 0, resolved: 0 };
-      if (!error) {
-        (data || []).forEach((row) => {
-          if (counts[row.status] !== undefined) counts[row.status] += 1;
-        });
-      }
-
-      Object.entries(counts).forEach(([key, value]) => {
-        const el = document.getElementById(`count-${key}`);
-        if (el) el.textContent = String(value);
-      });
-    }
-
-    function renderReports(emptyText = '') {
-      const loader = document.getElementById('loader');
-      const grid = document.getElementById('reports-grid');
-      if (loader) loader.classList.add('hidden');
-      if (!grid) return;
-
-      if (emptyText) {
-        grid.innerHTML = `<div class="card empty-card"><h3>${esc(emptyText)}</h3></div>`;
-        return;
-      }
-
-      if (!reports.length) {
-        grid.innerHTML = `<div class="card empty-card"><h3>No reports found</h3><p>Reports will appear here when users report rent listings.</p></div>`;
-        return;
-      }
-
-      grid.innerHTML = reports.map(renderReportCard).join('');
-    }
-
-    function renderReportCard(report) {
-      const listing = listingMap.get(report.listing_id);
-      const reason = REASON_LABELS[report.reason] || report.reason || 'Report';
-      const status = report.status || 'pending';
-
-      return `
-        <article class="report-card" data-report-id="${esc(report.id)}" data-listing-id="${esc(report.listing_id || '')}">
-          <div class="report-main">
-            <div class="report-head">
-              <span class="reason-pill">🚩 ${esc(reason)}</span>
-              <span class="status-pill status-${esc(status)}">${esc(STATUS_LABELS[status] || status)}</span>
-              <span class="date-text">${esc(formatDate(report.created_at))}</span>
-            </div>
-
-            <div class="report-texts">
-              <p><strong>Message:</strong> ${esc(report.message || 'N/A')}</p>
-              <p><strong>Reporter:</strong> ${esc(report.reporter_name || report.reporter_email || 'Anonymous')}</p>
-              <p><strong>Reporter phone:</strong> ${esc(report.reporter_phone || 'N/A')}</p>
-            </div>
-
-            ${listing ? `
-              <div class="listing-box">
-                <h4>Reported Listing</h4>
-                <div class="listing-grid">
-                  <p><strong>Owner:</strong> ${esc(listing.owner_name || 'N/A')}</p>
-                  <p><strong>Email:</strong> ${esc(listing.owner_email || 'N/A')}</p>
-                  <p><strong>Phone:</strong> ${esc(listing.owner_phone || 'N/A')}</p>
-                  <p><strong>WhatsApp:</strong> ${esc(listing.owner_whatsapp || 'N/A')}</p>
-                  <p><strong>Vehicle:</strong> ${esc(listing.vehicle_type || 'N/A')}</p>
-                  <p><strong>Model:</strong> ${esc(listing.vehicle_model || 'N/A')}</p>
-                  <p><strong>Reg:</strong> ${esc(listing.reg_number || 'N/A')}</p>
-                  <p><strong>Status:</strong> ${esc(listing.status || 'N/A')}</p>
-                  <p><strong>Price:</strong> ${esc(listing.price_text || 'N/A')}</p>
-                </div>
-                ${listing.description ? `<p class="desc">${esc(listing.description)}</p>` : ''}
-              </div>
-            ` : `
-              <div class="listing-box missing">Reported listing not found or already removed.</div>
-            `}
-          </div>
-
-          <div class="report-actions">
-            <button class="btn btn-outline btn-small report-action" type="button" data-action="reviewed">Reviewed</button>
-            <button class="btn btn-outline btn-small report-action" type="button" data-action="dismissed">Reject Report</button>
-            <button class="btn btn-outline btn-small report-action" type="button" data-action="resolved">Resolve</button>
-            <button class="btn btn-danger btn-small cancel-listing-btn" type="button">Cancel Listing</button>
-          </div>
-        </article>
-      `;
-    }
-
-    async function updateReportStatus(reportId, status) {
-      if (!isAdmin(currentUser)) return showMessage('Admin access required.', 'error');
-      showMessage('Updating report...', 'info');
-
-      const { error } = await supabase
-        .from('rent_listing_reports')
-        .update({
-          status,
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: currentUser.email || currentUser.id,
-        })
-        .eq('id', reportId);
-
-      if (error) {
-        showMessage(error.message, 'error');
-        return;
-      }
-
-      showMessage(`Report marked ${status}.`, 'success');
+    async function updateReport(id, status) {
+      const { error } = await supabase.from('rent_listing_reports').update({ status }).eq('id', id);
+      if (error) return showMessage(error.message, 'error');
       await loadReports();
     }
 
-    async function cancelListingFromReport(reportId, listingId) {
-      if (!isAdmin(currentUser)) return showMessage('Admin access required.', 'error');
-      if (!listingId) return showMessage('Listing id missing.', 'error');
-
-      const ok = confirm('Cancel this reported listing? It will be removed from public search.');
-      if (!ok) return;
-
-      showMessage('Cancelling listing...', 'info');
-
-      const { error: listingError } = await supabase
-        .from('rent_listings')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', listingId);
-
-      if (listingError) {
-        showMessage(listingError.message, 'error');
-        return;
-      }
-
-      const { error: reportError } = await supabase
-        .from('rent_listing_reports')
-        .update({
-          status: 'resolved',
-          admin_note: 'Listing cancelled by admin from report page.',
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: currentUser.email || currentUser.id,
-        })
-        .eq('id', reportId);
-
-      if (reportError) {
-        showMessage(reportError.message, 'error');
-        return;
-      }
-
-      showMessage('Listing cancelled and report resolved.', 'success');
+    async function cancelListing(id) {
+      if (!confirm('Cancel this listing and remove from public search?')) return;
+      const { error } = await supabase.from('rent_listings').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) return showMessage(error.message, 'error');
+      showMessage('Listing cancelled.', 'success');
       await loadReports();
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-      document.getElementById('login-btn')?.addEventListener('click', loginWithGoogle);
-      document.getElementById('logout-btn')?.addEventListener('click', logout);
+      const ok = await guardAdmin();
+      const auth = document.getElementById('auth-box');
+      if (!ok) { if (auth) auth.innerHTML = '<strong>Admin access blocked.</strong>'; return; }
+      if (auth) auth.innerHTML = `<strong>Logged in as</strong> ${esc(currentUser.email)} <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>`;
+      document.getElementById('filter-card')?.classList.remove('hidden');
+      document.getElementById('logout-btn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
       document.getElementById('refresh-btn')?.addEventListener('click', loadReports);
-
-      document.querySelectorAll('.filter-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          currentFilter = btn.dataset.status || 'pending';
-          loadReports();
-        });
-      });
-
-      document.addEventListener('click', (event) => {
-        const target = event.target;
-        const actionBtn = target.closest('.report-action');
-        if (actionBtn) {
-          const card = actionBtn.closest('.report-card');
-          const reportId = card?.dataset.reportId;
-          const status = actionBtn.dataset.action;
-          if (reportId && status) updateReportStatus(reportId, status);
-          return;
-        }
-
-        const cancelBtn = target.closest('.cancel-listing-btn');
-        if (cancelBtn) {
-          const card = cancelBtn.closest('.report-card');
-          const reportId = card?.dataset.reportId;
-          const listingId = card?.dataset.listingId;
-          if (reportId && listingId) cancelListingFromReport(reportId, listingId);
-        }
-      });
-
-      await refreshSession();
+      document.querySelectorAll('.filter-btn').forEach((btn) => btn.addEventListener('click', () => { document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active')); btn.classList.add('active'); activeFilter = btn.dataset.filter || 'pending'; render(); }));
+      document.getElementById('report-search-input')?.addEventListener('input', (event) => { searchQuery = event.target?.value || ''; render(); });
+      document.addEventListener('click', (event) => { const target = event.target; if (!(target instanceof Element)) return; const statusBtn = target.closest('.report-status-btn'); if (statusBtn) return updateReport(statusBtn.dataset.id, statusBtn.dataset.status); const cancelBtn = target.closest('.cancel-listing-btn'); if (cancelBtn) return cancelListing(cancelBtn.dataset.listingId); });
       await loadReports();
     });
   </script>
 
   <style is:global>
-    .rent-reports-admin {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0b0628 0%, #13084a 55%, #1e103f 100%);
-      color: white;
-      padding: 2rem 0 4rem;
-    }
-
-    .admin-container {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .back-link {
-      color: rgba(255, 255, 255, 0.65);
-      text-decoration: none;
-      font-weight: 800;
-      font-size: 0.85rem;
-    }
-
-    h1 {
-      margin: 0.5rem 0 0.35rem;
-      font-size: 1.8rem;
-    }
-
-    .topbar p {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    .top-actions,
-    .auth-actions {
-      display: flex;
-      gap: 0.6rem;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .card,
-    .summary-card,
-    .report-card,
-    .message-box {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 1rem;
-    }
-
-    .auth-card {
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .label {
-      display: block;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.8rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .btn {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      border-radius: 0.8rem;
-      padding: 0.75rem 1rem;
-      font-weight: 900;
-      text-decoration: none;
-      cursor: pointer;
-      border: 0;
-      color: white;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-    }
-
-    .btn-outline {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-    }
-
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid rgba(239, 68, 68, 0.35);
-      color: #fecaca;
-    }
-
-    .btn-small {
-      padding: 0.55rem 0.75rem;
-      font-size: 0.82rem;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .message-box {
-      padding: 0.9rem 1rem;
-      margin-bottom: 1rem;
-      font-weight: 900;
-    }
-
-    .message-box.info {
-      color: #93c5fd;
-      background: rgba(59, 130, 246, 0.14);
-    }
-
-    .message-box.success {
-      color: #86efac;
-      background: rgba(34, 197, 94, 0.14);
-    }
-
-    .message-box.error {
-      color: #fca5a5;
-      background: rgba(239, 68, 68, 0.14);
-    }
-
-    .filters {
-      padding: 0.75rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.55rem;
-      margin-bottom: 1rem;
-    }
-
-    .filter-btn {
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(255, 255, 255, 0.05);
-      color: rgba(255, 255, 255, 0.75);
-      border-radius: 999px;
-      padding: 0.5rem 0.85rem;
-      cursor: pointer;
-      font-weight: 900;
-    }
-
-    .filter-btn.active {
-      background: linear-gradient(135deg, #ff6b00, #ff8a00);
-      color: white;
-      border-color: transparent;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.75rem;
-      margin-bottom: 1rem;
-    }
-
-    .summary-card {
-      padding: 1rem;
-      display: grid;
-      gap: 0.25rem;
-    }
-
-    .summary-card span {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.82rem;
-      font-weight: 800;
-    }
-
-    .summary-card strong {
-      color: #ff8a00;
-      font-size: 1.5rem;
-    }
-
-    .loader-card,
-    .empty-card {
-      padding: 1.25rem;
-      margin-top: 1rem;
-    }
-
-    .reports-grid {
-      display: grid;
-      gap: 1rem;
-    }
-
-    .report-card {
-      padding: 1rem;
-      display: grid;
-      grid-template-columns: 1fr 180px;
-      gap: 1rem;
-    }
-
-    .report-head {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 0.75rem;
-    }
-
-    .reason-pill,
-    .status-pill {
-      border-radius: 999px;
-      padding: 0.3rem 0.65rem;
-      font-size: 0.75rem;
-      font-weight: 900;
-    }
-
-    .reason-pill {
-      background: rgba(255, 107, 0, 0.18);
-      color: #ffb56b;
-    }
-
-    .status-pending { background: rgba(250, 204, 21, 0.16); color: #fde68a; }
-    .status-reviewed { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
-    .status-dismissed { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
-    .status-resolved { background: rgba(34, 197, 94, 0.16); color: #86efac; }
-
-    .date-text {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.78rem;
-    }
-
-    .report-texts {
-      display: grid;
-      gap: 0.35rem;
-      margin-bottom: 0.8rem;
-      font-size: 0.9rem;
-      color: rgba(255, 255, 255, 0.78);
-    }
-
-    .report-texts p {
-      margin: 0;
-    }
-
-    .report-texts strong,
-    .listing-box strong {
-      color: white;
-    }
-
-    .listing-box {
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.16);
-      border-radius: 0.85rem;
-      padding: 0.85rem;
-    }
-
-    .listing-box h4 {
-      margin: 0 0 0.6rem;
-      color: #ffb56b;
-    }
-
-    .listing-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.35rem 0.75rem;
-      font-size: 0.85rem;
-    }
-
-    .listing-grid p,
-    .desc {
-      margin: 0;
-      color: rgba(255, 255, 255, 0.75);
-    }
-
-    .desc {
-      margin-top: 0.6rem;
-      font-size: 0.82rem;
-      line-height: 1.4;
-    }
-
-    .missing {
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    .report-actions {
-      display: grid;
-      gap: 0.55rem;
-      align-self: start;
-    }
-
-    @media (max-width: 820px) {
-      .topbar,
-      .auth-card {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .summary-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .report-card {
-        grid-template-columns: 1fr;
-      }
-
-      .report-actions {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .listing-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .admin-page{min-height:100vh;padding:1rem 1rem 3rem;background:radial-gradient(circle at top left,rgba(255,107,0,.16),transparent 30%),linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);color:#fff}.admin-container{max-width:1180px;margin:0 auto}.admin-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1rem}.eyebrow{margin:0 0 .35rem;color:#ff8a00;font-size:.75rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}h1{margin:0 0 .35rem;font-size:clamp(1.7rem,4vw,2.35rem);color:#fff}.admin-header p{margin:0;color:rgba(255,255,255,.72);font-size:.92rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:.5rem .75rem;border-radius:.65rem;border:0;font-weight:900;text-decoration:none;cursor:pointer;font-size:.78rem;line-height:1;white-space:nowrap}.btn-primary{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00)}.btn-outline{color:white;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.22)}.btn-danger{color:white;background:rgba(239,68,68,.72);border:1px solid rgba(239,68,68,.35)}.btn-small{min-height:28px;padding:.38rem .65rem;font-size:.72rem}.notice-card,.message,.filter-card,.admin-row-card{border-radius:.9rem;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff}.notice-card{padding:.9rem 1rem;margin-bottom:1rem;color:rgba(255,255,255,.82)}.hidden{display:none!important}.message{padding:.9rem 1rem;margin-bottom:1rem;font-weight:900}.message.info{color:#93c5fd;background:rgba(59,130,246,.12)}.message.success{color:#86efac;background:rgba(34,197,94,.12)}.message.error{color:#fca5a5;background:rgba(239,68,68,.12)}.filter-card{padding:.65rem;display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem}.filter-btn{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:rgba(255,255,255,.76);border-radius:999px;padding:.42rem .7rem;font-weight:900;cursor:pointer;font-size:.76rem}.filter-btn.active{color:white;background:linear-gradient(135deg,#ff6b00,#ff8a00);border-color:transparent}.admin-search-input{min-height:36px;flex:1 1 260px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;padding:.42rem .75rem;font-size:.78rem;font-weight:800;outline:none}.admin-search-input::placeholder{color:rgba(255,255,255,.5)}.admin-dynamic-grid{display:grid;grid-template-columns:1fr;gap:.75rem}.admin-row-card{padding:.75rem;display:grid;gap:.55rem}.row-title{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start}.row-title h3{margin:0 0 .2rem;font-size:.95rem;line-height:1.15;color:#fff}.sub{margin:0;color:rgba(255,255,255,.72);font-size:.75rem}.pill{display:inline-flex;align-items:center;min-height:22px;padding:.18rem .45rem;border-radius:999px;font-size:.64rem;font-weight:900;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.82);white-space:nowrap}.pill.active{background:rgba(34,197,94,.15);color:#86efac}.pill.pending{background:rgba(250,204,21,.14);color:#fde68a}.info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem}.info-grid span{min-width:0;padding:.42rem .5rem;border-radius:.5rem;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.86);font-size:.72rem;line-height:1.25;word-break:break-word}.info-grid strong{display:block;margin-bottom:.12rem;color:white;font-size:.64rem;opacity:.75}.actions{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;justify-content:flex-start}.admin-access-cover{position:fixed;inset:0;z-index:99999;min-height:100vh;padding:1rem;background:linear-gradient(135deg,#0b0628 0%,#13084a 55%,#1e103f 100%);display:flex;align-items:flex-start;justify-content:center}.admin-access-card{width:min(100%,980px);margin-top:4.5rem;padding:1rem;border-radius:1rem;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.32);color:#fde68a}.admin-access-card strong{display:block;margin-bottom:.35rem;color:#facc15;font-weight:950;font-size:1rem}.admin-access-card p{margin:0;color:rgba(255,255,255,.86);line-height:1.45}@media(max-width:760px){.admin-page{padding:.8rem .75rem 2rem}.admin-header{flex-direction:column}.info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </BaseLayout>
