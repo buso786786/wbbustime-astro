@@ -8,6 +8,13 @@ jobs:
     name: Build and Deploy to Cloudflare Worker
     runs-on: ubuntu-latest
 
+    env:
+      PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      MAX_STATIC_BUS_PAGES: 3000
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -23,11 +30,6 @@ jobs:
 
       - name: Build site
         run: npm run build
-        env:
-          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Deploy to Cloudflare Worker
         run: npx wrangler deploy --name tanstack-start-app --assets=dist --compatibility-date=2025-09-24 --compatibility-flag=nodejs_compat
