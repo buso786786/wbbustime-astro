@@ -516,9 +516,77 @@ const listingsForClient = listings.map((listing) => {
 
   <script>
     import { supabase } from "../lib/supabase";
-    const listings = Array.isArray(window.rentListingsData) ? window.rentListingsData : [];
+    let listings = Array.isArray(window.rentListingsData) ? window.rentListingsData : [];
     const cities = Array.isArray(window.rentCitiesData) ? window.rentCitiesData : [];
+    async function refreshRentListingsFromSupabase() {
+  try {
+    const { data: freshListings, error } = await supabase
+      .from("rent_listings")
+      .select(`
+        id,
+        owner_name,
+        owner_phone,
+        owner_whatsapp,
+        vehicle_type,
+        vehicle_model,
+        seats,
+        purposes,
+        base_city_id,
+        service_city_ids,
+        price_text,
+        photos,
+        description,
+        status,
+        created_at,
+        updated_at
+      `)
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(100);
 
+    if (error) {
+      console.warn("Live rent listings fetch failed:", error.message);
+      return;
+    }
+
+    const rows = Array.isArray(freshListings) ? freshListings : [];
+
+    listings = rows.map((listing) => {
+      const baseCity = cities.find((city) => city.id === listing.base_city_id);
+      const serviceCities = Array.isArray(listing.service_city_ids)
+        ? listing.service_city_ids
+            .map((id) => cities.find((city) => city.id === id))
+            .filter(Boolean)
+        : [];
+
+      return {
+        ...listing,
+        is_promoted: false,
+        is_verified_badge: false,
+        base_city_name: baseCity ? getDisplayName(baseCity) : "",
+        service_city_names: serviceCities.map(getDisplayName),
+        photo_urls: Array.isArray(listing.photos)
+          ? listing.photos.slice(0, 4).map((path) => {
+              if (!path) return "";
+              if (String(path).startsWith("http://") || String(path).startsWith("https://")) {
+                return path;
+              }
+
+              const { data } = supabase.storage
+                .from("rent-listing-photos")
+                .getPublicUrl(path);
+
+              return data.publicUrl;
+            })
+          : [],
+      };
+    });
+
+    renderListings();
+  } catch (error) {
+    console.warn("Live rent listings fetch failed:", error);
+  }
+}
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab") || "find";
     const typeParam = params.get("type") || "";
@@ -2128,7 +2196,7 @@ window.addEventListener("storage", () => {
       setupSelector("nearbyCities");
       setupSelector("baseCity");
       setupSelector("serviceCities");
-
+      void refreshRentListingsFromSupabase();
       setupSingleChipGroup("vehicle-chips", "vehicleType");
       setupSingleChipGroup("purpose-chips", "purpose");
       setupToggleChipGroup("create-vehicle-chips");
