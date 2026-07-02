@@ -85,19 +85,35 @@ import '../../styles/admin-compact.css';
     }
 
     async function guardAdmin() {
-      const cover = document.getElementById('admin-access-cover');
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user || null;
-      const email = user?.email?.toLowerCase() || '';
+  const cover = document.getElementById('admin-access-cover');
 
-      if (ADMIN_EMAILS.includes(email)) {
-        cover?.classList.add('hidden');
-        return user;
-      }
+  try {
+    const { data, error } = await supabase.auth.getSession();
 
+    if (error) {
       cover?.classList.remove('hidden');
       return null;
     }
+
+    const user = data.session?.user || null;
+    const email = user?.email?.toLowerCase() || '';
+
+    if (user && ADMIN_EMAILS.includes(email)) {
+      cover?.classList.add('hidden');
+      return user;
+    }
+
+    if (user) {
+      await supabase.auth.signOut();
+    }
+
+    cover?.classList.remove('hidden');
+    return null;
+  } catch {
+    cover?.classList.remove('hidden');
+    return null;
+  }
+}
 
     document.addEventListener('DOMContentLoaded', async () => {
       const user = await guardAdmin();

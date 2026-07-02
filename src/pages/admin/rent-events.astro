@@ -58,13 +58,56 @@ import '../../styles/admin-compact.css';
     function eventType(event) { return event.event_type || event.type || '-'; }
 
     async function guardAdmin() {
-      const cover = document.getElementById('admin-access-cover');
-      const { data } = await supabase.auth.getSession();
-      currentUser = data.session?.user || null;
-      if (isAdmin()) { cover?.classList.add('hidden'); return true; }
+  const cover = document.getElementById('admin-access-cover');
+  const authBox = document.getElementById('auth-box');
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      currentUser = null;
       cover?.classList.remove('hidden');
+
+      if (authBox) {
+        authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Session check failed.</p>';
+      }
+
       return false;
     }
+
+    const user = data.session?.user || null;
+    const email = user?.email?.toLowerCase() || '';
+
+    if (user && ADMIN_EMAILS.includes(email)) {
+      currentUser = user;
+      cover?.classList.add('hidden');
+      return true;
+    }
+
+    currentUser = null;
+
+    if (user) {
+      await supabase.auth.signOut();
+    }
+
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Official Admin Work Only</strong><p>Admin session not allowed.</p>';
+    }
+
+    return false;
+  } catch {
+    currentUser = null;
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Unable to verify admin session.</p>';
+    }
+
+    return false;
+  }
+}
 
     function filteredEvents() {
       let rows = events;
@@ -131,8 +174,13 @@ import '../../styles/admin-compact.css';
     }
 
     async function loadEvents() {
-      document.getElementById('loader')?.classList.remove('hidden');
-      const { data, error } = await supabase
+  if (!isAdmin()) {
+    document.getElementById('loader')?.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('loader')?.classList.remove('hidden');
+  const { data, error } = await supabase
         .from('rent_listing_events')
         .select('id,listing_id,event_type,city_id,vehicle_type,rent_type,user_agent,created_at')
         .order('created_at', { ascending: false })
@@ -150,7 +198,9 @@ import '../../styles/admin-compact.css';
     }
 
     async function clearEventsForListing(id) {
-      if (!confirm('Delete analytics events for this listing? This cleans admin panel but removes old stats.')) return;
+  if (!isAdmin()) return;
+
+  if (!confirm('Delete analytics events for this listing? This cleans admin panel but removes old stats.')) return;
       const { error } = await supabase.from('rent_listing_events').delete().eq('listing_id', id);
       if (error) return showMessage(error.message, 'error');
       showMessage('Events removed for listing.', 'success');

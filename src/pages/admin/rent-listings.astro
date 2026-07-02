@@ -56,17 +56,54 @@ import '../../styles/admin-compact.css';
     }
 
     async function guardAdminPage() {
-      const cover = document.getElementById('admin-access-cover');
-      const { data } = await supabase.auth.getSession();
-      const email = data.session?.user?.email?.toLowerCase() || '';
-      if (ADMIN_EMAILS.includes(email)) {
-        currentUser = data.session.user;
-        cover?.classList.add('hidden');
-        return true;
-      }
+  const cover = document.getElementById('admin-access-cover');
+  const authBox = document.getElementById('auth-box');
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      currentUser = null;
       cover?.classList.remove('hidden');
+      if (authBox) {
+        authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Session check failed.</p>';
+      }
       return false;
     }
+
+    const user = data.session?.user || null;
+    const email = user?.email?.toLowerCase() || '';
+
+    if (user && ADMIN_EMAILS.includes(email)) {
+      currentUser = user;
+      cover?.classList.add('hidden');
+      return true;
+    }
+
+    currentUser = null;
+
+    if (user) {
+      await supabase.auth.signOut();
+    }
+
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Official Admin Work Only</strong><p>Admin session not allowed.</p>';
+    }
+
+    return false;
+  } catch {
+    currentUser = null;
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Unable to verify admin session.</p>';
+    }
+
+    return false;
+  }
+}
 
     function isAdmin() {
       return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase()));
@@ -177,9 +214,20 @@ import '../../styles/admin-compact.css';
       const { data, error } = await supabase.auth.getSession();
       currentUser = error ? null : data.session?.user || null;
       if (!isAdmin()) {
-        if (auth) auth.innerHTML = '<strong>Admin access blocked.</strong><p>This page is only for SoniaBuddy super admin.</p>';
-        return;
-      }
+  if (currentUser) {
+    await supabase.auth.signOut();
+    currentUser = null;
+  }
+
+  if (auth) {
+    auth.innerHTML = '<strong>Admin access blocked.</strong><p>This page is only for SoniaBuddy super admin.</p>';
+  }
+
+  document.getElementById('admin-filter-card')?.classList.add('hidden');
+  document.getElementById('stats-grid')?.classList.add('hidden');
+
+  return;
+}
       if (auth) auth.innerHTML = `<strong>Admin:</strong> ${esc(currentUser.email)} <button id="logout-btn" class="btn btn-outline btn-small" type="button">Logout</button>`;
       document.getElementById('admin-filter-card')?.classList.remove('hidden');
       document.getElementById('stats-grid')?.classList.remove('hidden');

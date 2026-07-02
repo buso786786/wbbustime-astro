@@ -111,25 +111,56 @@ import '../../styles/admin-compact.css';
     }
 
     async function guardAdminPage() {
-      const cover = document.getElementById('admin-access-cover');
-      const { data, error } = await supabase.auth.getSession();
+  const cover = document.getElementById('admin-access-cover');
+  const authBox = document.getElementById('auth-box');
 
-      if (error) {
-        currentUser = null;
-        cover?.classList.remove('hidden');
-        return false;
-      }
+  try {
+    const { data, error } = await supabase.auth.getSession();
 
-      currentUser = data.session?.user || null;
-
-      if (isAdmin()) {
-        cover?.classList.add('hidden');
-        return true;
-      }
-
+    if (error) {
+      currentUser = null;
       cover?.classList.remove('hidden');
+
+      if (authBox) {
+        authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Session check failed.</p>';
+      }
+
       return false;
     }
+
+    const user = data.session?.user || null;
+    const email = user?.email?.toLowerCase() || '';
+
+    if (user && ADMIN_EMAILS.includes(email)) {
+      currentUser = user;
+      cover?.classList.add('hidden');
+      return true;
+    }
+
+    currentUser = null;
+
+    if (user) {
+      await supabase.auth.signOut();
+    }
+
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Official Admin Work Only</strong><p>Admin session not allowed.</p>';
+    }
+
+    return false;
+  } catch {
+    currentUser = null;
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Unable to verify admin session.</p>';
+    }
+
+    return false;
+  }
+}
 
     function isLive(membership) {
       const now = Date.now();
@@ -291,12 +322,17 @@ import '../../styles/admin-compact.css';
     }
 
     async function loadMemberships() {
-      hideMessage();
+  if (!isAdmin()) {
+    document.getElementById('loader')?.classList.add('hidden');
+    return;
+  }
 
-      const loader = document.getElementById('loader');
-      loader?.classList.remove('hidden');
+  hideMessage();
 
-      const { data, error } = await supabase
+  const loader = document.getElementById('loader');
+  loader?.classList.remove('hidden');
+
+  const { data, error } = await supabase
         .from('rent_memberships')
         .select('id,listing_id,owner_email,plan_type,status,payment_status,ads_status,starts_at,expires_at,created_at,updated_at')
         .eq('plan_type', 'featured')
@@ -338,8 +374,9 @@ import '../../styles/admin-compact.css';
     }
 
     async function approveAds(id) {
-      if (!id) return;
-      if (!confirm('Approve ads and start 90 days visibility?')) return;
+  if (!isAdmin()) return;
+  if (!id) return;
+  if (!confirm('Approve ads and start 90 days visibility?')) return;
 
       const now = new Date();
       const expiresAt = new Date(now);
@@ -367,8 +404,9 @@ import '../../styles/admin-compact.css';
     }
 
     async function disableAds(id) {
-      if (!id) return;
-      if (!confirm('Disable ads now? This listing will stop getting paid ads visibility.')) return;
+  if (!isAdmin()) return;
+  if (!id) return;
+  if (!confirm('Disable ads now? This listing will stop getting paid ads visibility.')) return;
 
       const now = new Date().toISOString();
 

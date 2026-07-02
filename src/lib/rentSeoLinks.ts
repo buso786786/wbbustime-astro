@@ -1,9 +1,4 @@
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || 'https://ytxtyphbguszjndtpakm.supabase.co';
-
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'sb_publishable_NCILoAG5w2kh9ciKd3QM8w_TTUfHkC4';
+import { supabase } from './supabase';
 
 export type RentCity = {
   id: string;
@@ -17,7 +12,7 @@ export type RentCity = {
 
 export type RentListing = {
   vehicle_type?: string | null;
-  rent_types?: string[] | null;
+  purposes?: string[] | null;
   base_city_id?: string | null;
   service_city_ids?: string[] | null;
   status?: string | null;
@@ -92,43 +87,34 @@ export function vehicleLabel(key: string) {
   return labels[key] || `${key} Rent`;
 }
 
-export function vehicleUrl(vehicle: string, city: string) {
-  return `/rent/${slugify(vehicle)}-rental-in-${slugify(city)}/`;
+function vehicleSlugPart(vehicle: string) {
+  const key = vehicleKey(vehicle);
+
+  const parts: Record<string, string> = {
+    car: 'car-rental',
+    bus: 'bus-rental',
+    toto: 'toto-rental',
+    auto: 'auto-rental',
+    'pickup-van': 'pickup-van-rental',
+    ambulance: 'ambulance-service',
+  };
+
+  return parts[key] || 'car-rental';
 }
 
-async function supabaseFetch<T>(path: string, timeoutMs = 3500): Promise<T[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const url = `${SUPABASE_URL.replace(/\/$/, '')}${path}`;
-
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    });
-
-    clearTimeout(timer);
-
-    if (!res.ok) return [];
-    return (await res.json()) as T[];
-  } catch {
-    clearTimeout(timer);
-    return [];
-  }
+export function vehicleUrl(vehicle: string, city: string) {
+  return `/rent/${vehicleSlugPart(vehicle)}-in-${slugify(city)}/`;
 }
 
 export function getVehicleLinks(group: CityLinkGroup): RentSeoLink[] {
   return group.vehicles.map((vehicle) => {
     const url = vehicleUrl(vehicle, group.city);
+    const slug = url.replace('/rent/', '').replace(/\/$/, '');
 
     return {
       label: `${vehicleLabel(vehicle)} in ${group.city}`,
       url,
-      slug: url.replace('/rent/', '').replace('/', ''),
+      slug,
     };
   });
 }
@@ -141,12 +127,12 @@ export function getUseCaseLinks(group: CityLinkGroup): RentSeoLink[] {
   const links: RentSeoLink[] = [];
 
   const add = (label: string, slug: string) => {
-  links.push({
-    label: `${label} in ${group.city}`,
-    slug,
-    url: `/rent/${slug}/`,
-  });
-};
+    links.push({
+      label: `${label} in ${group.city}`,
+      slug,
+      url: `/rent/${slug}/`,
+    });
+  };
 
   if ((vehicles.has('car') || vehicles.has('bus')) && rentText.includes('wedding')) {
     add('Wedding Car & Bus', `wedding-car-bus-rental-in-${citySlug}`);
@@ -171,7 +157,10 @@ export function getUseCaseLinks(group: CityLinkGroup): RentSeoLink[] {
     add('Goods Pickup Van', `goods-pickup-van-rental-in-${citySlug}`);
   }
 
-  if ((vehicles.has('car') || vehicles.has('bus')) && (rentText.includes('school') || rentText.includes('office'))) {
+  if (
+    (vehicles.has('car') || vehicles.has('bus')) &&
+    (rentText.includes('school') || rentText.includes('office'))
+  ) {
     add('School Office Vehicle', `school-office-car-bus-rental-in-${citySlug}`);
   }
 
@@ -179,18 +168,35 @@ export function getUseCaseLinks(group: CityLinkGroup): RentSeoLink[] {
 }
 
 export async function buildRentCityGroups(): Promise<CityLinkGroup[]> {
-  const cities = await supabaseFetch<RentCity>(
-    '/rest/v1/rent_cities?select=id,name_en,name_bn,name,district_en,district_bn,active&active=eq.true&limit=1000'
-  );
+  const { data: citiesData, error: cityError } = await supabase
+    .from('rent_cities')
+    .select('id,name_en,name_bn,name,district_en,district_bn,active')
+    .eq('active', true)
+    .limit(1000);
 
-  const listings = await supabaseFetch<RentListing>(
-    '/rest/v1/rent_listings?select=vehicle_type,rent_types,base_city_id,service_city_ids,status&status=eq.active&limit=2000'
-  );
+  if (cityError) {
+    console.error('[rentSeoLinks] rent_cities fetch failed:', cityError.message);
+    return [];
+  }
+
+  const { data: listingsData, error: listingError } = await supabase
+    .from('rent_listings')
+    .select('vehicle_type,purposes,base_city_id,service_city_ids,status')
+    .eq('status', 'active')
+    .limit(2000);
+
+  if (listingError) {
+    console.error('[rentSeoLinks] rent_listings fetch failed:', listingError.message);
+    return [];
+  }
+
+  const cities = Array.isArray(citiesData) ? citiesData : [];
+  const listings = Array.isArray(listingsData) ? listingsData : [];
 
   const cityById = new Map<string, CityLinkGroup>();
 
   for (const city of cities) {
-    const cityName = clean(city.name_en || city.name);
+    const cityName = clean(city.name_en || city.name || city.name_bn);
     if (!city.id || !cityName) continue;
 
     cityById.set(city.id, {
@@ -218,24 +224,15 @@ export async function buildRentCityGroups(): Promise<CityLinkGroup[]> {
       if (!group) continue;
 
       group.vehicles = unique([...group.vehicles, vehicle]);
-      group.rentTypes = unique([...group.rentTypes, ...(listing.rent_types || [])]);
+      group.rentTypes = unique([
+        ...group.rentTypes,
+        ...(Array.isArray(listing.purposes) ? listing.purposes : []),
+      ]);
     }
   }
 
-   const activeGroups = Array.from(cityById.values())
-    .filter((group) => group.vehicles.length > 0)
-    .sort((a, b) => a.city.localeCompare(b.city));
-
-  if (activeGroups.length > 0) {
-    return activeGroups;
-  }
-
   return Array.from(cityById.values())
-    .map((group) => ({
-      ...group,
-      vehicles: ['car'],
-      rentTypes: ['local', 'tour', 'wedding'],
-    }))
+    .filter((group) => group.vehicles.length > 0)
     .sort((a, b) => a.city.localeCompare(b.city));
 }
 

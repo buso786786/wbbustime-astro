@@ -46,13 +46,56 @@ import '../../styles/admin-compact.css';
     function isAdmin() { return Boolean(currentUser?.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())); }
 
     async function guardAdmin() {
-      const cover = document.getElementById('admin-access-cover');
-      const { data } = await supabase.auth.getSession();
-      currentUser = data.session?.user || null;
-      if (isAdmin()) { cover?.classList.add('hidden'); return true; }
+  const cover = document.getElementById('admin-access-cover');
+  const authBox = document.getElementById('auth-box');
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      currentUser = null;
       cover?.classList.remove('hidden');
+
+      if (authBox) {
+        authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Session check failed.</p>';
+      }
+
       return false;
     }
+
+    const user = data.session?.user || null;
+    const email = user?.email?.toLowerCase() || '';
+
+    if (user && ADMIN_EMAILS.includes(email)) {
+      currentUser = user;
+      cover?.classList.add('hidden');
+      return true;
+    }
+
+    currentUser = null;
+
+    if (user) {
+      await supabase.auth.signOut();
+    }
+
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Official Admin Work Only</strong><p>Admin session not allowed.</p>';
+    }
+
+    return false;
+  } catch {
+    currentUser = null;
+    cover?.classList.remove('hidden');
+
+    if (authBox) {
+      authBox.innerHTML = '<strong>Admin access blocked.</strong><p>Unable to verify admin session.</p>';
+    }
+
+    return false;
+  }
+}
 
     function filteredReports() {
       let rows = reports;
@@ -80,8 +123,13 @@ import '../../styles/admin-compact.css';
     }
 
     async function loadReports() {
-      document.getElementById('loader')?.classList.remove('hidden');
-      const { data, error } = await supabase
+  if (!isAdmin()) {
+    document.getElementById('loader')?.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('loader')?.classList.remove('hidden');
+  const { data, error } = await supabase
         .from('rent_listing_reports')
         .select('id,listing_id,reason,message,reporter_name,reporter_email,reporter_phone,status,created_at')
         .order('created_at', { ascending: false })
@@ -99,13 +147,17 @@ import '../../styles/admin-compact.css';
     }
 
     async function updateReport(id, status) {
-      const { error } = await supabase.from('rent_listing_reports').update({ status }).eq('id', id);
+  if (!isAdmin()) return;
+
+  const { error } = await supabase.from('rent_listing_reports').update({ status }).eq('id', id);
       if (error) return showMessage(error.message, 'error');
       await loadReports();
     }
 
     async function cancelListing(id) {
-      if (!confirm('Cancel this listing and remove from public search?')) return;
+  if (!isAdmin()) return;
+
+  if (!confirm('Cancel this listing and remove from public search?')) return;
       const { error } = await supabase.from('rent_listings').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', id);
       if (error) return showMessage(error.message, 'error');
       showMessage('Listing cancelled.', 'success');
