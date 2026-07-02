@@ -203,22 +203,26 @@ const listingsForClient = listings.map((listing) => {
 
   <section class="rent-page">
     <div class="container rent-container">
-      <div class="rent-hero-card">
-        <div class="rent-header-content">
-          <div class="rent-icon">🚗</div>
-          <div>
-            <h1>Rent with Driver</h1>
-            <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
-          </div>
-        </div>
-        <div class="rent-hero-actions">
+      <div class="rent-hero-card rent-hero-compact">
+  <div class="rent-hero-topline">
+    <div class="rent-title-line">
+      <span class="rent-icon">🚗</span>
+      <div class="rent-title-copy">
+        <h1>Rent with Driver</h1>
+        <p>Car, Bus, Toto, Pickup Van, Ambulance rental in West Bengal</p>
+      </div>
+    </div>
+
+    <a href="/owner/rent-dashboard" class="btn btn-outline btn-small rent-dashboard-side">
+      Dashboard
+    </a>
+  </div>
+
   <div class="rent-lang-toggle" aria-label="Language">
     <button type="button" class="rent-lang-btn active" data-lang="en">EN</button>
     <button type="button" class="rent-lang-btn" data-lang="bn">বাংলা</button>
   </div>
-  <a href="/owner/rent-dashboard" class="btn btn-outline btn-small">Dashboard</a>
 </div>
-  </div>
     
 
       <div class="rent-actions">
@@ -230,36 +234,37 @@ const listingsForClient = listings.map((listing) => {
         <div class="form-section-card">
           <h3 class="form-section-title">Search Rentals</h3>
 
-          <div class="form-group">
-            <label>Where do you need vehicle?</label>
-            <div class="city-search-box">
-              <input
-                id="main-city-search"
-                class="city-search-input"
-                type="text"
-                placeholder="Search city name, district, or keywords..."
-                autocomplete="off"
-              />
-              <div id="main-city-dropdown" class="city-dropdown hidden"></div>
-            </div>
-            <div id="main-city-selected" class="selected-cities"></div>
-          </div>
+          <div class="rent-search-two-fields">
+  <div class="form-group rent-search-mini-field">
+    <label>Select your home town</label>
+    <div class="city-search-box">
+      <input
+        id="main-city-search"
+        class="city-search-input"
+        type="text"
+        placeholder="Select your home town"
+        autocomplete="off"
+      />
+      <div id="main-city-dropdown" class="city-dropdown hidden"></div>
+    </div>
+    <div id="main-city-selected" class="selected-cities"></div>
+  </div>
 
-          <div class="form-group">
-            <label>Nearby cities (max 3)</label>
-            <div class="city-search-box">
-              <input
-                id="nearby-cities-search"
-                class="city-search-input"
-                type="text"
-                placeholder="Add nearby city"
-                autocomplete="off"
-              />
-              <div id="nearby-cities-dropdown" class="city-dropdown hidden"></div>
-            </div>
-            <div id="nearby-cities-selected" class="selected-cities"></div>
-          </div>
-
+  <div class="form-group rent-search-mini-field">
+    <label>Nearby cities (max 3)</label>
+    <div class="city-search-box">
+      <input
+        id="nearby-cities-search"
+        class="city-search-input"
+        type="text"
+        placeholder="Add nearby city"
+        autocomplete="off"
+      />
+      <div id="nearby-cities-dropdown" class="city-dropdown hidden"></div>
+    </div>
+    <div id="nearby-cities-selected" class="selected-cities"></div>
+  </div>
+</div>
           <div class="form-group">
             <label>Vehicle type</label>
             <div class="rent-chip-row" id="vehicle-chips">
@@ -306,7 +311,24 @@ const listingsForClient = listings.map((listing) => {
         )}
 
         <div id="rental-cards-grid" class="rental-cards-grid"></div>
+        <div id="rent-custom-modal" class="rent-custom-modal hidden" aria-hidden="true">
+  <div class="rent-modal-panel">
+    <h3 id="rent-modal-title">Confirm before booking</h3>
 
+    <div id="rent-modal-body" class="rent-modal-body">
+      Please confirm final rent, vehicle, date, pickup point and availability directly with the owner before booking.
+    </div>
+
+    <div class="rent-modal-actions">
+      <button type="button" class="rent-modal-cancel" data-rent-modal-close>
+        Cancel
+      </button>
+      <button type="button" class="rent-modal-ok" id="rent-modal-ok">
+        OK
+      </button>
+    </div>
+  </div>
+</div>
       </section>
 
       <section id="create-section" class="rent-panel hidden">
@@ -560,7 +582,7 @@ const rentBnText = {
   "Find Rent": "ভাড়া খুঁজুন",
   "Create Listing": "লিস্টিং তৈরি করুন",
   "Search Rentals": "ভাড়া সার্চ করুন",
-  "Where do you need vehicle?": "কোথায় গাড়ি দরকার?",
+  "Select your home town?": "কোথায় গাড়ি দরকার?",
   "Nearby cities (max 3)": "কাছাকাছি শহর (সর্বোচ্চ ৩টি)",
   "Vehicle type": "গাড়ির ধরন",
   "Purpose": "কাজের ধরন",
@@ -925,7 +947,7 @@ btn.innerHTML = `
       if (selectorType === "nearbyCities") {
         if (state.nearbyCities.some((c) => c.id === city.id)) return;
         if (state.nearbyCities.length >= 3) {
-          alert("Maximum 3 nearby cities allowed");
+          openRentModal("Limit reached", "<p>Maximum 3 nearby cities allowed.</p>", "OK");
           return;
         }
         state.nearbyCities.push(city);
@@ -934,7 +956,7 @@ btn.innerHTML = `
       if (selectorType === "serviceCities") {
         if (state.serviceCities.some((c) => c.id === city.id)) return;
         if (state.serviceCities.length >= 3) {
-          alert("Maximum 3 service cities allowed");
+          openRentModal("Limit reached", "<p>Maximum 3 service cities allowed.</p>", "OK");
           return;
         }
         state.serviceCities.push(city);
@@ -1252,18 +1274,25 @@ const verifiedB = b.is_verified_badge ? 0 : 1;
 
       ${renderPhotos(listing)}
 
-      <div class="rent-pro-info">
-        ${serviceNames.length ? `<p><strong>${rentT("Serves:")}</strong> ${esc(serviceNames.join(", "))}</p>` : ""}
-        <p>
-          <strong>${rentT("Vehicle:")}</strong>
-          ${esc(rentLabel(listing.vehicle_type || "Vehicle"))}
-          ${listing.vehicle_model ? ` • ${esc(listing.vehicle_model)}` : ""}
-          ${listing.seats ? ` • ${esc(listing.seats)} seater` : ""}
-        </p>
-        ${purposes.length ? `<p class="rent-purpose-line"><strong>${rentT("Purpose")}:</strong> ${esc(purposes.map(rentLabel).join(" • "))}</p>` : ""}
-${listing.price_text ? `<p class="rent-price-line">${esc(listing.price_text)}</p>` : ""}
-       
-      </div>
+      <div class="rent-pro-info rent-info-compact">
+  ${serviceNames.length ? `<p><strong>${rentT("Serves:")}</strong> ${esc(serviceNames.join(", "))}</p>` : ""}
+
+  <div class="rent-vehicle-detail-line">
+  <p>
+    <strong>${rentT("Vehicle:")}</strong>
+    ${esc(rentLabel(listing.vehicle_type || "Vehicle"))}
+  </p>
+
+  <p>
+    ${listing.vehicle_model ? `<strong>Name:</strong> ${esc(listing.vehicle_model)}` : ""}
+    ${listing.seats ? ` ${listing.vehicle_model ? " • " : ""}<strong>${rentT("Seats")}:</strong> ${esc(listing.seats)} seater` : ""}
+  </p>
+</div>
+
+  ${purposes.length ? `<p class="rent-purpose-line"><strong>${rentT("Purpose")}:</strong> ${esc(purposes.map(rentLabel).join(" • "))}</p>` : ""}
+
+  ${listing.price_text ? `<p class="rent-price-line"><strong>${rentT("Price")}:</strong> ${esc(listing.price_text)}</p>` : ""}
+</div>
 
             
 
@@ -1884,15 +1913,47 @@ async function submitCreateListing() {
     btn.textContent = "Submit Listing";
   }
 }
-async function reportListing(listingId) {
-  const reason = prompt(
-    "Report reason:\nwrong_phone / fake_listing / duplicate / not_responding / other",
-    "wrong_phone"
-  );
+function openRentModal(title, bodyHtml, okText = "OK", onOk = null) {
+  const modal = document.getElementById("rent-custom-modal");
+  const titleEl = document.getElementById("rent-modal-title");
+  const bodyEl = document.getElementById("rent-modal-body");
+  const okBtn = document.getElementById("rent-modal-ok");
 
-  if (!reason) return;
+  if (!modal || !titleEl || !bodyEl || !okBtn) return;
 
-  const message = prompt("Short message optional", "") || "";
+  titleEl.textContent = title;
+  bodyEl.innerHTML = bodyHtml;
+  okBtn.textContent = okText;
+
+  okBtn.onclick = async () => {
+  if (typeof onOk === "function") {
+    const shouldClose = await onOk();
+
+    if (shouldClose === false) {
+      return;
+    }
+  }
+
+  closeRentModal();
+};
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeRentModal() {
+  const modal = document.getElementById("rent-custom-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+async function submitReportFromModal(listingId) {
+  const checked = document.querySelector('input[name="rent-report-reason"]:checked');
+  const reason = checked ? checked.value : "wrong_phone";
+
+  const messageEl = document.getElementById("rent-report-message");
+  const message = messageEl ? String(messageEl.value || "").trim() : "";
 
   const { error } = await supabase.from("rent_listing_reports").insert({
     listing_id: listingId,
@@ -1902,11 +1963,33 @@ async function reportListing(listingId) {
   });
 
   if (error) {
-    alert(error.message);
+    openRentModal("Report failed", `<p>${esc(error.message)}</p>`, "OK");
     return;
   }
 
-  alert("Report submitted. Admin will review it.");
+  openRentModal("Report submitted", "<p>Admin will review this listing.</p>", "OK");
+}
+
+function reportListing(listingId) {
+  openRentModal(
+    "Report Listing",
+    `
+      <div class="rent-report-options">
+        <label><input type="radio" name="rent-report-reason" value="wrong_phone" checked /> Wrong phone</label>
+        <label><input type="radio" name="rent-report-reason" value="fake_listing" /> Fake listing</label>
+        <label><input type="radio" name="rent-report-reason" value="duplicate" /> Duplicate</label>
+        <label><input type="radio" name="rent-report-reason" value="not_responding" /> Not responding</label>
+        <label><input type="radio" name="rent-report-reason" value="other" /> Other</label>
+
+        <textarea id="rent-report-message" rows="2" placeholder="Short message optional"></textarea>
+      </div>
+    `,
+    "Submit",
+    async () => {
+  await submitReportFromModal(listingId);
+  return false;
+}
+  );
 }
 function setupPhotoUpload() {
   const input = document.getElementById("rent-photo-input");
@@ -1977,19 +2060,25 @@ async function handlePostLoginRestore() {
   void trackRentListingEvent(listing, "view_details_click");
   if (listing.is_promoted) void trackRentListingEvent(listing, "ad_click");
 
-  const details = [
-    listing.vehicle_model ? `Model: ${listing.vehicle_model}` : "",
-    listing.seats ? `Seats: ${listing.seats}` : "",
-    Array.isArray(listing.purposes) && listing.purposes.length
-      ? `Purpose: ${listing.purposes.map(rentLabel).join(" • ")}`
-      : "",
-    listing.price_text ? `Price: ${listing.price_text}` : "",
-    listing.description ? `\nDetails:\n${listing.description}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  openRentModal(
+    "Vehicle Details",
+    `
+      <div class="rent-details-box">
+        ${listing.vehicle_type ? `<p><strong>Vehicle:</strong> ${esc(rentLabel(listing.vehicle_type))}</p>` : ""}
+        ${listing.vehicle_model ? `<p><strong>Vehicle name:</strong> ${esc(listing.vehicle_model)}</p>` : ""}
+        ${listing.seats ? `<p><strong>Seats:</strong> ${esc(listing.seats)} seater</p>` : ""}
+        ${
+          Array.isArray(listing.purposes) && listing.purposes.length
+            ? `<p><strong>Purpose:</strong> ${esc(listing.purposes.map(rentLabel).join(" • "))}</p>`
+            : ""
+        }
+        ${listing.price_text ? `<p><strong>Price:</strong> ${esc(listing.price_text)}</p>` : ""}
+        ${listing.description ? `<div class="rent-detail-desc"><strong>Details:</strong><p>${esc(listing.description)}</p></div>` : ""}
+      </div>
+    `,
+    "OK"
+  );
 
-  alert(details || "No extra details available.");
   return;
 }
 });
@@ -2089,12 +2178,15 @@ document.getElementById("submit-listing-btn")?.addEventListener("click", () => {
           return;
         }
         const alertBtn = target.closest(".rent-alert-btn");
-        if (alertBtn) {
-          alert(
-            "Please confirm final rent, vehicle, date, pickup point and availability directly with the owner before booking. SoniaBuddy is only a listing platform and is not responsible for owner pricing or service."
-          );
-          return;
-        }
+if (alertBtn) {
+  openRentModal(
+    "Confirm before booking",
+    `<p>Please confirm final rent, vehicle, date, pickup point and availability directly with the owner before booking.</p>
+     <p>SoniaBuddy is only a listing platform and is not responsible for owner pricing or service.</p>`,
+    "OK"
+  );
+  return;
+}
 
         const reportBtn = target.closest(".rent-report-btn");
 if (reportBtn) {
@@ -2118,6 +2210,18 @@ if (reportBtn) {
 
       refreshCityDisplays();
     });
+    document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-rent-modal-close]")) {
+    closeRentModal();
+  }
+
+  if (event.target.id === "rent-custom-modal") {
+    closeRentModal();
+  }
+});
+
+
+
   </script>
 
   <style is:global>
@@ -3663,6 +3767,350 @@ body:has(#find-tab.active) .trust-cards {
   .rent-purpose-line {
   color: rgba(255, 255, 255, 0.86) !important;
   font-weight: 700;
+}
+/* RENT MOBILE COMPACT LAYOUT FIX */
+.rent-hero-compact {
+  padding: 0.9rem 1rem !important;
+  margin-bottom: 1rem !important;
+  display: block !important;
+}
+
+.rent-hero-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rent-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.rent-title-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rent-title-copy h1 {
+  margin: 0 !important;
+  font-size: 1.35rem !important;
+  line-height: 1.1 !important;
+}
+
+.rent-title-copy p {
+  margin: 0.25rem 0 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.35 !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+}
+
+.rent-dashboard-side {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem !important;
+  min-height: 34px !important;
+  border-radius: 999px !important;
+  font-size: 0.82rem !important;
+}
+
+.rent-hero-compact .rent-lang-toggle {
+  margin-top: 0.75rem !important;
+}
+
+/* SEARCH TWO INPUTS COMPACT */
+.rent-search-two-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.rent-search-mini-field {
+  margin-bottom: 0.85rem !important;
+}
+
+.rent-search-mini-field label {
+  font-size: 0.82rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.rent-search-mini-field .city-search-input {
+  min-height: 44px !important;
+  padding: 0.75rem 0.9rem !important;
+  font-size: 0.9rem !important;
+}
+
+.rent-search-mini-field .selected-cities {
+  min-height: auto !important;
+  margin-top: 0.35rem !important;
+  font-size: 0.78rem !important;
+}
+
+/* LISTING INFO READABLE */
+.rent-info-compact p {
+  margin: 0.28rem 0 !important;
+  line-height: 1.45 !important;
+}
+
+.rent-vehicle-detail-line {
+  white-space: normal !important;
+}
+
+.rent-price-line {
+  color: #ffb000 !important;
+  font-weight: 800 !important;
+}
+
+/* CUSTOM MODAL */
+.rent-custom-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  padding: 1rem;
+  background: rgba(4, 0, 20, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rent-custom-modal.hidden {
+  display: none !important;
+}
+
+.rent-modal-panel {
+  width: min(92vw, 430px);
+  background: #fff7fb;
+  color: #211025;
+  border: 1px solid rgba(135, 55, 110, 0.35);
+  border-radius: 1.1rem;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+  padding: 1rem;
+}
+
+.rent-modal-panel h3 {
+  margin: 0 0 0.65rem !important;
+  color: #1f1029 !important;
+  font-size: 1.1rem !important;
+  line-height: 1.25 !important;
+}
+
+.rent-modal-body {
+  color: #2d1832;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.rent-modal-body p {
+  margin: 0.35rem 0;
+}
+
+.rent-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.rent-modal-cancel,
+.rent-modal-ok {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rent-modal-cancel {
+  background: #ffd7ea;
+  color: #6e2852;
+}
+
+.rent-modal-ok {
+  background: #8d477b;
+  color: white;
+  min-width: 78px;
+}
+
+.rent-report-options {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.rent-report-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #2d1832 !important;
+  font-weight: 700;
+}
+
+.rent-report-options textarea {
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.7rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(135, 55, 110, 0.45);
+  resize: vertical;
+}
+
+.rent-details-box p {
+  margin: 0.35rem 0;
+}
+
+.rent-detail-desc {
+  margin-top: 0.65rem;
+}
+
+/* MOBILE ONLY TIGHT */
+@media (max-width: 640px) {
+  .rent-page {
+    padding-top: 1rem !important;
+  }
+
+  .rent-hero-topline {
+    align-items: flex-start;
+  }
+
+  .rent-icon {
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 1rem !important;
+  }
+
+  .rent-title-copy h1 {
+    font-size: 1.25rem !important;
+  }
+
+  .rent-title-copy p {
+    font-size: 0.82rem !important;
+  }
+
+  .rent-dashboard-side {
+    padding: 0.4rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .rent-search-two-fields {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .form-section-card {
+    padding: 1rem !important;
+  }
+
+  .form-section-title {
+    margin-bottom: 0.8rem !important;
+  }
+
+  .rent-chip-row {
+    gap: 0.45rem !important;
+  }
+
+  .rent-chip {
+    padding: 0.48rem 0.75rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  .rent-pro-info {
+    font-size: 0.82rem !important;
+  }
+
+  .rent-modal-panel {
+    width: 94vw;
+    padding: 0.95rem;
+  }
+}
+/* FINAL HERO MOBILE FIX */
+.rent-hero-compact {
+  position: relative !important;
+  padding: 0.9rem 1rem !important;
+}
+
+.rent-hero-topline {
+  display: grid !important;
+  grid-template-columns: auto 92px !important;
+  align-items: start !important;
+  gap: 0.7rem !important;
+}
+
+.rent-title-line {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  min-width: 0 !important;
+}
+
+.rent-title-copy {
+  min-width: 0 !important;
+}
+
+.rent-title-copy h1 {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  font-size: 1.25rem !important;
+  line-height: 1.15 !important;
+  margin: 0 !important;
+}
+
+.rent-title-copy p {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  font-size: 0.78rem !important;
+  line-height: 1.25 !important;
+  margin: 0.25rem 0 0 !important;
+}
+
+.rent-dashboard-side {
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.76rem !important;
+  border-radius: 999px !important;
+}
+
+.rent-hero-compact .rent-lang-toggle {
+  margin-top: 0.7rem !important;
+}
+
+@media (max-width: 420px) {
+  .rent-hero-topline {
+    grid-template-columns: auto 86px !important;
+  }
+
+  .rent-dashboard-side {
+    width: 86px !important;
+    min-width: 86px !important;
+    max-width: 86px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .rent-title-copy h1 {
+    font-size: 1.15rem !important;
+  }
+
+  .rent-title-copy p {
+    font-size: 0.74rem !important;
+  }
+}
+.rent-vehicle-detail-line {
+  display: grid !important;
+  gap: 0.15rem !important;
+}
+
+.rent-vehicle-detail-line p {
+  margin: 0 !important;
 }
   </style>
 </BaseLayout>
